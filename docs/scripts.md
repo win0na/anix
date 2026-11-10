@@ -15,8 +15,7 @@ runtime failure, and `2` for a usage error.
 | `ios` | WSL or macOS | Build an iOS app on the Mac and install it |
 | `install-herdr-plugins.sh` | Both | Link the first-party Herdr plugin |
 | `herdr-ide` | Both | Build the sidebar, agent, and ttt layout |
-| `spellcheck` | Both | Run typos over the repository |
-| `check.sh` | Both | Evaluate both hosts, lint the scripts, and spellcheck |
+| `check.sh` | Both | Evaluate both hosts, lint the scripts, and run typos |
 | `mount-src` | macOS | Mount the NFS export at `/Users/winona/src` |
 
 ## scripts/rebuild
@@ -135,15 +134,15 @@ ttt with a per-workspace `TMPDIR`, stamps the `hs-ttt-workspace` and
 `hs-ttt-tmpdir` tokens, opens the sidebar, and focuses the agent. The Herdr
 config binds it to `prefix+i`. Home Manager links it to `~/.local/bin/herdr-ide`.
 
-## scripts/spellcheck
+## typos
 
-```text
-scripts/spellcheck [PATH...]
-```
+Run `typos` from the repository root. It reads `typos.toml`, which excludes
+`flake.lock`, `secrets/`, the vendored Herdr patches, the vendored OpenCode fix,
+and the ttt plugins, and lists the project words. Check a file or directory with
+`typos path/to/file`.
 
-Runs `typos` with `typos.toml` at the repository root. With no arguments it
-checks the whole repository. The Nix hosts install `typos` and a Hunspell
-dictionary; use `hunspell -l file.md` for an interactive prose check.
+The Nix hosts install `typos`. `hunspell` stays available for an interactive
+prose check with `hunspell -l file.md`.
 
 ## scripts/check.sh
 

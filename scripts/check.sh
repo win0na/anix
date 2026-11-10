@@ -73,7 +73,7 @@ fi
 
 if command -v typos >/dev/null 2>&1; then
   echo "==> typos"
-  "$repo_root/scripts/spellcheck" "$repo_root" || fail "typos found spelling errors"
+  typos --force-exclude || fail "typos found spelling errors"
 else
   echo "check: typos not found; skipping"
 fi
