@@ -135,13 +135,14 @@ in
   power.restartAfterPowerFailure = true;
 
   # The lid stays closed. A macOS update can reset this; activation restores it.
-  system.activationScripts.anixPower.text = ''
+  # power is one of the activation script names nix-darwin actually runs.
+  system.activationScripts.power.text = lib.mkAfter ''
     /usr/bin/pmset -a disablesleep 1 sleep 0 hibernatemode 0 standby 0 autopoweroff 0 womp 1 autorestart 1
   '';
 
-  # FileVault must be off for this to work. sops creates the secret after
-  # activation on the first run, so a second switch applies it.
-  system.activationScripts.anixAutoLogin.text = ''
+  # FileVault must be off for this to work. sops-nix writes the secret in
+  # postActivation at priority 1500; 1600 runs after it.
+  system.activationScripts.postActivation.text = lib.mkOrder 1600 ''
     if [ -s /run/secrets/mac-login-password ]; then
       console_uid=$(/usr/bin/stat -f%u /dev/console)
       if [ "$console_uid" = "0" ]; then

@@ -80,6 +80,7 @@ in
   # never opened in the firewall.
   services.nfs.settings.nfsd.vers3 = false;
 
+  networking.nftables.enable = true;
   networking.firewall = {
     enable = true;
     extraInputRules = ''
