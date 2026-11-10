@@ -1,14 +1,11 @@
-# The AGE_RECIPIENT_* placeholders are replaced at bootstrap.
+# Add the anix host key after the first switch generates it.
+# Add the recovery key after you create the offline key.
 keys:
-  anix: &anix AGE_RECIPIENT_ANIX
-  # amac: &amac AGE_RECIPIENT_AMAC  # add in Part 5 after the Mac host key exists
-  winona: &winona AGE_RECIPIENT_WINONA
-  recovery: &recovery AGE_RECIPIENT_RECOVERY
+  # anix: &anix age1...
+  winona: &winona age1tpj6u0myx27ny7su05cglcsu3wccu7jyz83l49msdzf08qxnhc2qdcaruy
+  # recovery: &recovery age1...
 
 creation_rules:
   - path_regex: ^secrets/[^/]+\.yaml$
     age:
-      - *anix
-      # - *amac
       - *winona
-      - *recovery
