@@ -114,6 +114,9 @@ vers=4.1,resvport,rw,noowners,hard,intr,rsize=131072,wsize=131072,bg
 retrying instead of returning I/O errors. `intr` lets a signal interrupt a hung
 call. `bg` retries the mount in the background when the server is not ready.
 
+If the Mac rejects `vers=4.1`, mount with `vers=4` against the same export and
+check reads and writes. Do not fall back to NFSv3; the export uses `fsid=0`.
+
 NFSv4.1 needs only TCP 2049. There is no rpcbind, mountd, or SMB fallback.
 
 ## File watching
@@ -165,7 +168,9 @@ in `winona`'s `authorizedKeys` on the Mac.
 | 22/tcp | Mac | WSL to Mac | SSH, `darwin-rebuild`, `ssh-ng` |
 | 41641/udp | Windows, Mac | Tailscale | NAT traversal |
 
-No inbound SSH is needed on WSL. The Mac never pushes to the WSL host.
+anix runs sshd locally to generate and hold the host key used by sops. The
+firewall stays closed, and the Mac never pushes to the WSL host. No inbound SSH
+is needed on WSL.
 
 ## Failure modes
 
@@ -175,6 +180,8 @@ No inbound SSH is needed on WSL. The Mac never pushes to the WSL host.
   from the Mac.
 - The NixOS firewall blocks 2049: the export exists, but the Mac gets
   `Operation timed out`.
+- WSL is not started: the `anix-wsl` logon task starts it. Check Task
+  Scheduler if the NFS server is absent after a Windows reboot.
 - WSL is stopped or idle: the mount hangs until the VM returns.
   `instanceIdleTimeout` and the `bg` mount option reduce the impact.
 - MagicDNS is off: `amac` does not resolve. Use the Tailscale IP as a temporary

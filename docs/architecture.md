@@ -102,7 +102,7 @@ and config directories.
 
 ## Boot and build flow
 
-1. Windows boots, Tailscale starts, and the WSL distro starts.
+1. Windows boots, a logon task starts the WSL distro, and Tailscale starts.
 2. anix starts `nfsd`, exports `~/src`, and runs `nix-daemon`.
 3. The Mac auto-logs in, Tailscale starts, and a LaunchDaemon waits for the
    network before mounting `anix:/` at `/Users/winona/src`.

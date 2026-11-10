@@ -6,7 +6,8 @@ usage() {
 Usage: scripts/bootstrap-mac.sh [options]
 
 Bootstrap the Intel Mac: check macOS and Xcode, install Nix if asked, clone
-the repository, verify the sops age key, and switch the amac configuration.
+the repository, warn when the sops age key is missing, and switch the amac
+configuration.
 
 Options:
   -h, --help     Show this help and exit.
@@ -118,9 +119,9 @@ fi
 
 key="$HOME/.config/sops/age/keys.txt"
 if [[ ! -f "$key" ]]; then
-  echo "error: sops age key not found: $key" >&2
-  echo "Restore the key from your offline backup before switching." >&2
-  exit 1
+  echo "warning: sops age key not found: $key" >&2
+  echo "The switch can still run; activation uses the Mac host key." >&2
+  echo "Restore the personal key from Passwords.app to edit secrets." >&2
 fi
 
 if [[ -n "${SSH_CONNECTION:-}" ]]; then

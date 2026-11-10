@@ -6,7 +6,7 @@ keys:
   recovery: &recovery AGE_RECIPIENT_RECOVERY
 
 creation_rules:
-  - path_regex: secrets/[^/]+\.yaml$
+  - path_regex: ^secrets/[^/]+\.yaml$
     age:
       - *anix
       - *amac

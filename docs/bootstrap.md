@@ -133,6 +133,16 @@ D:\backup\ubuntu.tar` gives you a rollback.
    # winona
    ```
 
+   Keep the host running: create a logon task so WSL starts when Windows logs
+   in. Run this in an elevated PowerShell:
+
+   ```powershell
+   schtasks /Create /SC ONLOGON /TN "anix-wsl" /TR "wsl.exe -d NixOS -u winona --exec /bin/true" /RL HIGHEST /F
+   ```
+
+   The task runs at logon. Enable Windows auto-login if the machine reboots
+   without a person present.
+
 6. Clone the repository as `winona`:
 
    ```sh
@@ -153,13 +163,15 @@ D:\backup\ubuntu.tar` gives you a rollback.
 
    Store the private key in Passwords.app and keep the recovery key offline.
 
-2. Add the anix host key as a recipient:
+2. Add the anix host key as a recipient. The first switch enables sshd locally,
+   without opening the firewall, so the key exists. If the file is missing, run
+   `sudo ssh-keygen -A` and restart WSL:
 
    ```sh
    nix shell nixpkgs#ssh-to-age -c ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub
    ```
 
-3. Fill `secrets/.sops.yaml` with the anix host key, the personal key, and the
+3. Fill `.sops.yaml` with the anix host key, the personal key, and the
    recovery key. Leave the Mac recipient for Part 5.
 
 4. Create the encrypted file and add the secrets:
@@ -169,8 +181,16 @@ D:\backup\ubuntu.tar` gives you a rollback.
    sops secrets/secrets.yaml
    ```
 
-   Add `cachix-token`, `mac-builder-key`, and `mac-login-password`. The
-   [Secrets](secrets.md) page lists the keys.
+   Add `cachix-token`, `mac-builder-key`, and `mac-login-password`. Generate
+   the builder key first:
+
+   ```sh
+   ssh-keygen -t ed25519 -C anix-builder -f ~/.ssh/mac-builder -N ""
+   ```
+
+   Add the private key as `mac-builder-key`. Keep the public key for the Mac
+   host config; the configuration pass installs it in `winona`'s
+   `authorizedKeys`. The [Secrets](secrets.md) page lists the keys.
 
 5. Switch again. The sops module now sees the file and decrypts at activation:
 
@@ -178,8 +198,8 @@ D:\backup\ubuntu.tar` gives you a rollback.
    ~/src/anix/scripts/bootstrap-wsl.sh
    ```
 
-   The script checks the environment, uses the existing checkout, verifies the
-   key, and runs `nixos-rebuild switch`.
+   The script checks the environment, uses the existing checkout, warns when
+   the personal key is missing, and runs `nixos-rebuild switch`.
 
 ## Part 4: Move projects
 
@@ -231,27 +251,28 @@ script is for directories that already exist in the home directory.
    nix shell nixpkgs#ssh-to-age -c ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub
    ```
 
-4. On the WSL host, add the Mac recipient to `secrets/.sops.yaml`, then
+4. On the WSL host, add the Mac recipient to `.sops.yaml`, then
    re-encrypt and push:
 
    ```sh
    sops updatekeys secrets/secrets.yaml
-   git add secrets/.sops.yaml secrets/secrets.yaml
+   git add .sops.yaml secrets/secrets.yaml
    git commit -m "secrets: add amac recipient"
    git push
    ```
 
 5. On the Mac, create the personal key path and copy the key from
-   Passwords.app, or from the WSL host over SSH:
+   Passwords.app:
 
    ```sh
    mkdir -p ~/.config/sops/age
-   scp winona@WINDOWS_TAILSCALE_HOST:~/.config/sops/age/keys.txt ~/.config/sops/age/keys.txt
    chmod 600 ~/.config/sops/age/keys.txt
    ```
 
-   Enable Remote Login once in System Settings > General > Sharing if SSH is
-   not available yet.
+   If SSH is enabled on the WSL host, `scp` from
+   `winona@WINDOWS_TAILSCALE_HOST:~/.config/sops/age/keys.txt` is an
+   alternative. The personal key is for editing secrets; activation uses the
+   Mac host key.
 
 6. Clone the repository and run the first switch from a GUI Terminal:
 

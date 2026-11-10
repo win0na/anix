@@ -16,5 +16,5 @@
   # - sops-nix secrets
   # - power settings and auto-login activation
   # - NFS mount of ~/src from anix
-  # - system.stateVersion
+  # - system.stateVersion = 7
 }

@@ -18,6 +18,9 @@ Options:
   -h, --help           Show this help and exit.
   --build-only         Build without installing.
   --configuration NAME Build configuration (default: Release).
+
+The build uses a temporary derived data directory under /tmp so artifacts do
+not land on NFS. Automatic signing needs an Apple ID and a team in Xcode.
 EOF
 }
 
@@ -90,8 +93,10 @@ if [[ $build_only -eq 0 && -z "$udid" ]]; then
   exit 2
 fi
 
-body="$(
-cat <<'BODY'
+body_file="$(mktemp "${TMPDIR:-/tmp}/anix-ios.XXXXXX")"
+trap 'rm -f "$body_file"' EXIT
+
+cat >"$body_file" <<'BODY'
 set -euo pipefail
 
 project=$1
@@ -128,13 +133,24 @@ else
   exit 1
 fi
 
-derived="/tmp/anix-ios-$scheme"
-printf '==>'
-printf ' %q' xcodebuild "${target_args[@]}" -scheme "$scheme" -configuration "$configuration" -destination "generic/platform=iOS" -derivedDataPath "$derived" build
-printf '\n'
-xcodebuild "${target_args[@]}" -scheme "$scheme" -configuration "$configuration" -destination "generic/platform=iOS" -derivedDataPath "$derived" build
+derived="$(mktemp -d "${TMPDIR:-/tmp}/anix-ios.XXXXXX")"
+common=("${target_args[@]}" -scheme "$scheme" -configuration "$configuration" -destination "generic/platform=iOS" -derivedDataPath "$derived")
 
-app="$derived/Build/Products/$configuration-iphoneos/$scheme.app"
+printf '==>'
+printf ' %q' xcodebuild "${common[@]}" -allowProvisioningUpdates build
+printf '\n'
+xcodebuild "${common[@]}" -allowProvisioningUpdates build
+
+settings="$(xcodebuild "${common[@]}" -showBuildSettings)"
+build_dir="$(printf '%s\n' "$settings" | awk -F' = ' '/ TARGET_BUILD_DIR = / { print $2; exit }')"
+product="$(printf '%s\n' "$settings" | awk -F' = ' '/ FULL_PRODUCT_NAME = / { print $2; exit }')"
+
+if [[ -z "$build_dir" || -z "$product" ]]; then
+  echo "error: could not read TARGET_BUILD_DIR or FULL_PRODUCT_NAME" >&2
+  exit 1
+fi
+
+app="$build_dir/$product"
 if [[ ! -d "$app" ]]; then
   echo "error: built app not found: $app" >&2
   exit 1
@@ -150,7 +166,6 @@ printf ' %q' xcrun devicectl device install app --device "$udid" "$app"
 printf '\n'
 xcrun devicectl device install app --device "$udid" "$app"
 BODY
-)"
 
 host_os="$(uname -s)"
 if [[ "$host_os" == "Linux" ]]; then
@@ -159,10 +174,10 @@ if [[ "$host_os" == "Linux" ]]; then
     exit 1
   fi
   printf '==> ssh amac bash -s -- %q %q %q %q %q\n' "$project" "$scheme" "$udid" "$configuration" "$build_only"
-  printf '%s\n' "$body" | ssh amac bash -s -- "$project" "$scheme" "$udid" "$configuration" "$build_only"
+  ssh amac bash -s -- "$project" "$scheme" "$udid" "$configuration" "$build_only" <"$body_file"
 elif [[ "$host_os" == "Darwin" ]]; then
   printf '==> bash -s -- %q %q %q %q %q\n' "$project" "$scheme" "$udid" "$configuration" "$build_only"
-  printf '%s\n' "$body" | bash -s -- "$project" "$scheme" "$udid" "$configuration" "$build_only"
+  bash -s -- "$project" "$scheme" "$udid" "$configuration" "$build_only" <"$body_file"
 else
   echo "error: unsupported operating system: $host_os" >&2
   exit 1

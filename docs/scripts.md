@@ -39,7 +39,7 @@ scripts/bootstrap-wsl.sh [--no-switch] [--repo URL]
 ```
 
 Checks that the host is NixOS-WSL, clones to `$HOME/src/anix` when absent,
-verifies `$HOME/.config/sops/age/keys.txt`, and runs
+warns when `$HOME/.config/sops/age/keys.txt` is missing, and runs
 `sudo nixos-rebuild switch --flake $HOME/src/anix#anix`.
 
 `--no-switch` stops after the checks and the clone. `--repo` overrides
@@ -54,7 +54,7 @@ scripts/bootstrap-mac.sh [--no-switch] [--install-nix] [--repo URL]
 
 Checks Darwin, `x86_64`, macOS 26.x, and the command line tools. With
 `--install-nix`, it runs the upstream daemon installer when `nix` is missing.
-It clones to `$HOME/.config/anix`, verifies the age key, and runs
+It clones to `$HOME/.config/anix`, warns when the age key is missing, and runs
 `sudo darwin-rebuild switch --flake $HOME/.config/anix#amac`.
 
 The script warns when `SSH_CONNECTION` is set: the first switch should run from
@@ -86,9 +86,10 @@ scripts/ios <project> <scheme> [device-udid] [--build-only] [--configuration NAM
 configuration is `Release`.
 
 On Linux the body runs through `ssh amac bash -s -- ...`; on macOS it runs
-locally. It detects `*.xcworkspace` before `*.xcodeproj`, builds to
-`/tmp/anix-ios-$scheme`, and installs with
-`xcrun devicectl device install app --device UDID APP`.
+locally. It detects `*.xcworkspace` before `*.xcodeproj`, builds into a
+`mktemp` directory under `/tmp` with `-allowProvisioningUpdates`, reads
+`TARGET_BUILD_DIR` and `FULL_PRODUCT_NAME` from `-showBuildSettings`, and
+installs with `xcrun devicectl device install app --device UDID APP`.
 
 ## scripts/install-herdr-plugins.sh
 

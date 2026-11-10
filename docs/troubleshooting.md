@@ -28,9 +28,29 @@ Fix:
 3. Confirm the NixOS firewall allows 2049 from `MAC_TAILSCALE_IP`.
 4. Confirm the export names `MAC_TAILSCALE_IP/32`, not a stale address.
 5. Retry with `sudo ANIX_NFS_HOST=WINDOWS_TAILSCALE_HOST scripts/mount-src`.
+6. If `mount_nfs` rejects `vers=4.1`, retry with `vers=4`.
 
 `scripts/mount-src` waits 60 seconds for Tailscale and port 2049 before it
 mounts.
+
+## NFS server is absent after a Windows reboot
+
+Symptom: the Mac cannot mount, and the WSL host is not running.
+
+Check the logon task on Windows:
+
+```powershell
+schtasks /Query /TN "anix-wsl"
+```
+
+Fix: create the task if it is missing:
+
+```powershell
+schtasks /Create /SC ONLOGON /TN "anix-wsl" /TR "wsl.exe -d NixOS -u winona --exec /bin/true" /RL HIGHEST /F
+```
+
+The task runs at logon. If the machine reboots unattended, enable Windows
+auto-login.
 
 ## NFS permission denied
 
@@ -252,7 +272,7 @@ sops -d secrets/secrets.yaml
 nix shell nixpkgs#ssh-to-age -c ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
-The host recipient must appear in `secrets/.sops.yaml` and in the encrypted
+The host recipient must appear in `.sops.yaml` and in the encrypted
 file. After adding a recipient, run `sops updatekeys secrets/secrets.yaml` and
 commit the result.
 
@@ -278,8 +298,9 @@ Fix:
 4. Confirm the device is paired and trusted. `xcrun devicectl list devices`
    shows the identifier.
 
-The build uses `-derivedDataPath /tmp/anix-ios-$scheme`, so artifacts stay off
-NFS.
+The build uses a `mktemp` directory under `/tmp`, so artifacts stay off NFS.
+The script passes `-allowProvisioningUpdates`; automatic signing needs the
+Apple ID and team in Xcode.
 
 ## Nuvio is blocked
 

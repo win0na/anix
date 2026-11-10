@@ -6,8 +6,9 @@ with each host's SSH host key.
 
 NixOS imports `sops-nix.nixosModules.sops`. nix-darwin imports
 `sops-nix-2605.darwinModules.sops`. Both modules support
-`sops.age.sshKeyPaths`; the Darwin default reads the ed25519 keys from
-`services.openssh.hostKeys`, so SSH must be enabled on the Mac.
+`sops.age.sshKeyPaths`. The Darwin default reads
+`/etc/ssh/ssh_host_ed25519_key`, so the key must exist; enabling OpenSSH
+generates it.
 
 ## What is stored
 
@@ -19,7 +20,7 @@ NixOS imports `sops-nix.nixosModules.sops`. nix-darwin imports
 | `opencode-api-keys` | OpenCode providers |
 
 Add a secret only when a host or a service reads it. The encrypted file is
-`secrets/secrets.yaml`; the creation rules are in `secrets/.sops.yaml`.
+`secrets/secrets.yaml`; the creation rules are in `.sops.yaml`.
 
 ## Create the personal key
 
@@ -65,7 +66,7 @@ The result is an `age1...` recipient for each host.
 
 ## Set the recipients
 
-Replace the placeholders in `secrets/.sops.yaml`:
+Replace the placeholders in `.sops.yaml`:
 
 ```yaml
 keys:
@@ -138,7 +139,7 @@ For a secret that must exist before a user logs in, set `neededForUsers = true`.
 
 ## Add or replace a recipient
 
-1. Add the new `age1...` key to `secrets/.sops.yaml`.
+1. Add the new `age1...` key to `.sops.yaml`.
 2. Run `sops updatekeys secrets/secrets.yaml`.
 3. Commit the re-encrypted file.
 4. Rebuild both hosts.

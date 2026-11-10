@@ -6,7 +6,8 @@ usage() {
 Usage: scripts/bootstrap-wsl.sh [options]
 
 Bootstrap a fresh NixOS-WSL host as winona: check the environment, clone the
-repository, verify the sops age key, and switch the anix configuration.
+repository, warn when the sops age key is missing, and switch the anix
+configuration.
 
 Options:
   -h, --help    Show this help and exit.
@@ -84,12 +85,11 @@ fi
 
 key="$HOME/.config/sops/age/keys.txt"
 if [[ ! -f "$key" ]]; then
-  echo "error: sops age key not found: $key" >&2
+  echo "warning: sops age key not found: $key" >&2
   echo "Restore the key from your offline backup, or create a new one:" >&2
   echo "  mkdir -p \"$HOME/.config/sops/age\"" >&2
-  echo "  age-keygen -o \"$key\"" >&2
+  echo "  nix shell nixpkgs#age -c age-keygen -o \"$key\"" >&2
   echo "Then add its public key to .sops.yaml and re-encrypt the secrets." >&2
-  exit 1
 fi
 
 if [[ $no_switch -eq 1 ]]; then
