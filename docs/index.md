@@ -6,7 +6,7 @@ it for a lesson, a task, a fact, or an explanation.
 ## Tutorials
 
 - [Bootstrap](bootstrap.md): install NixOS-WSL, bring up the Mac, and reach a
-  working pair of hosts.
+  working pair of hosts with the interactive scripts.
 
 ## How-to guides
 

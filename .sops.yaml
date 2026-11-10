@@ -1,7 +1,8 @@
-# Add the anix host key after the first switch generates it.
+# The host recipients are filled by scripts/bootstrap.
 # Add the recovery key after you create the offline key.
 keys:
   # anix: &anix age1...
+  # amac: &amac age1...
   winona: &winona age1tpj6u0myx27ny7su05cglcsu3wccu7jyz83l49msdzf08qxnhc2qdcaruy
   # recovery: &recovery age1...
 

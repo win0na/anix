@@ -70,8 +70,9 @@ The 9router key lives in sops and is referenced from `opencode.json`:
 
 The sops secret is owned by `winona` with mode `0400`; both hosts read it from
 `/run/secrets`. The repository contains no plaintext key. The key name in
-`secrets/secrets.yaml` is `opencode/9router-api-key`, so the sops module maps it
-with `key = "opencode/9router-api-key"`. A missing secret reads as an empty
+`secrets/secrets.yaml` nests the key as `opencode: 9router-api-key`, so the
+sops module maps it with `key = "opencode/9router-api-key"`. A missing secret
+reads as an empty
 string; the provider then fails auth.
 
 `service.json` is a local secret and stays out of the repository. `auth.json`

@@ -38,14 +38,14 @@ The first switch still needs the bootstrap sequence in
 
 ## Bootstrap
 
-Run the scripts on each host after the first NixOS install:
+Prepare Windows with `scripts\bootstrap-windows.ps1`, then run the interactive script on each host:
 
 ```sh
 # On the NixOS-WSL host, as winona
-~/src/anix/scripts/bootstrap-wsl.sh
+~/src/anix/scripts/bootstrap
 
 # On the Mac, as winona
-~/.config/anix/scripts/bootstrap-mac.sh
+~/.config/anix/scripts/bootstrap
 ```
 
 The first NixOS-WSL switch runs as the image's `nixos` user. See

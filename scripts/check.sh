@@ -59,13 +59,13 @@ nix "${nix_flags[@]}" eval --raw ".#darwinConfigurations.amac.config.system.buil
 echo "==> bash -n scripts/*"
 while IFS= read -r -d '' file; do
   bash -n "$file" || fail "syntax error in ${file#"$repo_root"/}"
-done < <(find "$repo_root/scripts" -maxdepth 1 -type f -print0)
+done < <(find "$repo_root/scripts" -maxdepth 1 -type f ! -name '*.ps1' -print0)
 
 if command -v shellcheck >/dev/null 2>&1; then
   echo "==> shellcheck scripts/*"
   while IFS= read -r -d '' file; do
     shellcheck "$file" || fail "shellcheck failed for ${file#"$repo_root"/}"
-  done < <(find "$repo_root/scripts" -maxdepth 1 -type f -print0)
+  done < <(find "$repo_root/scripts" -maxdepth 1 -type f ! -name '*.ps1' -print0)
 else
   echo "check: shellcheck not found; skipping"
 fi

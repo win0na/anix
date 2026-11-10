@@ -1,0 +1,762 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/bootstrap [options]
+
+Interactive first run for one host. Run it from the repository checkout.
+
+Options:
+  --host anix|amac  Select the host. The default detects Linux or Darwin.
+  -y, --yes         Accept prompts and defaults.
+  --dry-run         Print the actions without changing anything.
+  --no-switch       Configure keys and secrets, but skip the switch.
+  --install-nix     Install Nix on macOS when it is missing.
+  --no-install      Never install Nix.
+  --force-ssh       Allow the first Mac switch over SSH. Not recommended.
+  --repo URL        Clone URL used in messages. Default ANIX_REPO_URL.
+  -h, --help        Show this help and exit.
+
+The script is idempotent. It never deletes a distribution, never force-pushes,
+and never commits without a prompt.
+EOF
+}
+
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+usage_error() {
+  printf 'error: %s\n' "$*" >&2
+  usage >&2
+  exit 2
+}
+
+warn() {
+  printf 'warning: %s\n' "$*" >&2
+}
+
+say() {
+  printf '==> %s\n' "$*"
+}
+
+ask() {
+  local prompt=$1 default=${2:-y} reply
+  if [[ $assume_yes -eq 1 ]]; then
+    [[ $default == y ]]
+    return
+  fi
+  if [[ $default == y ]]; then
+    prompt="$prompt [Y/n]"
+  else
+    prompt="$prompt [y/N]"
+  fi
+  read -r -p "$prompt " reply || true
+  reply=${reply:-$default}
+  [[ $reply == [Yy]* ]]
+}
+
+ask_secret() {
+  local prompt=$1 var=$2 value
+  if [[ $assume_yes -eq 1 ]]; then
+    printf -v "$var" '%s' ""
+    return 0
+  fi
+  read -r -s -p "$prompt " value || true
+  printf '\n' >&2
+  printf -v "$var" '%s' "$value"
+}
+
+run() {
+  printf '==>'
+  printf ' %q' "$@"
+  printf '\n'
+  if [[ $dry_run -eq 0 ]]; then
+    "$@"
+  fi
+}
+
+sed_inplace() {
+  local expr=$1 file=$2
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$expr" "$file"
+  else
+    sed -i '' "$expr" "$file"
+  fi
+}
+
+nixc() {
+  nix --extra-experimental-features 'nix-command flakes' "$@"
+}
+
+find_nix() {
+  if ! command -v nix >/dev/null 2>&1; then
+    if [[ -x "$HOME/.nix-profile/bin/nix" ]]; then
+      PATH="$HOME/.nix-profile/bin:$PATH"
+      export PATH
+    elif [[ -x /nix/var/nix/profiles/default/bin/nix ]]; then
+      PATH="/nix/var/nix/profiles/default/bin:$PATH"
+      export PATH
+    fi
+  fi
+}
+
+tool_ref() {
+  if [[ ${host:-} == amac ]]; then
+    printf 'nixpkgs-2605#%s' "$1"
+  else
+    printf 'nixpkgs#%s' "$1"
+  fi
+}
+
+sops_cmd() {
+  if command -v sops >/dev/null 2>&1; then
+    sops "$@"
+  else
+    nixc shell --inputs-from "$repo_root" "$(tool_ref sops)" -c sops "$@"
+  fi
+}
+
+age_keygen() {
+  if command -v age-keygen >/dev/null 2>&1; then
+    age-keygen "$@"
+  else
+    nixc shell --inputs-from "$repo_root" "$(tool_ref age)" -c age-keygen "$@"
+  fi
+}
+
+ssh_to_age() {
+  if command -v ssh-to-age >/dev/null 2>&1; then
+    ssh-to-age "$@"
+  else
+    nixc shell --inputs-from "$repo_root" "$(tool_ref ssh-to-age)" -c ssh-to-age "$@"
+  fi
+}
+
+yaml_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"
+}
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$repo_root" ]]; then
+  repo_root="$(cd "$script_dir/.." && pwd)"
+fi
+
+host=""
+assume_yes=0
+dry_run=0
+do_switch=1
+install_nix=0
+no_install=0
+force_ssh=0
+repo_url="${ANIX_REPO_URL:-https://github.com/win0na/anix.git}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --host)
+      [[ $# -ge 2 ]] || usage_error "--host requires anix or amac"
+      host=$2
+      shift 2
+      ;;
+    --host=*)
+      host=${1#*=}
+      shift
+      ;;
+    -y|--yes)
+      assume_yes=1
+      shift
+      ;;
+    --dry-run)
+      dry_run=1
+      shift
+      ;;
+    --no-switch)
+      do_switch=0
+      shift
+      ;;
+    --install-nix)
+      install_nix=1
+      shift
+      ;;
+    --no-install)
+      no_install=1
+      shift
+      ;;
+    --force-ssh)
+      force_ssh=1
+      shift
+      ;;
+    --repo)
+      [[ $# -ge 2 ]] || usage_error "--repo requires a URL"
+      repo_url=$2
+      shift 2
+      ;;
+    --repo=*)
+      repo_url=${1#*=}
+      shift
+      ;;
+    *)
+      usage_error "unknown argument: $1"
+      ;;
+  esac
+done
+
+if [[ -z $host ]]; then
+  case "$(uname -s)" in
+    Darwin) host=amac ;;
+    Linux) host=anix ;;
+    *) die "unsupported operating system: $(uname -s)" ;;
+  esac
+fi
+
+case "$host" in
+  anix|amac) ;;
+  *) usage_error "--host must be anix or amac" ;;
+esac
+
+find_nix
+cd "$repo_root"
+
+if [[ ! -d .git ]]; then
+  die "not a git checkout: $repo_root; clone $repo_url first"
+fi
+
+if [[ $host == anix ]]; then
+  expected="$HOME/src/anix"
+else
+  expected="$HOME/.config/anix"
+fi
+if [[ $repo_root != "$expected" ]]; then
+  warn "using checkout at $repo_root; the documented path is $expected"
+fi
+
+require_anix() {
+  if [[ $dry_run -eq 1 ]]; then
+    warn "dry run on $(uname -s); NixOS checks skipped"
+    return 0
+  fi
+  [[ "$(uname -s)" == Linux ]] || die "anix runs on NixOS-WSL (Linux)"
+  [[ -e /etc/NIXOS ]] || die "/etc/NIXOS not found; this is not NixOS"
+  command -v nixos-rebuild >/dev/null 2>&1 || die "nixos-rebuild not found"
+}
+
+require_amac() {
+  if [[ $dry_run -eq 1 ]]; then
+    warn "dry run on $(uname -s); macOS checks skipped"
+    return 0
+  fi
+  [[ "$(uname -s)" == Darwin ]] || die "amac runs on macOS"
+  [[ "$(uname -m)" == x86_64 ]] || die "this configuration targets the Intel Mac"
+  case "$(sw_vers -productVersion)" in
+    26.*) ;;
+    *) warn "expected macOS 26.x, found $(sw_vers -productVersion)" ;;
+  esac
+}
+
+checkout_notes() {
+  if [[ $host == anix ]]; then
+    say "checkout: $repo_root"
+    say "projects: $HOME/src, exported to amac over NFS"
+  else
+    say "checkout: $repo_root"
+    say "the Mac builds from this checkout, not the NFS copy"
+  fi
+}
+
+ensure_personal_key() {
+  personal_key="$HOME/.config/sops/age/keys.txt"
+  export SOPS_AGE_KEY_FILE="$personal_key"
+  if [[ ! -s $personal_key ]]; then
+    if [[ $host == amac ]]; then
+      die "restore the personal age key from Passwords.app to $personal_key"
+    fi
+    if [[ -s "$repo_root/secrets/secrets.yaml" ]]; then
+      die "secrets exist but $personal_key is missing; restore the key from Passwords.app"
+    fi
+    if [[ $dry_run -eq 1 ]]; then
+      say "would create $personal_key"
+      age_pub="AGE_RECIPIENT"
+      return 0
+    fi
+    if ! ask "No age key at $personal_key. Generate one now?" y; then
+      die "restore the key from Passwords.app and rerun"
+    fi
+    run mkdir -p "$(dirname "$personal_key")"
+    run chmod 700 "$(dirname "$personal_key")"
+    run age_keygen -o "$personal_key"
+    run chmod 600 "$personal_key"
+  fi
+  age_pub="$(age_keygen -y "$personal_key")"
+  say "personal age recipient: $age_pub"
+}
+
+ensure_sops_personal() {
+  if grep -q "^  winona: &winona ${age_pub}$" .sops.yaml; then
+    return 0
+  fi
+  if [[ $dry_run -eq 1 ]]; then
+    say "would update the winona recipient in .sops.yaml"
+    return 0
+  fi
+  if ! grep -q '^  winona: &winona ' .sops.yaml; then
+    die ".sops.yaml has no winona recipient line"
+  fi
+  if ! ask "Update the winona recipient in .sops.yaml?" y; then
+    die "the personal key must match .sops.yaml"
+  fi
+  sed_inplace "s|^  winona: &winona .*|  winona: \\&winona ${age_pub}|" .sops.yaml
+}
+
+ensure_builder_key() {
+  builder_key="$HOME/.ssh/mac-builder"
+  if [[ ! -s $builder_key ]]; then
+    if [[ $dry_run -eq 1 ]]; then
+      say "would create $builder_key"
+      builder_pub="BUILDER_PUBLIC_KEY"
+    else
+      if ! ask "No Mac builder key at $builder_key. Generate one now?" y; then
+        die "the Mac builder needs an ed25519 key"
+      fi
+      run mkdir -p "$HOME/.ssh"
+      run chmod 700 "$HOME/.ssh"
+      run ssh-keygen -q -t ed25519 -C anix-builder -f "$builder_key" -N ""
+      builder_pub="$(cat "$builder_key.pub")"
+    fi
+  else
+    if [[ ! -s "${builder_key}.pub" ]]; then
+      if [[ $dry_run -eq 0 ]]; then
+        ssh-keygen -y -f "$builder_key" > "${builder_key}.pub"
+      fi
+    fi
+    builder_pub="$(cat "$builder_key.pub" 2>/dev/null || true)"
+  fi
+  [[ -n $builder_pub ]] || die "cannot read ${builder_key}.pub"
+  say "builder public key: $builder_pub"
+
+  if grep -qF "builderKey = \"${builder_pub}\"" home/winona/amac.nix; then
+    return 0
+  fi
+  if [[ $dry_run -eq 1 ]]; then
+    say "would update home/winona/amac.nix with the builder public key"
+    return 0
+  fi
+  if ask "Update home/winona/amac.nix with this builder public key?" y; then
+    sed_inplace "s|^  builderKey = \".*\";|  builderKey = \"${builder_pub}\";|" home/winona/amac.nix
+  fi
+}
+
+secrets_get() {
+  sops_cmd decrypt --extract "$1" "$secrets_file" 2>/dev/null || true
+}
+
+json_stream() {
+  if command -v jq >/dev/null 2>&1; then
+    jq -Rs .
+  else
+    nixc shell --inputs-from "$repo_root" "$(tool_ref jq)" -c jq -Rs .
+  fi
+}
+
+secrets_set_value() {
+  local path=$1 value=$2
+  if [[ $dry_run -eq 1 ]]; then
+    say "would set $path"
+    return 0
+  fi
+  printf '%s' "$value" | json_stream | sops_cmd set --value-stdin "$secrets_file" "$path"
+}
+
+secrets_set_file() {
+  local path=$1 file=$2
+  if [[ $dry_run -eq 1 ]]; then
+    say "would set $path"
+    return 0
+  fi
+  json_stream < "$file" | sops_cmd set --value-stdin "$secrets_file" "$path"
+}
+
+ensure_secrets() {
+  secrets_file="$repo_root/secrets/secrets.yaml"
+  mkdir -p "$(dirname "$secrets_file")"
+  if [[ ! -s $secrets_file ]]; then
+    if [[ $host == amac ]]; then
+      die "secrets/secrets.yaml is missing; run the anix bootstrap and push, then pull"
+    fi
+    if [[ $dry_run -eq 1 ]]; then
+      say "would create the encrypted secrets file"
+      return 0
+    fi
+    if ! ask "Create $secrets_file now?" y; then
+      warn "secrets are missing; the switch will run without sops"
+      return 0
+    fi
+    local api_key cachix macpass tmp
+    ask_secret "9router API key (blank to skip):" api_key || true
+    ask_secret "Cachix token (blank to skip):" cachix || true
+    if [[ $host == amac ]]; then
+      ask_secret "Mac login password (blank to skip):" macpass || true
+    else
+      macpass=""
+    fi
+    local tmpdir
+    tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/anix-secrets.XXXXXX")"
+    chmod 700 "$tmpdir"
+    trap "rm -rf $(printf '%q' "$tmpdir")" EXIT
+    tmp="$tmpdir/secrets.yaml"
+    {
+      printf "opencode:\n  9router-api-key: %s\n" "$(yaml_quote "$api_key")"
+      printf "mac-builder-key: |\n"
+      sed 's/^/  /' "$builder_key"
+      printf "cachix-token: %s\n" "$(yaml_quote "$cachix")"
+      printf "mac-login-password: %s\n" "$(yaml_quote "$macpass")"
+    } > "$tmp"
+    ( cd "$tmpdir" && sops_cmd encrypt --age "$age_pub" "$tmp" > "$secrets_file" )
+    chmod 600 "$secrets_file"
+    rm -rf "$tmpdir"
+    trap - EXIT
+    return 0
+  fi
+
+  if [[ $dry_run -eq 1 ]]; then
+    say "would verify the encrypted secrets file"
+    return 0
+  fi
+  if ! sops_cmd decrypt "$secrets_file" >/dev/null 2>&1; then
+    die "cannot decrypt $secrets_file with $personal_key"
+  fi
+  if [[ $host == anix ]]; then
+    local stored_builder
+    stored_builder="$(secrets_get '["mac-builder-key"]')"
+    if [[ -n $stored_builder && "$stored_builder" != "$(cat "$builder_key")" ]]; then
+      warn "mac-builder-key in secrets differs from ~/.ssh/mac-builder; the Mac authorized key may not match"
+    fi
+  fi
+  if [[ -z "$(secrets_get '["opencode"]["9router-api-key"]')" ]]; then
+    local api_key
+    ask_secret "9router API key (blank to skip):" api_key || true
+    if [[ -n $api_key ]]; then
+      secrets_set_value '["opencode"]["9router-api-key"]' "$api_key"
+    fi
+  fi
+  if [[ -z "$(secrets_get '["mac-builder-key"]')" ]]; then
+    if [[ $host == amac ]]; then
+      die "mac-builder-key is missing; add it on anix and push"
+    fi
+    secrets_set_file '["mac-builder-key"]' "$builder_key"
+  fi
+  if [[ -z "$(secrets_get '["cachix-token"]')" ]]; then
+    local cachix
+    ask_secret "Cachix token (blank to skip):" cachix || true
+    if [[ -n $cachix ]]; then
+      secrets_set_value '["cachix-token"]' "$cachix"
+    fi
+  fi
+  if [[ $host == amac && -z "$(secrets_get '["mac-login-password"]')" ]]; then
+    local macpass
+    ask_secret "Mac login password (blank to skip):" macpass || true
+    if [[ -n $macpass ]]; then
+      secrets_set_value '["mac-login-password"]' "$macpass"
+    fi
+  fi
+}
+
+add_recipient() {
+  local name=$1 recipient=$2
+  if [[ $dry_run -eq 1 ]]; then
+    say "would add the $name recipient and update keys"
+    return 0
+  fi
+  if grep -q "^  # ${name}: &${name}" .sops.yaml; then
+    sed_inplace "s|^  # ${name}: &${name} .*|  ${name}: \\&${name} ${recipient}|" .sops.yaml
+  elif grep -q "^  ${name}: &${name} " .sops.yaml; then
+    if ! grep -q "^  ${name}: &${name} ${recipient}$" .sops.yaml; then
+      if ! ask "Replace the $name recipient in .sops.yaml?" y; then
+        die "the $name recipient must match the host key"
+      fi
+      sed_inplace "s|^  ${name}: &${name} .*|  ${name}: \\&${name} ${recipient}|" .sops.yaml
+    fi
+  else
+    awk -v line="  ${name}: &${name} ${recipient}" '{ print; if ($0 ~ /^  winona: &winona /) print line }' .sops.yaml > .sops.yaml.tmp
+    mv .sops.yaml.tmp .sops.yaml
+  fi
+  if ! grep -q "^      - \*${name}$" .sops.yaml; then
+    awk -v line="      - *${name}" '{ print; if ($0 == "      - *winona") print line }' .sops.yaml > .sops.yaml.tmp
+    mv .sops.yaml.tmp .sops.yaml
+  fi
+  sops_cmd updatekeys -y "$secrets_file"
+}
+
+commit_secrets() {
+  local message=$1
+  if [[ $dry_run -eq 1 ]]; then
+    say "would commit .sops.yaml, secrets, and the Mac builder key"
+    return 0
+  fi
+  if [[ ! -e $secrets_file ]]; then
+    return 0
+  fi
+  run git add .sops.yaml secrets/secrets.yaml home/winona/amac.nix
+  if git diff --cached --quiet -- .sops.yaml secrets/secrets.yaml home/winona/amac.nix; then
+    return 0
+  fi
+  if ! ask "Commit the encrypted secrets and .sops.yaml?" y; then
+    warn "secrets left uncommitted"
+    return 0
+  fi
+  if ! git commit -m "$message" -- .sops.yaml secrets/secrets.yaml home/winona/amac.nix; then
+    warn "commit failed; set git user.name and user.email"
+    return 0
+  fi
+  if ask "Push to the current branch?" n; then
+    run git push
+  fi
+}
+
+host_recipient() {
+  local key=/etc/ssh/ssh_host_ed25519_key
+  if [[ ! -s $key ]]; then
+    warn "$key is missing; the host key is generated by the switch"
+    return 1
+  fi
+  ssh_to_age < "${key}.pub"
+}
+
+switch_anix() {
+  if [[ $do_switch -eq 0 ]]; then
+    say "skipping nixos-rebuild (--no-switch)"
+    return 0
+  fi
+  if [[ $dry_run -eq 1 ]]; then
+    say "would run sudo nixos-rebuild switch --flake $repo_root#anix"
+    return 0
+  fi
+  run sudo nixos-rebuild switch --flake "$repo_root#anix"
+}
+
+switch_mac() {
+  if [[ $do_switch -eq 0 ]]; then
+    say "skipping darwin-rebuild (--no-switch)"
+    return 0
+  fi
+  if [[ $dry_run -eq 1 ]]; then
+    say "would run the first or normal darwin-rebuild switch"
+    return 0
+  fi
+  if command -v darwin-rebuild >/dev/null 2>&1; then
+    run sudo darwin-rebuild switch --flake "$repo_root#amac"
+    return 0
+  fi
+  local file
+  for file in /etc/nix/nix.conf /etc/bashrc /etc/zshrc; do
+    if [[ -e $file && ! -e ${file}.before-nix-darwin ]]; then
+      run sudo mv "$file" "${file}.before-nix-darwin"
+    fi
+  done
+  local nix_bin
+  nix_bin="$(command -v nix)"
+  run sudo "$nix_bin" --extra-experimental-features 'nix-command flakes' run \
+    github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild -- \
+    switch --flake "$repo_root#amac"
+}
+
+ensure_clt() {
+  if xcode-select -p >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ $dry_run -eq 1 ]]; then
+    say "would install the Xcode command line tools"
+    return 0
+  fi
+  if ! ask "Install the Xcode command line tools now?" y; then
+    die "the command line tools are required"
+  fi
+  xcode-select --install || true
+  say "finish the installer window, then press Enter"
+  read -r _ || true
+  xcode-select -p >/dev/null 2>&1 || die "command line tools still missing"
+}
+
+ensure_nix_mac() {
+  find_nix
+  if command -v nix >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ $no_install -eq 1 ]]; then
+    die "nix not found and --no-install is set"
+  fi
+  if [[ $install_nix -eq 0 ]] && ! ask "Install Nix with the upstream daemon installer?" y; then
+    die "nix is required"
+  fi
+  run sh -c 'curl --proto "=https" --tlsv1.2 -fsSL https://nixos.org/nix/install | sh -s -- --daemon'
+  if [[ -f /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then
+    # shellcheck disable=SC1091
+    . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+  fi
+  find_nix
+  command -v nix >/dev/null 2>&1 || die "nix still not on PATH; open a new shell"
+}
+
+ensure_mac_host_key() {
+  if [[ -s /etc/ssh/ssh_host_ed25519_key ]]; then
+    return 0
+  fi
+  if [[ $dry_run -eq 1 ]]; then
+    say "would generate /etc/ssh/ssh_host_ed25519_key"
+    return 0
+  fi
+  run sudo ssh-keygen -A
+}
+
+update_checkout_mac() {
+  if [[ ! -d .git ]]; then
+    die "not a git checkout: $repo_root"
+  fi
+  if [[ -n "$(git status --porcelain)" ]]; then
+    warn "checkout has local changes; not pulling"
+    return 0
+  fi
+  if ask "Pull the latest main before the switch?" y; then
+    run git pull --ff-only
+  fi
+}
+
+set_sidebar_state() {
+  local state_dir="$HOME/.local/state/herdr/plugins/herdr-sidebar"
+  [[ $dry_run -eq 1 ]] && { say "would set the herdr-sidebar click state"; return 0; }
+  mkdir -p "$state_dir"
+  printf 'ttt\n' > "$state_dir/editor-command.txt"
+  if command -v jq >/dev/null 2>&1; then
+    if [[ -s $state_dir/state.json ]]; then
+      jq '.custom_editor_on_click = true' "$state_dir/state.json" > "$state_dir/state.json.tmp"
+      mv "$state_dir/state.json.tmp" "$state_dir/state.json"
+    else
+      printf '{"custom_editor_on_click": true}\n' > "$state_dir/state.json"
+    fi
+  else
+    warn "jq not found; set custom_editor_on_click in $state_dir/state.json"
+  fi
+}
+
+install_herdr() {
+  if ! command -v herdr >/dev/null 2>&1; then
+    warn "herdr not on PATH; skipping plugin installation"
+    return 0
+  fi
+  if ! ask "Install the pinned Herdr plugins now?" y; then
+    return 0
+  fi
+  run herdr plugin install jeffarese/herdr-bar --ref d9cdd88cb734615e96b1c37ed17fc39be904f060 --yes
+  run herdr plugin install eugenioenko/ttt/herdr-plugin --ref b51ae983e0f60599090e0b0061093dbece9b541f --yes
+  run "$repo_root/scripts/install-herdr-plugins.sh"
+  set_sidebar_state
+}
+
+ensure_anix_host_key() {
+  local key=/etc/ssh/ssh_host_ed25519_key
+  if [[ -s $key ]]; then
+    return 0
+  fi
+  if [[ $dry_run -eq 1 ]]; then
+    say "would generate $key"
+    return 0
+  fi
+  run sudo mkdir -p /etc/ssh
+  run sudo ssh-keygen -t ed25519 -N '' -f "$key"
+  run sudo chmod 600 "$key"
+}
+
+post_mac() {
+  if [[ $dry_run -eq 1 ]]; then
+    say "would verify the Mac host, mount, and packages"
+    return 0
+  fi
+  if ask "Mount the NFS export now?" y; then
+    run sudo "$repo_root/scripts/mount-src" || warn "NFS mount failed; the LaunchDaemon retries"
+  fi
+  if ask "Build the Darwin Herdr package as a check?" y; then
+    run nixc build --no-link ".#packages.x86_64-darwin.herdr" || warn "Darwin package check failed"
+  fi
+  install_herdr
+  if command -v xcodes >/dev/null 2>&1; then
+    if ask "Install Xcode 26.6 now? It is a large download." n; then
+      run xcodes install 26.6 || warn "Xcode install failed"
+      run sudo xcode-select -s /Applications/Xcode-26.6.app || warn "xcode-select failed"
+      run sudo xcodebuild -license accept || warn "Xcode license failed"
+      run sudo xcodebuild -runFirstLaunch || warn "Xcode first launch failed"
+    fi
+  fi
+}
+
+bootstrap_anix() {
+  require_anix
+  checkout_notes
+  ensure_personal_key
+  ensure_builder_key
+  ensure_secrets
+  ensure_sops_personal
+  ensure_anix_host_key
+
+  if [[ $dry_run -eq 1 ]]; then
+    switch_anix
+    say "would install the Herdr plugins and set the sidebar state"
+    return 0
+  fi
+
+  local recipient
+  recipient="$(host_recipient)" || die "cannot derive the anix age recipient from the host key"
+  if [[ -s $secrets_file ]]; then
+    add_recipient anix "$recipient"
+    commit_secrets "secrets: add the anix recipient and builder key"
+  fi
+
+  switch_anix
+  if [[ $do_switch -eq 1 ]]; then
+    if [[ ! -s $secrets_file ]]; then
+      warn "secrets are missing; sops stays off"
+    elif [[ ! -s /etc/nix/mac-builder ]]; then
+      warn "builder key is still missing; check the sops secret and the switch"
+    else
+      say "sops is active; builder key installed"
+    fi
+    install_herdr
+  fi
+}
+
+bootstrap_mac() {
+  require_amac
+  checkout_notes
+  ensure_clt
+  ensure_nix_mac
+  update_checkout_mac
+  if [[ -n "${SSH_CONNECTION:-}" && $force_ssh -eq 0 && $dry_run -eq 0 ]] && ! command -v darwin-rebuild >/dev/null 2>&1; then
+    die "run the first switch from Terminal.app, not SSH"
+  fi
+  ensure_mac_host_key
+  ensure_personal_key
+  if [[ ! -s "$repo_root/secrets/secrets.yaml" ]]; then
+    die "secrets/secrets.yaml is missing; run the anix bootstrap and push, then pull"
+  fi
+  ensure_secrets
+
+  local recipient
+  recipient="$(host_recipient)" || die "the Mac host key was not generated"
+  say "amac recipient: $recipient"
+  add_recipient amac "$recipient"
+  commit_secrets "secrets: add the amac recipient"
+  switch_mac
+  post_mac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  case "$host" in
+    anix) bootstrap_anix ;;
+    amac) bootstrap_mac ;;
+  esac
+fi

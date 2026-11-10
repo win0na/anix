@@ -7,8 +7,10 @@ runtime failure, and `2` for a usage error.
 | Script | Runs on | Purpose |
 | --- | --- | --- |
 | `rebuild` | Both | Rebuild and activate one host |
-| `bootstrap-wsl.sh` | NixOS-WSL | Clone, check, and switch anix |
-| `bootstrap-mac.sh` | macOS | Install Nix, clone, check, and switch amac |
+| `bootstrap` | Both | Interactive first run: keys, secrets, recipients, and switch |
+| `bootstrap-windows.ps1` | Windows | Prepare WSL, the firewall, the NixOS image, and the logon task |
+| `bootstrap-wsl.sh` | NixOS-WSL | Alias for `bootstrap --host anix` |
+| `bootstrap-mac.sh` | macOS | Alias for `bootstrap --host amac` |
 | `migrate-projects.sh` | Linux or WSL | Move projects into `~/src` and leave symlinks |
 | `ios` | WSL or macOS | Build an iOS app on the Mac and install it |
 | `install-herdr-plugins.sh` | Both | Link the first-party Herdr plugin |
@@ -33,37 +35,50 @@ With no target, `uname -s` selects `amac` on Darwin and `anix` on Linux.
 
 Exit `2` for an unknown target or too many arguments. `--help` exits `0`.
 
-## scripts/bootstrap-wsl.sh
+## scripts/bootstrap
 
 ```text
-scripts/bootstrap-wsl.sh [--no-switch] [--repo URL]
+scripts/bootstrap [--host anix|amac] [--yes] [--dry-run] [--no-switch]
+                  [--install-nix] [--no-install] [--force-ssh] [--repo URL]
 ```
 
-Checks that the host is NixOS-WSL, clones to `$HOME/src/anix` when absent,
-warns when `$HOME/.config/sops/age/keys.txt` is missing, and runs
-`sudo nixos-rebuild switch --flake $HOME/src/anix#anix`.
+The interactive first run. It detects the host from `uname`, checks the
+environment, restores or creates the personal age key and the Mac builder key,
+creates or updates `secrets/secrets.yaml`, adds the host recipient to
+`.sops.yaml`, runs `sops updatekeys`, and switches the host. It asks before
+committing and before pushing.
 
-`--no-switch` stops after the checks and the clone. `--repo` overrides
-`ANIX_REPO_URL` and the default `https://github.com/win0na/anix.git`. The
-script never pulls an existing checkout.
+`--host` selects `anix` or `amac` when detection is wrong. `--yes` accepts the
+prompts; it cannot invent a missing secret. `--dry-run` prints the actions
+without changing anything. `--no-switch` stops before the switch.
+`--install-nix` installs the upstream daemon on macOS without prompting;
+`--no-install` refuses to install. `--force-ssh` allows the first Mac switch
+over SSH; the default refuses because macOS App Management can block
+`/Applications/Nix Apps`. `--yes` never pushes and never installs Xcode; those
+prompts default to no. `--repo` changes the clone URL named in the
+missing-checkout error.
 
-## scripts/bootstrap-mac.sh
+The script is idempotent. It skips an existing key, an existing secret, and an
+existing recipient. It never unregisters a distribution and never force-pushes.
+
+`bootstrap-wsl.sh` and `bootstrap-mac.sh` are thin aliases that pass
+`--host anix` or `--host amac`.
+
+## scripts/bootstrap-windows.ps1
 
 ```text
-scripts/bootstrap-mac.sh [--no-switch] [--install-nix] [--repo URL]
+scripts/bootstrap-windows.ps1 [-Yes] [-SkipWslUpdate] [-SkipFirewall]
+                              [-ImageUrl URL] [-ImageSha256 HASH]
 ```
 
-Checks Darwin, `x86_64`, macOS 26.x, and the command line tools. With
-`--install-nix`, it runs the upstream daemon installer when `nix` is missing.
-It clones to `$HOME/.config/anix`, warns when the age key is missing, and runs
-`sudo darwin-rebuild switch --flake $HOME/.config/anix#amac`.
+Run in an elevated PowerShell. It updates WSL, writes
+`%UserProfile%\.wslconfig`, opens TCP 2049 for the WSL VM, downloads and
+verifies the NixOS-WSL 2605.7.2 image, installs it as `NixOS`, runs the first
+switch, clones the repository to `~/src/anix` as `winona`, and registers the
+`anix-wsl` logon task. `-Yes` accepts the prompts.
 
-The script warns when `SSH_CONNECTION` is set: the first switch should run from
-a GUI Terminal because of macOS App Management. On a machine without
-`darwin-rebuild`, it moves the installer's `/etc/nix/nix.conf`, `/etc/bashrc`,
-and `/etc/zshrc` to `*.before-nix-darwin`, then runs
-`nix run github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild`. It never pulls
-an existing checkout.
+If `NixOS` already exists, it offers to skip the install and run the remaining
+steps. It never deletes or unregisters a distribution.
 
 ## scripts/migrate-projects.sh
 
@@ -132,9 +147,10 @@ Evaluates both system derivations:
 .#darwinConfigurations.amac.config.system.build.toplevel.drvPath
 ```
 
-Then runs `bash -n` on every file in `scripts/`, and `shellcheck` when it is on
-`PATH`. It stops on the first failure and prints `check: ok` on success. It
-requires `nix`; it does not install anything.
+Then runs `bash -n` on every shell script in `scripts/`, and `shellcheck` when
+it is on `PATH`. The PowerShell script is skipped. It stops on the first
+failure and prints `check: ok` on success. It requires `nix`; it does not
+install anything.
 
 ## scripts/mount-src
 

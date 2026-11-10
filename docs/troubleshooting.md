@@ -134,7 +134,7 @@ A fresh Mac has no `darwin-rebuild`. The upstream installer also leaves
 `/etc/nix/nix.conf`, `/etc/bashrc`, and `/etc/zshrc` behind, which nix-darwin
 refuses on the first activation.
 
-Fix: run `scripts/bootstrap-mac.sh`. It moves those files to
+Fix: run `scripts/bootstrap`. It moves those files to
 `*.before-nix-darwin` and runs:
 
 ```sh
@@ -153,7 +153,7 @@ macOS shows an App Management prompt.
 Fix: run the first switch from a GUI Terminal on the Mac:
 
 ```sh
-~/.config/anix/scripts/bootstrap-mac.sh
+~/.config/anix/scripts/bootstrap
 ```
 
 Approve the prompt. Later switches work over SSH. If the prompt does not appear,
