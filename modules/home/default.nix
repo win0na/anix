@@ -1,7 +1,16 @@
 { ... }:
 
 {
-  imports = [ ];
+  programs.zsh = {
+    enable = true;
+    enableCompletion = true;
+    autosuggestion.enable = true;
+    syntaxHighlighting.enable = true;
 
-  # TODO: shared home-manager pieces (zsh, packages, herdr, opencode, ttt).
+    history = {
+      size = 100000;
+      save = 100000;
+      share = true;
+    };
+  };
 }

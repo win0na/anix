@@ -1,20 +1,73 @@
-{ ... }:
+{ config, lib, pkgs, inputs, ... }:
 
+let
+  secretsFile = ../../secrets/secrets.yaml;
+in
 {
   imports = [
     ../../modules/common
     ../../modules/darwin
-  ];
+    inputs.home-manager-2605.darwinModules.home-manager
+  ] ++ lib.optional (builtins.pathExists secretsFile) ./sops.nix;
 
   nixpkgs.hostPlatform = "x86_64-darwin";
   networking.hostName = "amac";
+  system.stateVersion = 7;
 
-  # TODO (configuration pass):
-  # - system.primaryUser = "winona"
-  # - users.users.winona.home = "/Users/winona"
-  # - nix-homebrew wiring
-  # - sops-nix secrets
-  # - power settings and auto-login activation
-  # - NFS mount of ~/src from anix
-  # - system.stateVersion = 7
+  system.primaryUser = "winona";
+
+  environment.systemPackages = with pkgs; [
+    age
+    curl
+    git
+    jq
+    sops
+    ssh-to-age
+  ];
+
+  nix.settings = {
+    experimental-features = [ "nix-command" "flakes" ];
+    trusted-users = [ "winona" ];
+  };
+
+  # Apple's OpenSSH server. Key authentication only; the builder public key is
+  # installed into winona's authorized_keys.
+  services.openssh = {
+    enable = true;
+    extraConfig = ''
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+    '';
+  };
+
+  power.restartAfterPowerFailure = true;
+
+  # The lid stays closed. A macOS update can reset this; activation restores it.
+  system.activationScripts.anixPower.text = ''
+    /usr/bin/pmset -a disablesleep 1 sleep 0 hibernatemode 0 standby 0 autopoweroff 0 womp 1 autorestart 1
+  '';
+
+  # Retry the NFS mount every five minutes until the WSL host is reachable.
+  launchd.daemons.anix-nfs = {
+    command = "/Users/winona/.config/anix/scripts/mount-src";
+    serviceConfig = {
+      RunAtLoad = true;
+      StartInterval = 300;
+      StandardOutPath = "/var/log/anix-nfs.log";
+      StandardErrorPath = "/var/log/anix-nfs.log";
+    };
+  };
+
+  home-manager = {
+    useGlobalPkgs = true;
+    useUserPackages = true;
+    backupFileExtension = "hm-backup";
+    sharedModules = [ ../../modules/home ];
+    users.winona = {
+      imports = [
+        ../../home/winona
+        ../../home/winona/amac.nix
+      ];
+    };
+  };
 }

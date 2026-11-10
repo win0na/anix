@@ -2,6 +2,5 @@
 
 {
   home.homeDirectory = "/Users/winona";
-
-  # TODO: amac-specific home settings.
+  home.stateVersion = "26.05";
 }

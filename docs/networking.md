@@ -119,9 +119,9 @@ call. `bg` retries the mount in the background when the server is not ready.
 If the Mac rejects `vers=4.1`, mount with `vers=4` against the same export and
 check reads and writes. Do not fall back to NFSv3; the export uses `fsid=0`.
 
-NFSv4.1 needs only TCP 2049. The host configuration disables v3 services;
-otherwise rpcbind and mountd still listen on 111 and 20048. There is no SMB
-fallback.
+NFSv4.1 needs only TCP 2049. The host configuration disables NFSv3. The NixOS
+module still starts rpcbind and mountd; they are not opened in the firewall.
+There is no SMB fallback.
 
 ## File watching
 
@@ -161,8 +161,8 @@ the daemon accepts build requests from that user. It is also root-equivalent on
 the Mac; this is the accepted cost of building as the login user.
 
 The builder key is the `mac-builder-key` sops secret. The private key is
-installed at `/etc/nix/mac-builder` with mode `0400` on WSL. The public key is
-in `winona`'s `authorizedKeys` on the Mac. Add the Mac host key to root's
+installed at `/etc/nix/mac-builder` with mode `0400` on WSL. The public key goes
+in `winona`'s `~/.ssh/authorized_keys` on the Mac, managed by Home Manager. Add the Mac host key to root's
 `known_hosts` on WSL, for example with `programs.ssh.knownHosts`, or the
 nix-daemon SSH fails host-key verification.
 
@@ -174,9 +174,10 @@ nix-daemon SSH fails host-key verification.
 | 22/tcp | Mac | WSL to Mac | SSH, `darwin-rebuild`, `ssh-ng` |
 | 41641/udp | Windows, Mac | Tailscale | NAT traversal |
 
-anix runs sshd on `127.0.0.1` to generate and hold the host key used by sops.
-The firewall stays closed, and the Mac never pushes to the WSL host. No inbound
-SSH is needed on WSL.
+anix generates and holds the host key used by sops with
+`services.openssh.generateHostKeys`; sshd does not run. The firewall stays
+closed, and the Mac never pushes to the WSL host. No inbound SSH is needed on
+WSL.
 
 ## Failure modes
 

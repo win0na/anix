@@ -251,7 +251,7 @@ herdr plugin list
 herdr plugin link /home/winona/src/anix/pkgs/herdr-plugins/responsive-sidebar
 ```
 
-`herdr plugin link` registers the plugin enabled; there is no `--enabled` flag.
+`herdr plugin link` registers the plugin enabled by default; `--disabled` registers it off.
 The three remote plugins are installed from pinned commits:
 
 ```sh

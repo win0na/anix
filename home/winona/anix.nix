@@ -2,6 +2,5 @@
 
 {
   home.homeDirectory = "/home/winona";
-
-  # TODO: anix-specific home settings.
+  home.stateVersion = "26.11";
 }

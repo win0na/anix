@@ -3,5 +3,5 @@
 {
   home.username = "winona";
 
-  # TODO: home.stateVersion, shared packages, zsh shell, herdr, opencode, ttt.
+  # TODO: shared packages, aliases, prompt, herdr, opencode, ttt.
 }

@@ -101,7 +101,8 @@ scripts/install-herdr-plugins.sh
 ```
 
 Links `pkgs/herdr-plugins/responsive-sidebar` with `herdr plugin link`. The
-command registers the plugin enabled; there is no `--enabled` flag. The script
+command registers the plugin enabled by default; `--disabled` registers it off.
+The script
 prints the pinned commits for `herdr-bar`, `herdr-sidebar`, and `ttt.editor`,
 which Home Manager installs declaratively, and finishes with
 `herdr plugin list`.

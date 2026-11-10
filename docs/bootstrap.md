@@ -170,9 +170,9 @@ D:\backup\ubuntu.tar` gives you a rollback.
 
    Store the private key in Passwords.app and keep the recovery key offline.
 
-2. Add the anix host key as a recipient. The first switch enables sshd locally,
-   without opening the firewall, so the key exists. If the file is missing, run
-   `sudo ssh-keygen -A` and restart WSL:
+2. Add the anix host key as a recipient. The first switch generated it with
+   `services.openssh.generateHostKeys`; sshd is not running. If the file is
+   missing, run `sudo ssh-keygen -A` and restart WSL:
 
    ```sh
    nix shell nixpkgs#ssh-to-age -c ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub
@@ -197,8 +197,8 @@ D:\backup\ubuntu.tar` gives you a rollback.
    ```
 
    Add the private key as `mac-builder-key`. Keep the public key for the Mac
-   host config; the configuration pass installs it in `winona`'s
-   `authorizedKeys`. The [Secrets](secrets.md) page lists the keys.
+   host config; Home Manager installs it in `winona`'s
+   `~/.ssh/authorized_keys`. The [Secrets](secrets.md) page lists the keys.
 
    Commit the encrypted file before the next switch. A flake only sees tracked
    files, so an untracked `secrets/secrets.yaml` keeps the sops guard off:

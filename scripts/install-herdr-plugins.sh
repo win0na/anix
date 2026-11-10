@@ -47,7 +47,7 @@ if [[ ! -d "$plugin" ]]; then
   exit 1
 fi
 
-# link registers the plugin enabled; there is no --enabled flag.
+# link registers the plugin enabled by default; --disabled registers it off.
 echo "==> herdr plugin link $plugin"
 herdr plugin link "$plugin"
 
