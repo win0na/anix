@@ -167,7 +167,8 @@ the file.
 **Consequence.** The patch must spawn `ttt <file>` with the workspace `TMPDIR`
 and then call `pane.focus`. `pane.send_input` would type into the ttt TUI. The
 marker token must survive pane recreation, so the layout action sets it on every
-run. The patch is not shipped in this skeleton.
+run. The patch is built in `pkgs/herdr-sidebar` and linked by the Home Manager
+activation.
 
 ## D13: ttt settings
 

@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Build the IDE layout in the active Herdr workspace:
+# sidebar on the left, agent in the center, ttt at 35% on the bottom.
+set -euo pipefail
+
+herdr=${HERDR_BIN_PATH:-herdr}
+command -v jq >/dev/null || { echo "herdr-ide: jq is required" >&2; exit 1; }
+
+state=$("$herdr" pane list)
+
+agent=${HERDR_PANE_ID:-}
+if [ -z "$agent" ]; then
+  agent=$(jq -r '.result.panes[] | select(.focused == true) | .pane_id' <<<"$state" | head -n 1)
+fi
+[ -n "$agent" ] || { echo "herdr-ide: no focused pane" >&2; exit 1; }
+
+ws=$(jq -r --arg id "$agent" '.result.panes[] | select(.pane_id == $id) | .workspace_id' <<<"$state")
+cwd=$(jq -r --arg id "$agent" '.result.panes[] | select(.pane_id == $id) | .cwd' <<<"$state")
+[ -n "$ws" ] && [ "$ws" != "null" ] || { echo "herdr-ide: no workspace" >&2; exit 1; }
+[ -n "$cwd" ] && [ "$cwd" != "null" ] || cwd=$PWD
+
+ttt=$(jq -r --arg ws "$ws" '
+  .result.panes[]
+  | select(.workspace_id == $ws and .tokens["hs-ttt-workspace"] == $ws)
+  | .pane_id
+' <<<"$state" | head -n 1)
+
+if [ -z "$ttt" ]; then
+  command -v ttt >/dev/null || { echo "herdr-ide: ttt is not on PATH" >&2; exit 1; }
+
+  tmpdir=${XDG_RUNTIME_DIR:-/tmp}/herdr-ttt-$ws
+  mkdir -p "$tmpdir"
+  chmod 700 "$tmpdir"
+
+  split=$("$herdr" pane split "$agent" \
+    --direction down \
+    --ratio 0.65 \
+    --cwd "$cwd" \
+    --env "TMPDIR=$tmpdir" \
+    --no-focus)
+
+  ttt=$(jq -r '.result.pane.pane_id' <<<"$split")
+  [ -n "$ttt" ] && [ "$ttt" != "null" ] || { echo "herdr-ide: split returned no pane" >&2; exit 1; }
+
+  "$herdr" pane run "$ttt" ttt
+  "$herdr" pane report-metadata "$ttt" \
+    --source herdr-sidebar-ttt \
+    --token "hs-ttt-workspace=$ws" \
+    --token "hs-ttt-tmpdir=$tmpdir"
+fi
+
+"$herdr" plugin action invoke herdr-sidebar.show-explorer >/dev/null 2>&1 || true
+
+if command -v python3 >/dev/null && [ -n "${HERDR_SOCKET_PATH:-}" ]; then
+  python3 - "$HERDR_SOCKET_PATH" "$agent" <<'PY'
+import json
+import socket
+import sys
+
+sock = socket.socket(socket.AF_UNIX)
+sock.connect(sys.argv[1])
+sock.sendall(
+    json.dumps(
+        {"id": "herdr-ide-focus", "method": "pane.focus", "params": {"pane_id": sys.argv[2]}}
+    ).encode()
+    + b"\n"
+)
+sock.recv(65536)
+PY
+else
+  "$herdr" plugin pane focus "$agent" >/dev/null 2>&1 || true
+fi

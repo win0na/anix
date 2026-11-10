@@ -25,8 +25,9 @@ Change a pin in the same commit as the config that uses it.
 | `herdr-sidebar` | 0.15.1 | `alexarthurs/herdr-sidebar`, subdir `plugins/herdr-sidebar` | `081ed133f3faa377438b51ce435fe8a87c439593` |
 | `ttt.editor` | 0.1.2 | `eugenioenko/ttt`, subdir `herdr-plugin` | `b51ae983e0f60599090e0b0061093dbece9b541f` |
 
-The `herdr-sidebar` pin receives the editor-pane patch. The patch is not shipped
-in this skeleton.
+The `herdr-sidebar` pin receives the editor-pane patch. `pkgs/herdr-sidebar`
+builds the patched plugin and the Home Manager activation links it over the
+GitHub install.
 
 ## ttt
 

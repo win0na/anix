@@ -39,12 +39,16 @@
 
     nix-homebrew = {
       url = "github:zhaofengli/nix-homebrew";
-      inputs.nixpkgs.follows = "nixpkgs-2605";
     };
 
     herdr-src = {
       url = "github:kitknox/herdr/rootshell-v0.1.10";
       flake = false;
+    };
+
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
@@ -64,8 +68,27 @@
 
       overlays.default = import ./overlays;
 
-      # TODO: packages, checks, and module wiring land in the configuration pass.
+      packages =
+        let
+          herdrOverlay = import ./overlays/herdr.nix { inherit (inputs) herdr-src; };
+          overlays = [
+            inputs.rust-overlay.overlays.default
+            herdrOverlay
+            (import ./overlays/default.nix)
+          ];
+          pkgsFor = channel: system: import channel { inherit system overlays; };
+        in
+        {
+          x86_64-linux.fff-mcp = (pkgsFor nixpkgs "x86_64-linux").fff-mcp;
+          x86_64-linux.herdr = (pkgsFor nixpkgs "x86_64-linux").herdr;
+          x86_64-linux.herdr-sidebar = (pkgsFor nixpkgs "x86_64-linux").herdr-sidebar;
+          x86_64-linux.ttt = (pkgsFor nixpkgs "x86_64-linux").ttt;
+          x86_64-darwin.fff-mcp = (pkgsFor nixpkgs-2605 "x86_64-darwin").fff-mcp;
+          x86_64-darwin.herdr = (pkgsFor nixpkgs-2605 "x86_64-darwin").herdr;
+          x86_64-darwin.herdr-sidebar = (pkgsFor nixpkgs-2605 "x86_64-darwin").herdr-sidebar;
+          x86_64-darwin.ttt = (pkgsFor nixpkgs-2605 "x86_64-darwin").ttt;
+        };
+
       checks = { };
-      packages = { };
     };
 }

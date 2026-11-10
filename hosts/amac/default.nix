@@ -11,18 +11,34 @@ in
   ] ++ lib.optional (builtins.pathExists secretsFile) ./sops.nix;
 
   nixpkgs.hostPlatform = "x86_64-darwin";
+  nixpkgs.overlays = [
+    inputs.rust-overlay.overlays.default
+    (import ../../overlays/herdr.nix { inherit (inputs) herdr-src; })
+    (import ../../overlays/default.nix)
+  ];
+
   networking.hostName = "amac";
   system.stateVersion = 7;
 
   system.primaryUser = "winona";
 
+  # Not in users.knownUsers, so nix-darwin does not create or delete the
+  # account. The values let Home Manager read the existing home directory.
+  users.users.winona = {
+    uid = 501;
+    home = "/Users/winona";
+  };
+
   environment.systemPackages = with pkgs; [
     age
     curl
+    fff-mcp
     git
+    herdr
     jq
     sops
     ssh-to-age
+    ttt
   ];
 
   nix.settings = {

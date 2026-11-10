@@ -1,0 +1,25 @@
+// OpenCode Quota settings: only the ones you changed. A missing key uses its default.
+// Every setting and its default: https://github.com/slkiser/opencode-quota/blob/main/docs/readme/configuration.md
+// Edit it by hand or ask your agent; OpenCode Quota keeps your comments when it saves.
+{
+  "version": 6,
+  "layout": {
+    "providerGap": 0,
+    "barWidth": 6,
+    "labelWidth": 6,
+    "bar": "shades",
+    "separator": " · "
+  },
+  "words": {
+    "sessionTokens": "tree"
+  },
+  "providers": {
+    "off": [
+      "openai"
+    ]
+  },
+  "toast": {
+    "afterReply": "off",
+    "afterCompaction": false
+  }
+}

@@ -12,6 +12,7 @@ runtime failure, and `2` for a usage error.
 | `migrate-projects.sh` | Linux or WSL | Move projects into `~/src` and leave symlinks |
 | `ios` | WSL or macOS | Build an iOS app on the Mac and install it |
 | `install-herdr-plugins.sh` | Both | Link the first-party Herdr plugin |
+| `herdr-ide` | Both | Build the sidebar, agent, and ttt layout |
 | `check.sh` | Both | Evaluate both hosts and lint the scripts |
 | `mount-src` | macOS | Mount the NFS export at `/Users/winona/src` |
 
@@ -102,10 +103,21 @@ scripts/install-herdr-plugins.sh
 
 Links `pkgs/herdr-plugins/responsive-sidebar` with `herdr plugin link`. The
 command registers the plugin enabled by default; `--disabled` registers it off.
-The script
-prints the pinned commits for `herdr-bar`, `herdr-sidebar`, and `ttt.editor`,
-which Home Manager installs declaratively, and finishes with
-`herdr plugin list`.
+The script prints the pinned commits for `herdr-bar`, `herdr-sidebar`, and
+`ttt.editor`, then finishes with `herdr plugin list`. Home Manager links the
+patched `herdr-sidebar` build and copies the Herdr config; the other plugins
+stay on their pinned GitHub installs.
+
+## scripts/herdr-ide
+
+```text
+scripts/herdr-ide
+```
+
+Runs on both hosts. Finds the focused pane, splits it down at 35 percent, starts
+ttt with a per-workspace `TMPDIR`, stamps the `hs-ttt-workspace` and
+`hs-ttt-tmpdir` tokens, opens the sidebar, and focuses the agent. The Herdr
+config binds it to `prefix+i`. Home Manager links it to `~/.local/bin/herdr-ide`.
 
 ## scripts/check.sh
 

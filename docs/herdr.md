@@ -19,8 +19,9 @@ Herdr core for every feature.
 
 The left pane switches between Explorer and Source Control in place. The center
 pane runs the agent or a shell. The bottom pane runs ttt at 35 percent height.
-The Herdr tab bar is hidden. The `herdr-ide` layout action is idempotent: it
-finds or creates each pane, resizes the split, and focuses the center pane.
+The Herdr tab bar is hidden. The `herdr-ide` script runs on `prefix+i`: it
+splits the focused pane, starts ttt with a workspace `TMPDIR`, sets the
+`hs-ttt-workspace` marker, opens the sidebar, and focuses the agent again.
 
 ## The pieces
 
@@ -41,9 +42,10 @@ plugin.
 
 The sidebar owns the click. On a file click, the patched sidebar:
 
-1. Resolves the workspace's ttt socket directory.
-2. Spawns `ttt <file>` with that `TMPDIR`, detached.
-3. Focuses the existing ttt pane.
+1. Finds the pane whose `hs-ttt-workspace` token equals the current workspace.
+2. Reads the `hs-ttt-tmpdir` token from that pane.
+3. Spawns `ttt <file>` with that `TMPDIR`, detached.
+4. Focuses the existing ttt pane.
 
 ttt uses `reuseWindow = true`, so the new process forwards the open request to
 the newest socket in `$TMPDIR/ttt-uid/` and exits. The patch does not type into
@@ -51,7 +53,9 @@ the ttt pane. `pane.send_input` writes to the foreground TUI, which would send
 the path as editor keystrokes.
 
 The per-workspace `TMPDIR` is what keeps one ttt instance per workspace. Without
-it, `reuseWindow` can forward to the newest socket from another workspace.
+it, `reuseWindow` can forward to the newest socket from another workspace. The
+tokens are ephemeral: a Herdr restart clears pane metadata, so run `herdr-ide`
+again after a restart.
 
 ## Plugin boundary
 
@@ -67,15 +71,17 @@ event subscriber.
 ## The sidebar patch
 
 `herdr-sidebar` already deduplicates per-file editor tabs. On a miss it creates
-a tab, and on a hit it focuses the tab. The patch replaces that behavior with a
-single editor pane:
+a tab, and on a hit it focuses the tab. The patch adds a marker lookup before
+that path:
 
-- Find the workspace editor pane.
-- If it exists, spawn ttt with the file and focus the pane.
-- If it does not, create the pane, then spawn ttt and focus it.
+- Find the pane with the workspace's `hs-ttt-workspace` token.
+- If it exists, spawn ttt with the file and the recorded `TMPDIR`, then focus
+  the pane.
+- If it does not, keep the stock per-file tab path.
 
-The patch targets commit `081ed133f3faa377438b51ce435fe8a87c439593` and will be
-applied as a Nix overlay. It is small enough to upstream. The upstream pull
+The patch targets commit `081ed133f3faa377438b51ce435fe8a87c439593`. The package
+at `pkgs/herdr-sidebar` builds it and the Home Manager activation links the
+result over the GitHub install. The patch is small enough to upstream; the pull
 request is part of the work, not a later cleanup.
 
 ## ttt
@@ -91,12 +97,14 @@ The exact settings and LSP commands are in
 
 ## What stays manual
 
-- The `herdr-ide` layout action and the sidebar patch are not in this skeleton.
-  They land in the configuration pass.
-- Until the sidebar patch lands, the pinned plugin creates a tab per unseen
-  file.
+- The sidebar's `custom_editor_on_click` state and `editor-command.txt` must
+  select the custom editor. The state lives under
+  `~/.local/state/herdr/plugins/herdr-sidebar`; the plugin settings UI writes
+  it. The patch does not override that user choice.
 - The Herdr Darwin build is not exercised in upstream CI. The first Mac build
   proves the Zig and Rust toolchain.
 - ttt cannot attach a debugger or load VSIX extensions. Use Xcode or a terminal
   debugger for those cases.
 - The layout script arranges panes; it does not restore editor state.
+- The `herdr-sidebar` build is pinned to commit `081ed13`. A new plugin release
+  needs the patch rebased.

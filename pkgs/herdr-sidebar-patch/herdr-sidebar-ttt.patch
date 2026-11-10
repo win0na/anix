@@ -1,0 +1,98 @@
+diff --git a/src/actions.rs b/src/actions.rs
+index 3a4c808..3cea068 100644
+--- a/src/actions.rs
++++ b/src/actions.rs
+@@ -481,6 +481,62 @@ const EDITOR_METADATA_SOURCE: &str = "herdr-sidebar-editor";
+ const EDITOR_PATH_TOKEN: &str = "hs-editor-path";
+ const EDITOR_HEARTBEAT_EVERY: std::time::Duration = std::time::Duration::from_secs(5);
+ 
++const TTT_WORKSPACE_TOKEN: &str = "hs-ttt-workspace";
++const TTT_TMPDIR_TOKEN: &str = "hs-ttt-tmpdir";
++
++struct TttPane {
++    tab_id: String,
++    pane_id: String,
++    tmpdir: PathBuf,
++}
++
++fn ttt_pane_for(panes_json: &str, workspace_id: &str) -> Option<TttPane> {
++    #[derive(serde::Deserialize)]
++    struct Msg {
++        result: Res,
++    }
++    #[derive(serde::Deserialize)]
++    struct Res {
++        #[serde(default)]
++        panes: Vec<Pane>,
++    }
++    #[derive(serde::Deserialize)]
++    struct Pane {
++        pane_id: Option<String>,
++        tab_id: Option<String>,
++        workspace_id: Option<String>,
++        #[serde(default)]
++        tokens: std::collections::BTreeMap<String, serde_json::Value>,
++    }
++
++    let msg = serde_json::from_str::<Msg>(crate::launch::strip_bom(panes_json)).ok()?;
++    msg.result.panes.into_iter().find_map(|pane| {
++        if pane.workspace_id.as_deref() != Some(workspace_id)
++            || pane.tokens.get(TTT_WORKSPACE_TOKEN)?.as_str()? != workspace_id
++        {
++            return None;
++        }
++        let tmpdir = pane.tokens.get(TTT_TMPDIR_TOKEN)?.as_str()?;
++        Some(TttPane {
++            tab_id: pane.tab_id?,
++            pane_id: pane.pane_id?,
++            tmpdir: PathBuf::from(tmpdir),
++        })
++    })
++}
++
++fn spawn_ttt_file(file: &Path, tmpdir: &Path) -> io::Result<()> {
++    std::process::Command::new("ttt")
++        .arg(file)
++        .env("TMPDIR", tmpdir)
++        .env_remove("TTT_FORWARD_SOCKET")
++        .stdin(std::process::Stdio::null())
++        .stdout(std::process::Stdio::null())
++        .stderr(std::process::Stdio::null())
++        .spawn()
++        .map(|_| ())
++}
++
+ pub fn configured_editor() -> Option<String> {
+     crate::state::load_editor_command().or_else(|| {
+         [EDITOR_COMMAND_ENV, "VISUAL", "EDITOR"]
+@@ -620,12 +676,6 @@ pub fn run_configured_editor() -> io::Result<()> {
+ }
+ 
+ pub fn open_in_editor_tab(my_pane_id: &str, root: &Path, file: &Path) -> io::Result<()> {
+-    let command = configured_editor().ok_or_else(|| {
+-        io::Error::new(
+-            io::ErrorKind::NotFound,
+-            "set HERDR_SIDEBAR_EDITOR, VISUAL, or EDITOR",
+-        )
+-    })?;
+     let panes = crate::ipc::call_text("pane.list", serde_json::json!({}))?;
+     let workspace_id = crate::launch::workspace_of(&panes, my_pane_id);
+     if workspace_id.is_empty() {
+@@ -639,6 +689,17 @@ pub fn open_in_editor_tab(my_pane_id: &str, root: &Path, file: &Path) -> io::Res
+     } else {
+         root.join(file)
+     };
++    if let Some(ttt) = ttt_pane_for(&panes, &workspace_id) {
++        spawn_ttt_file(&editor_file, &ttt.tmpdir)?;
++        crate::viewer::focus_tab_for_client(&ttt.tab_id, Some(&ttt.pane_id));
++        return Ok(());
++    }
++    let command = configured_editor().ok_or_else(|| {
++        io::Error::new(
++            io::ErrorKind::NotFound,
++            "set HERDR_SIDEBAR_EDITOR, VISUAL, or EDITOR",
++        )
++    })?;
+     let file_token = editor_file_token(&editor_file);
+     if let Some((tab_id, pane_id)) =
+         editor_tab_for_file(&panes, &workspace_id, &file_token, crate::state::unix_now())

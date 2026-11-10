@@ -1,0 +1,29 @@
+[
+  {
+    "name": "markdown-preview",
+    "displayName": "Markdown Preview",
+    "repo": "https://github.com/eugenioenko/ttt-plugins",
+    "path": "markdown-preview",
+    "version": "0.1.0",
+    "enabled": true,
+    "permissions": {
+      "panel.editor": true,
+      "commands": true,
+      "editor.read": true,
+      "network.http": false
+    },
+    "grantsVersion": 2
+  },
+  {
+    "name": "theme-catppuccin-mocha",
+    "displayName": "Catppuccin Mocha Theme",
+    "repo": "https://github.com/eugenioenko/ttt-plugins",
+    "path": "theme-catppuccin-mocha",
+    "version": "0.1.0",
+    "enabled": true,
+    "permissions": {
+      "network.http": false
+    },
+    "grantsVersion": 2
+  }
+]

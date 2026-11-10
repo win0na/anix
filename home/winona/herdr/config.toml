@@ -1,0 +1,42 @@
+onboarding = false
+
+[ui]
+# Changes the collapsed mode from a 4-column strip to fully hidden
+sidebar_collapsed_mode = "hidden"
+# Removes the tab row entirely; switch tabs with prefix+k (herdr-bar)
+hide_tab_bar = true
+# Keep the desktop layout at phone widths. The dashboard is persisted
+# collapsed, and the responsive-sidebar plugin owns the server-side sidebar.
+# A nonzero threshold switches the whole client to herdr's mobile layout,
+# which adds a 2-row header at the top of the screen.
+mobile_width_threshold = 0
+
+[experimental]
+kitty_graphics = true
+
+[terminal]
+palette = "~/.config/herdr/catppuccin-mocha.xresources"
+
+[[keys.command]]
+key = "prefix+k"
+type = "plugin_action"
+command = "herdr-bar.open"
+description = "command bar"
+
+[[keys.command]]
+key = "prefix+s"
+type = "plugin_action"
+command = "responsive-sidebar.toggle"
+description = "sidebar (dock wide, overlay narrow)"
+
+[[keys.command]]
+key = "prefix+e"
+type = "shell"
+command = "herdr plugin pane open --plugin ttt.editor --entrypoint editor"
+description = "open TTT editor"
+
+[[keys.command]]
+key = "prefix+i"
+type = "shell"
+command = "herdr-ide"
+description = "IDE layout: sidebar, agent, ttt"

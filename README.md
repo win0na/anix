@@ -9,9 +9,10 @@ and stays awake with the lid closed.
 
 ## Status
 
-The repository is a skeleton. Host configurations land in the next pass. The
-scripts and docs describe the intended system; commands that need a host
-configuration fail until it exists.
+The host configurations and shared home modules are in place. The flake
+evaluates both hosts, and the Linux Herdr, sidebar, ttt, and fff packages build.
+The first switch still needs the bootstrap sequence in
+[docs/bootstrap.md](docs/bootstrap.md).
 
 ## Features
 

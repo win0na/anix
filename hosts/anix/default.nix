@@ -12,6 +12,12 @@ in
   ] ++ lib.optional (builtins.pathExists secretsFile) ./sops.nix;
 
   nixpkgs.hostPlatform = "x86_64-linux";
+  nixpkgs.overlays = [
+    inputs.rust-overlay.overlays.default
+    (import ../../overlays/herdr.nix { inherit (inputs) herdr-src; })
+    (import ../../overlays/default.nix)
+  ];
+
   networking.hostName = "anix";
   system.stateVersion = "26.11";
 
@@ -20,15 +26,20 @@ in
     defaultUser = "winona";
   };
 
+  programs.zsh.enable = true;
   users.users.winona.shell = pkgs.zsh;
 
   environment.systemPackages = with pkgs; [
     age
     curl
+    fff-mcp
     git
+    herdr
     jq
+    python3
     sops
     ssh-to-age
+    ttt
     zsh
   ];
 

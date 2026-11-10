@@ -1,0 +1,1 @@
+{"$schema":"https://opencode.ai/v2/cli.json","theme":{"name":"system","mode":"dark"},"plugins":["oh-my-opencode-slim","./oc-title-strip"],"session":{"scrollbar":true,"markdown":"rendered","thinking":"hide"}}

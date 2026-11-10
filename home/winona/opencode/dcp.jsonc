@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+
+  // Compression notifications as toasts so they do not consume chat tokens.
+  "pruneNotification": "detailed",
+  "pruneNotificationType": "toast",
+
+  // Verbose plugin log at ~/.config/opencode/logs/dcp/daily/.
+  "debug": true,
+
+  "compress": {
+    "mode": "range",
+    "permission": "allow",
+
+    // Absolute token limits keep the same ceiling on any model.
+    // 180k max / 150k min: the session settles around 170k, so the
+    // strong nudge only fires above 180k and the agent is not pushed
+    // into small recent-tail compressions to chase a lower ceiling.
+    "maxContextLimit": 180000,
+    "minContextLimit": 150000,
+
+    // Remind at most every 10th fetch, not every one.
+    "nudgeFrequency": 10,
+    // Iteration reminders only after 60 messages without user input.
+    "iterationNudgeThreshold": 60,
+    "nudgeForce": "soft",
+
+    // Summary tokens count toward context but do not raise the ceiling;
+    // the 180k target stays fixed instead of drifting upward.
+    "summaryBuffer": false,
+    "protectUserMessages": false
+  },
+
+  // Required for the overrides in dcp-prompts/overrides/.
+  "experimental": {
+    "customPrompts": true,
+    "allowSubAgents": true
+  },
+
+  "strategies": {
+    "deduplication": {
+      "enabled": true
+    },
+    "purgeErrors": {
+      "enabled": true,
+      "turns": 2
+    }
+  }
+}

@@ -74,11 +74,15 @@ both platforms. A platform-specific module belongs in `modules/nixos` or
 | `modules/darwin` | nix-darwin-only options. |
 | `modules/home` | Home Manager modules shared by both hosts. |
 | `home/winona` | The user's packages, shell, Herdr, OpenCode, and ttt. |
+| `home/winona/opencode` | The shared OpenCode config and first-party plugins. |
+| `home/winona/herdr` | Herdr config, palette, and the sidebar plugin activation. |
 | `pkgs/herdr` | Pinned Herdr source with the two core patches. |
+| `pkgs/herdr-sidebar` | Pinned sidebar plugin with the single-ttt-pane patch. |
+| `pkgs/herdr-sidebar-patch` | The patch applied to the sidebar plugin. |
+| `pkgs/fff-mcp` | Pinned fff MCP binary for Linux and Darwin. |
 | `pkgs/nuvio` | Pinned Nuvio desktop DMG. |
 | `pkgs/opencode-dcp-fix` | First-party OpenCode plugin, vendored. |
 | `pkgs/herdr-plugins` | First-party Herdr plugins packaged in Nix. |
-| `pkgs/herdr-sidebar-patch` | Planned patch for the pinned sidebar plugin. |
 | `secrets` | Encrypted secrets and the sops creation rules. |
 | `scripts` | User-facing entry points. |
 | `docs` | This documentation. |

@@ -13,5 +13,11 @@
     };
 
     secrets."cachix-token" = { };
+
+    secrets."opencode-9router-api-key" = {
+      key = "opencode/9router-api-key";
+      owner = "winona";
+      mode = "0400";
+    };
   };
 }

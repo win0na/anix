@@ -1,0 +1,179 @@
+{
+  "agent": {
+    "explore": {
+      "disable": true
+    },
+    "general": {
+      "disable": true
+    }
+  },
+  "mcp": {
+    "servers": {
+      "fff": {
+        "type": "local",
+        "command": [
+          "fff-mcp"
+        ],
+        "enabled": true
+      },
+      "headroom": {
+        "type": "local",
+        "command": [
+          "uvx",
+          "--from",
+          "headroom-ai[all]",
+          "headroom",
+          "mcp",
+          "serve"
+        ],
+        "enabled": true
+      },
+      "serena": {
+        "type": "local",
+        "command": [
+          "uvx",
+          "--from",
+          "serena-agent",
+          "serena",
+          "start-mcp-server",
+          "--project-from-cwd",
+          "--context",
+          "agent",
+          "--open-web-dashboard",
+          "False"
+        ],
+        "enabled": true
+      }
+    }
+  },
+  "lsp": true,
+  "websearch": {
+    "provider": "tavily"
+  },
+  "plugins": [
+    "oh-my-opencode-slim",
+    "@tarquinen/opencode-dcp@latest",
+    "@ex-machina/opencode-anthropic-auth@2.0.0-next.6",
+    "@slkiser/opencode-quota",
+    {
+      "package": "headroom-opencode",
+      "options": {
+        "proxyUrl": "http://127.0.0.1:8787",
+        "excludeHosts": [
+          "api.anthropic.com"
+        ]
+      }
+    },
+    "./plugins/opencode-dcp-fix"
+  ],
+  "compaction": {
+    "prune": true
+  },
+  "providers": {
+    "orcarouter": {
+      "models": {
+        "deepseek/deepseek-v4.1-flash-free": {
+          "modelID": "deepseek/deepseek-v4.1-flash-free",
+          "family": "deepseek-flash",
+          "name": "DeepSeek V4.1 Flash (free)",
+          "cost": [
+            {
+              "input": 0,
+              "output": 0,
+              "cache": {
+                "read": 0,
+                "write": 0
+              }
+            }
+          ],
+          "compatibility": {
+            "reasoningField": "reasoning_content"
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ],
+            "temperature": true
+          },
+          "variants": [
+            {
+              "id": "low",
+              "settings": {
+                "reasoningEffort": "low"
+              }
+            },
+            {
+              "id": "high",
+              "settings": {
+                "reasoningEffort": "high"
+              }
+            },
+            {
+              "id": "max",
+              "settings": {
+                "reasoningEffort": "max"
+              }
+            }
+          ],
+          "limit": {
+            "context": 1000000,
+            "output": 384000
+          }
+        }
+      }
+    }
+  },
+  "experimental": {
+    "background_compaction": true
+  },
+  "provider": {
+    "9router": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:20128/v1",
+        "apiKey": "{file:/run/secrets/opencode-9router-api-key}"
+      },
+      "models": {
+        "kr/glm-5": {
+          "name": "kr/glm-5",
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "kr/claude-sonnet-4.5": {
+          "name": "kr/claude-sonnet-4.5",
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    "headroom": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Headroom Proxy",
+      "options": {
+        "baseURL": "http://127.0.0.1:8787/v1"
+      }
+    },
+    "anthropic": {},
+    "opencode-go": {},
+    "opencode": {}
+  },
+  "model": "9router/kr/claude-sonnet-4.5"
+}

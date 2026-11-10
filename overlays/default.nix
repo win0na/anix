@@ -1,3 +1,6 @@
-final: prev: {
-  # TODO: herdr, nuvio, opencode-dcp-fix, responsive-sidebar.
+final: _prev:
+
+{
+  fff-mcp = final.callPackage ../pkgs/fff-mcp { };
+  ttt = final.callPackage ../pkgs/ttt { };
 }

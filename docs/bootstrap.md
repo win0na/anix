@@ -2,8 +2,8 @@
 
 This tutorial takes a Windows 11 machine with an Intel Mac and leaves two hosts
 on one flake: `anix` on NixOS-WSL and `amac` on nix-darwin. It assumes the
-configuration in this repository is complete. The current repository is a
-skeleton, so the switch steps fail until the configuration pass lands.
+configuration in this repository is complete. The host configuration is in
+place; the first switch still needs the one-time steps below.
 
 ## Before you start
 

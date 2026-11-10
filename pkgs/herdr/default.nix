@@ -1,19 +1,23 @@
-{ ... }:
+{ callPackage, rustPlatform, herdr-src }:
 
-# Verified build facts for kitknox/herdr rootshell-v0.1.10:
-#
-# - rustPlatform.buildRustPackage
-# - src = herdr-src (the flake input)
-# - cargoLock.lockFile = "${herdr-src}/Cargo.lock"
-# - Zig dependencies from vendor/libghostty-vt/build.zig.zon.nix
-# - nativeBuildInputs: zig_0_16, zstd, pkg-config, git
-# - Darwin build inputs: cctools, xcbuild
-# - doCheck = false
-# - HERDR_BUILD_CHANNEL=rootshell
-# - HERDR_BUILD_ID=0.1.10
-# - two patches in ./patches: herdr-hide-tab-bar-only.patch,
-#   herdr-palette-fallback.patch
-#
-# TODO: write the derivation. The Darwin build has never run in upstream CI.
-{
-}
+let
+  upstream = callPackage (herdr-src + "/nix/package.nix") {
+    inherit rustPlatform;
+  };
+in
+upstream.overrideAttrs (old: {
+  # The upstream fileset drops CHANGELOG.md and docs/next/website, which both
+  # patches touch. Build from the full tag tree so the hunks apply.
+  src = herdr-src;
+
+  patches = [
+    ./patches/herdr-hide-tab-bar-only.patch
+    ./patches/herdr-palette-fallback.patch
+  ];
+
+  env = old.env // {
+    HERDR_BUILD_CHANNEL = "rootshell";
+    HERDR_BUILD_ID = "0.1.10";
+    HERDR_BUILD_COMMIT = "174c20253fe07110e8b0318ce0adaa93d18a349e";
+  };
+})

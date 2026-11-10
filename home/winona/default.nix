@@ -1,7 +1,14 @@
 { ... }:
 
 {
-  home.username = "winona";
+  imports = [
+    ./herdr
+    ./opencode
+    ./ttt
+  ];
 
-  # TODO: shared packages, aliases, prompt, herdr, opencode, ttt.
+  home.username = "winona";
+  home.sessionPath = [ "$HOME/.local/bin" ];
+
+  # TODO: shared packages, aliases, prompt.
 }

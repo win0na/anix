@@ -9,15 +9,20 @@ at activation.
 | Item | Location |
 | --- | --- |
 | Main config | `~/.config/opencode/opencode.json` |
+| TUI config | `~/.config/opencode/cli.json` |
 | Agent instructions | `~/.config/opencode/AGENTS.md` |
 | Plugin config | `~/.config/opencode/oh-my-opencode-slim.json`, `dcp.jsonc` |
+| Prompts | `~/.config/opencode/dcp-prompts/` |
+| Theme | `~/.config/opencode/themes/catppuccin-mocha.json` |
 | Local plugins | `~/.config/opencode/plugins/` |
 | Skills | `~/.config/opencode/skills/`, `~/.agents/skills/` |
 | State | `~/.local/share/opencode/`, `~/.cache/opencode/` |
 
-Home Manager writes the config files. State stays on the local disk. The two
-skill directories are provisioned from their own sources; the repository tracks
-the config that points at them.
+Home Manager links the read-only files with `xdg.configFile`. It copies
+`opencode.json` and `cli.json` from the store at activation because OpenCode
+rewrites those two. State stays on the local disk. The two skill directories are
+provisioned from their own sources; the repository tracks the config that points
+at them.
 
 ## Plugins
 
@@ -26,7 +31,7 @@ the config that points at them.
 | `oh-my-opencode-slim` | npm | Agent and tool policy |
 | `opencode-dcp-fix` | This repo | Strips internal context metadata from prompts and output |
 | `@tarquinen/opencode-dcp` | npm | Context management |
-| `@ex-machina/opencode-anthropic-auth` | npm | Anthropic auth |
+| `@ex-machina/opencode-anthropic-auth` | npm, `2.0.0-next.6` | Anthropic auth |
 | `@slkiser/opencode-quota` | npm | Quota display |
 | `headroom-opencode` | npm | Context compression |
 | `herdr-agent-state.js` | First-party | Reports agent state to Herdr |
@@ -36,16 +41,18 @@ the config that points at them.
 Caveman and Moshi are removed. Their plugins and MCP servers do not load on
 either host.
 
-npm plugin versions follow latest. The repository does not pin them, so a new
-upstream release reaches both hosts on the next rebuild. If a release breaks
-the setup, pin that one plugin in the same commit that fixes the config.
+npm plugin versions follow latest, with one exception. The Anthropic auth plugin
+is pinned to `2.0.0-next.6`, the published build that works; a bare `latest`
+does not resolve to that prerelease. The other npm plugins are unpinned, so a
+new release reaches both hosts on the next rebuild. If a release breaks the
+setup, pin that one plugin in the same commit that fixes the config.
 
 ## MCP servers
 
 | Server | Command | Notes |
 | --- | --- | --- |
 | `fff` | `fff-mcp` | File search |
-| `headroom` | `headroom mcp serve` | Context compression |
+| `headroom` | `uvx --from headroom-ai[all] headroom mcp serve` | Context compression |
 | `serena` | `uvx --from serena-agent serena start-mcp-server --project-from-cwd --context agent --open-web-dashboard False` | Code intelligence |
 
 Use commands on `PATH`, not absolute home paths. The WSL host and the Mac have
@@ -55,11 +62,20 @@ Caveman MCP is not configured.
 
 ## Secrets
 
-API keys do not live in `opencode.json`. Home Manager writes the file from a
-sops template, or exports the keys into the OpenCode environment at login. The
-exact template lands in the configuration pass. The rule is fixed: the
-repository contains no plaintext key, and the generated file is not edited by
-hand.
+The 9router key lives in sops and is referenced from `opencode.json`:
+
+```json
+"apiKey": "{file:/run/secrets/opencode-9router-api-key}"
+```
+
+The sops secret is owned by `winona` with mode `0400`; both hosts read it from
+`/run/secrets`. The repository contains no plaintext key. The key name in
+`secrets/secrets.yaml` is `opencode/9router-api-key`, so the sops module maps it
+with `key = "opencode/9router-api-key"`. A missing secret reads as an empty
+string; the provider then fails auth.
+
+`service.json` is a local secret and stays out of the repository. `auth.json`
+does not exist in this setup.
 
 ## DCP fix
 
@@ -79,16 +95,23 @@ terminal. The plugin is shared; the Herdr config is in [Herdr](herdr.md).
 ```sh
 opencode --version
 opencode --help
+opencode debug config
+opencode plugin list
 ```
 
 Check the generated config for absolute paths from the other host. The WSL host
 uses `/home/winona`; the Mac uses `/Users/winona`. A shared file with either
-path is a bug.
+path is a bug. Check that `mcp` has exactly `fff`, `headroom`, and `serena`, and
+that no caveman or moshi entry survives. The checked-in config parses with
+`jq empty home/winona/opencode/opencode.json`.
 
 ## Known limits
 
-- npm plugins follow latest, so two rebuilds can load different code.
+- npm plugins follow latest, so two rebuilds can load different code. The
+  Anthropic auth plugin is the deliberate exception at `2.0.0-next.6`.
 - Skills are large and are not vendored. A missing skill directory is a setup
   error, not a config error.
-- The auth plugin may require a prerelease version. If latest fails, pin the
-  known working prerelease for that plugin only.
+- The 9router provider uses `127.0.0.1:20128`; the headroom plugin expects the
+  proxy at `127.0.0.1:8787`. Both must run on each host that uses them.
+- `opencode.json` and `cli.json` are copies, not links. A manual edit is
+  overwritten by the next activation.

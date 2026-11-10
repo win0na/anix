@@ -46,12 +46,14 @@ fi
 
 cd "$repo_root"
 
+nix_flags=(--extra-experimental-features "nix-command flakes")
+
 echo "==> nix eval .#nixosConfigurations.anix"
-nix eval --raw ".#nixosConfigurations.anix.config.system.build.toplevel.drvPath" >/dev/null ||
+nix "${nix_flags[@]}" eval --raw ".#nixosConfigurations.anix.config.system.build.toplevel.drvPath" >/dev/null ||
   fail "anix configuration eval failed"
 
 echo "==> nix eval .#darwinConfigurations.amac"
-nix eval --raw ".#darwinConfigurations.amac.config.system.build.toplevel.drvPath" >/dev/null ||
+nix "${nix_flags[@]}" eval --raw ".#darwinConfigurations.amac.config.system.build.toplevel.drvPath" >/dev/null ||
   fail "amac configuration eval failed"
 
 echo "==> bash -n scripts/*"
