@@ -1,0 +1,33 @@
+id = "responsive-sidebar"
+name = "Responsive Sidebar"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+description = "Dock herdr-sidebar on wide tabs and open it as an overlay on narrow tabs."
+platforms = ["linux", "macos"]
+
+# One-shot hook: detach the width watcher, then exit so herdr can finish
+# startup. The watcher exits on its own when the server socket goes away.
+[[startup]]
+command = ["python3", "bin/responsive_sidebar.py", "start"]
+platforms = ["linux", "macos"]
+
+# prefix+s: dock/undock on a wide tab, overlay on a narrow tab.
+[[actions]]
+id = "toggle"
+title = "Toggle sidebar (responsive)"
+description = "Dock herdr-sidebar on a wide tab; open it as a full-screen overlay on a narrow tab."
+command = ["python3", "bin/responsive_sidebar.py", "toggle"]
+platforms = ["linux", "macos"]
+
+# Manual watcher control, for reloads and debugging.
+[[actions]]
+id = "start-watcher"
+title = "Start responsive watcher"
+command = ["python3", "bin/responsive_sidebar.py", "start"]
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "stop-watcher"
+title = "Stop responsive watcher"
+command = ["python3", "bin/responsive_sidebar.py", "stop"]
+platforms = ["linux", "macos"]

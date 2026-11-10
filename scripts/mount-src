@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/mount-src
+
+Mount the NFS export from the WSL host at the macOS source directory. Run as
+root, or let the script use sudo for the mount.
+
+Environment:
+  ANIX_NFS_HOST    NFS server hostname. The default anix is a placeholder; set
+                   this to the Windows Tailscale node that forwards to the
+                   WSL NFS server.
+  ANIX_MOUNT_POINT Local mount point. Defaults to /Users/winona/src.
+
+Options:
+  -h, --help       Show this help and exit.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+MOUNT_POINT=${ANIX_MOUNT_POINT:-/Users/winona/src}
+NFS_HOST=${ANIX_NFS_HOST:-anix}
+
+if [[ -z "${ANIX_NFS_HOST:-}" ]]; then
+  echo "warning: ANIX_NFS_HOST is unset; using 'anix' as a placeholder." >&2
+  echo "warning: set ANIX_NFS_HOST to the Windows Tailscale node that forwards" >&2
+  echo "warning: to the WSL NFS server." >&2
+fi
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "error: mount-src runs on macOS, found $(uname -s)" >&2
+  exit 1
+fi
+
+if mount | awk -v mp="$MOUNT_POINT" '$3 == mp { found = 1 } END { exit !found }'; then
+  echo "==> already mounted at $MOUNT_POINT"
+  echo "==> host: $NFS_HOST"
+  echo "==> mount point: $MOUNT_POINT"
+  exit 0
+fi
+
+tailscale_bin=""
+if command -v tailscale >/dev/null 2>&1; then
+  tailscale_bin="$(command -v tailscale)"
+elif [[ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ]]; then
+  tailscale_bin="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+fi
+
+ready=0
+deadline=$((SECONDS + 60))
+while (( SECONDS < deadline )); do
+  if [[ -n "$tailscale_bin" ]]; then
+    "$tailscale_bin" status >/dev/null 2>&1 || true
+  fi
+  if nc -z -G 5 "$NFS_HOST" 2049 >/dev/null 2>&1; then
+    ready=1
+    break
+  fi
+  sleep 2
+done
+
+if (( ready == 0 )); then
+  echo "error: $NFS_HOST:2049 not reachable after 60 seconds" >&2
+  echo "error: check Tailscale on the Mac and the Windows node, then retry" >&2
+  exit 1
+fi
+
+mkdir -p "$MOUNT_POINT"
+
+options="vers=4.1,resvport,rw,noowners,hard,intr,rsize=131072,wsize=131072,bg"
+if [[ "$(id -u)" -ne 0 ]]; then
+  echo "==> sudo mount_nfs -o $options $NFS_HOST:/ $MOUNT_POINT"
+  sudo mount_nfs -o "$options" "$NFS_HOST:/" "$MOUNT_POINT"
+else
+  echo "==> mount_nfs -o $options $NFS_HOST:/ $MOUNT_POINT"
+  mount_nfs -o "$options" "$NFS_HOST:/" "$MOUNT_POINT"
+fi
+
+echo "==> host: $NFS_HOST"
+echo "==> mount point: $MOUNT_POINT"

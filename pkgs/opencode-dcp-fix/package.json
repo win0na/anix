@@ -1,0 +1,21 @@
+{
+  "name": "@winona/opencode-dcp-fix",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Strips internal context-management metadata (system-reminder blocks and @N@ message refs) from OpenCode v2 prompts and model output.",
+  "exports": {
+    ".": "./index.js"
+  },
+  "main": "./index.js",
+  "files": [
+    "index.js",
+    "lib"
+  ],
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

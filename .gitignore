@@ -1,0 +1,9 @@
+.slim/deepwork/
+result
+result-*
+.direnv/
+.DS_Store
+*.swp
+__pycache__/
+*.pyc
+node_modules/

@@ -1,0 +1,113 @@
+diff --git a/docs/next/website/src/content/docs/configuration.mdx b/docs/next/website/src/content/docs/configuration.mdx
+index 874fe56..68db0fd 100644
+--- a/docs/next/website/src/content/docs/configuration.mdx
++++ b/docs/next/website/src/content/docs/configuration.mdx
+@@ -315,6 +315,8 @@ The sidebar is the main Herdr dashboard. Search `ui.` in the [Config reference](
+ 
+ Set `tab_bar_position = "bottom"` under `[ui]` to place the desktop tab row below the terminal panes. Prefix, Navigate, Copy, and Resize mode bars temporarily replace the bottom tab row while active. The default is `"top"`.
+ 
++Set `hide_tab_bar = true` under `[ui]` to remove the desktop tab row entirely. Tabs stay reachable through keybindings and the tab API. `hide_tab_bar_when_single_tab` is the narrower variant that hides the row only when the workspace has one tab.
++
+ Configure an ordered tmux-style status area at the right edge of the tab row:
+ 
+ ```toml
+diff --git a/src/client/shell/config.rs b/src/client/shell/config.rs
+index 04a3ddb..f2e86f7 100644
+--- a/src/client/shell/config.rs
++++ b/src/client/shell/config.rs
+@@ -120,6 +120,7 @@ impl ClientShellConfig {
+             sidebar_collapsed_mode: config.ui.sidebar_collapsed_mode,
+             mobile_width_threshold: config.ui.mobile_width_threshold,
+             tab_bar_position: config.ui.tab_bar_position,
++            hide_tab_bar: config.ui.hide_tab_bar,
+             hide_tab_bar_when_single_tab: config.ui.hide_tab_bar_when_single_tab,
+             spaces: config.ui.sidebar.spaces.clone(),
+             agents: config.ui.sidebar.agents.clone(),
+@@ -347,6 +348,7 @@ impl ClientShellConfig {
+                 self.sidebar_collapsed_mode = ui.sidebar_collapsed_mode;
+                 self.mobile_width_threshold = ui.mobile_width_threshold;
+                 self.tab_bar_position = ui.tab_bar_position;
++                self.hide_tab_bar = ui.hide_tab_bar;
+                 self.hide_tab_bar_when_single_tab = ui.hide_tab_bar_when_single_tab;
+                 self.spaces = ui.sidebar.spaces.clone();
+                 self.agents = ui.sidebar.agents.clone();
+@@ -415,7 +417,8 @@ impl ClientShellConfig {
+         }
+         .min(cols.saturating_sub(1));
+         let main = Rect::new(sidebar_width, 0, cols.saturating_sub(sidebar_width), rows);
+-        let show_tab_bar = rows > 1 && !(self.hide_tab_bar_when_single_tab && tab_count == 1);
++        let show_tab_bar =
++            rows > 1 && !self.hide_tab_bar && !(self.hide_tab_bar_when_single_tab && tab_count == 1);
+         let tab_height = u16::from(show_tab_bar);
+         let (tab_bar, pane_surface) = match self.tab_bar_position {
+             TabBarPositionConfig::Top => (
+diff --git a/src/client/shell/state.rs b/src/client/shell/state.rs
+index 5a73292..0ff1540 100644
+--- a/src/client/shell/state.rs
++++ b/src/client/shell/state.rs
+@@ -20,6 +20,7 @@ pub(crate) struct ClientShellConfig {
+     pub(super) sidebar_collapsed_mode: SidebarCollapsedModeConfig,
+     pub(super) mobile_width_threshold: u16,
+     pub(super) tab_bar_position: TabBarPositionConfig,
++    pub(super) hide_tab_bar: bool,
+     pub(super) hide_tab_bar_when_single_tab: bool,
+     pub(super) spaces: SpacesSidebarConfig,
+     pub(super) agents: crate::config::AgentsSidebarConfig,
+diff --git a/src/client/shell/tests/mobile.rs b/src/client/shell/tests/mobile.rs
+index 4dac549..0059303 100644
+--- a/src/client/shell/tests/mobile.rs
++++ b/src/client/shell/tests/mobile.rs
+@@ -69,6 +69,18 @@ fn mobile_layout_reserves_only_client_header() {
+     );
+ }
+ 
++#[test]
++fn hiding_the_tab_bar_reclaims_its_row() {
++    let mut config = ClientShellConfig::from_config(&Config::default());
++    config.hide_tab_bar = true;
++    let state = ClientShellState::new(config);
++    let layout = state.layout(106, 30);
++    assert!(layout.tab_bar.is_empty());
++    assert_eq!(layout.pane_surface.y, 0);
++    assert_eq!(layout.pane_surface.height, 30);
++    assert_eq!(state.surface_size(106, 30).rows, 30);
++}
++
+ #[test]
+ fn mobile_switcher_can_activate_an_online_saved_machine() {
+     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+diff --git a/src/config/model.rs b/src/config/model.rs
+index 29802fd..7ad59d5 100644
+--- a/src/config/model.rs
++++ b/src/config/model.rs
+@@ -980,6 +980,8 @@ pub struct UiConfig {
+     pub pane_gaps: bool,
+     /// Show agent labels in split pane borders when no manual pane label is set. Default: false.
+     pub show_agent_labels_on_pane_borders: bool,
++    /// Hide the tab row entirely. Default: false.
++    pub hide_tab_bar: bool,
+     /// Hide the tab row when the workspace has one tab. Default: false.
+     pub hide_tab_bar_when_single_tab: bool,
+     /// Desktop tab row placement. Default: top.
+@@ -1218,6 +1220,7 @@ impl Default for UiConfig {
+             pane_scrollbars: true,
+             pane_gaps: true,
+             show_agent_labels_on_pane_borders: false,
++            hide_tab_bar: false,
+             hide_tab_bar_when_single_tab: false,
+             tab_bar_position: TabBarPositionConfig::Top,
+             tab_bar_right: Vec::new(),
+diff --git a/src/main.rs b/src/main.rs
+index f97e7e2..a7135f2 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -311,6 +311,9 @@ const DEFAULT_CONFIG: &str = r##"# herdr configuration
+ # Show detected/reported agent labels in split pane borders when no manual pane name is set.
+ # show_agent_labels_on_pane_borders = false
+ 
++# Hide the tab row entirely. Tabs remain reachable by keybinding.
++# hide_tab_bar = false
++
+ # Hide the tab row when a workspace has exactly one tab.
+ # New tabs can still be created with the configured keybinding.
+ # hide_tab_bar_when_single_tab = false

@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/rebuild [anix|amac]
+
+Rebuild and activate one host configuration.
+
+Targets:
+  anix   NixOS-WSL host. Runs nixos-rebuild switch locally. Requires Linux.
+  amac   Intel Mac host. Runs darwin-rebuild switch on macOS, or over
+         ssh amac when run from Linux.
+
+With no target, rebuild detects the OS: Darwin selects amac, Linux selects anix.
+
+Options:
+  -h, --help  Show this help and exit.
+EOF
+}
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$repo_root" ]]; then
+  repo_root="$(cd "$script_dir/.." && pwd)"
+fi
+
+host_os="$(uname -s)"
+
+if [[ $# -gt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+target="${1:-}"
+case "$target" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  "")
+    case "$host_os" in
+      Darwin) target="amac" ;;
+      Linux) target="anix" ;;
+      *)
+        echo "error: unsupported operating system: $host_os" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  anix|amac) ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+run() {
+  printf '==>'
+  printf ' %q' "$@"
+  printf '\n'
+  "$@"
+}
+
+case "$target" in
+  anix)
+    if [[ "$host_os" != "Linux" ]]; then
+      echo "error: anix is the NixOS-WSL host; rebuild it on Linux with nixos-rebuild" >&2
+      exit 1
+    fi
+    if ! command -v nixos-rebuild >/dev/null 2>&1; then
+      echo "error: nixos-rebuild not found on PATH (is this NixOS?)" >&2
+      exit 1
+    fi
+    run sudo nixos-rebuild switch --flake "$repo_root#anix"
+    ;;
+  amac)
+    if [[ "$host_os" == "Darwin" ]]; then
+      if ! command -v darwin-rebuild >/dev/null 2>&1; then
+        echo "error: darwin-rebuild not found on PATH (is nix-darwin installed?)" >&2
+        exit 1
+      fi
+      run sudo darwin-rebuild switch --flake "$repo_root#amac"
+    elif [[ "$host_os" == "Linux" ]]; then
+      if ! command -v ssh >/dev/null 2>&1; then
+        echo "error: ssh not found on PATH" >&2
+        exit 1
+      fi
+      if ! ssh -o BatchMode=yes -o ConnectTimeout=5 amac true; then
+        echo "error: cannot reach amac over SSH (check ssh amac and Tailscale)" >&2
+        exit 1
+      fi
+      run ssh amac 'set -euo pipefail; cd ~/.config/anix; git pull --ff-only; sudo darwin-rebuild switch --flake .#amac'
+    else
+      echo "error: amac is the Intel Mac host and cannot be rebuilt from $host_os" >&2
+      exit 1
+    fi
+    ;;
+esac

@@ -1,0 +1,80 @@
+diff --git a/packages/tui/src/routes/session/dialog-message.tsx b/packages/tui/src/routes/session/dialog-message.tsx
+index 5b2b67419d..932d73bf89 100644
+--- a/packages/tui/src/routes/session/dialog-message.tsx
++++ b/packages/tui/src/routes/session/dialog-message.tsx
+@@ -8,6 +8,7 @@ import { useClient } from "../../context/client"
+ import { errorMessage } from "../../util/error"
+ import { DialogFork } from "./dialog-fork"
+ import { usePromptRestore } from "../../prompt/restore"
++import { filterSystemMetadata } from "../../util/message-filter"
+ import { useNewDesigns } from "../../config"
+ import { appendToSessionPrompt } from "../../component/prompt/draft-stash"
+ 
+@@ -57,7 +58,7 @@ export function DialogMessage(props: { messageID: string; sessionID: string }) {
+             if (!value) return
+             const text =
+               value.type === "user"
+-                ? value.text
++                ? filterSystemMetadata(value.text)
+                 : value.type === "assistant"
+                   ? value.content
+                       .filter((content) => content.type === "text")
+diff --git a/packages/tui/src/routes/session/index.tsx b/packages/tui/src/routes/session/index.tsx
+index 0e685134a4..ffa1b16b9d 100644
+--- a/packages/tui/src/routes/session/index.tsx
++++ b/packages/tui/src/routes/session/index.tsx
+@@ -97,6 +97,7 @@ import { useClipboard } from "../../context/clipboard"
+ import { nextThinkingMode, type ThinkingMode } from "../../context/thinking"
+ import { getScrollAcceleration } from "../../util/scroll"
+ import { collapseShellOutput, collapseToolOutput } from "../../util/collapse-tool-output"
++import { filterSystemMetadata } from "../../util/message-filter"
+ import { Keymap, type KeymapCommand } from "../../context/keymap"
+ import { usePathFormatter } from "../../context/path-format"
+ import { useLocation } from "../../context/location"
+@@ -2423,7 +2424,7 @@ function UserMessage(props: { message: SessionMessageUser }) {
+           backgroundColor={hover() ? theme.decrease(theme.background.raised.base) : theme.background.raised.base}
+           flexShrink={0}
+         >
+-          <text fg={theme.text.base}>{props.message.text}</text>
++          <text fg={theme.text.base}>{filterSystemMetadata(props.message.text)}</text>
+           <Show when={skills().length}>
+             <box flexDirection="row" paddingTop={1} gap={1} flexWrap="wrap">
+               <For each={skills()}>
+@@ -3745,7 +3746,7 @@ function formatSessionTranscript(
+   tools = true,
+ ) {
+   const body = messages.flatMap((message) => {
+-    if (message.type === "user") return [`## User\n\n${message.text}`]
++    if (message.type === "user") return [`## User\n\n${filterSystemMetadata(message.text)}`]
+     if (message.type === "shell")
+       return [`## Shell\n\n\`\`\`\n$ ${message.command}\n${message.output?.output ?? ""}\n\`\`\``]
+     if (message.type !== "assistant") return []
+diff --git a/packages/tui/src/util/message-filter.ts b/packages/tui/src/util/message-filter.ts
+new file mode 100644
+index 0000000000..689becdb62
+--- /dev/null
++++ b/packages/tui/src/util/message-filter.ts
+@@ -0,0 +1,23 @@
++/**
++ * Strip context-management metadata from user-visible text.
++ *
++ * DCP and the runtime mark up the transcript they send to the model with
++ * sentinels that only the agent should read. Messages are stored with them
++ * intact, so anything rendering stored text has to filter first.
++ */
++
++const TAGS = ["dcp-system-reminder", "system-reminder"]
++
++/** A DCP reference token, e.g. `@12@` or `@b3@`. */
++const REF = /@b?\d+@/g
++
++export function filterSystemMetadata(text: string): string {
++  let out = text
++  for (const tag of TAGS) {
++    // Unterminated blocks are left alone: a lone tag is more likely prose.
++    out = out.replace(new RegExp(`<${tag}>[\\s\\S]*?</${tag}>`, "g"), "")
++  }
++  out = out.replace(REF, "")
++  out = out.replace(/[ \t]+$/gm, "")
++  return out.replace(/\n{3,}/g, "\n\n").trim()
++}

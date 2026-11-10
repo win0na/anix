@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/ios <project> <scheme> [device-udid] [options]
+
+Build an iOS app on the Mac and install it on a device. From Linux the work
+runs over `ssh amac`; on macOS it runs locally.
+
+Arguments:
+  project              Absolute path on the Mac, or a directory name under
+                       HOME/src.
+  scheme               Xcode scheme to build.
+  device-udid          Target device identifier. Required unless --build-only.
+
+Options:
+  -h, --help           Show this help and exit.
+  --build-only         Build without installing.
+  --configuration NAME Build configuration (default: Release).
+EOF
+}
+
+project=""
+scheme=""
+udid=""
+configuration="Release"
+build_only=0
+positionals=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --build-only)
+      build_only=1
+      shift
+      ;;
+    --configuration)
+      if [[ $# -lt 2 ]]; then
+        echo "error: --configuration requires a name" >&2
+        exit 2
+      fi
+      configuration="$2"
+      shift 2
+      ;;
+    --configuration=*)
+      configuration="${1#*=}"
+      shift
+      ;;
+    --)
+      shift
+      positionals+=("$@")
+      break
+      ;;
+    -*)
+      echo "error: unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      positionals+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ${#positionals[@]} -lt 2 ]]; then
+  echo "error: project and scheme are required" >&2
+  usage >&2
+  exit 2
+fi
+
+if [[ ${#positionals[@]} -gt 3 ]]; then
+  echo "error: too many arguments" >&2
+  usage >&2
+  exit 2
+fi
+
+project="${positionals[0]}"
+scheme="${positionals[1]}"
+if [[ ${#positionals[@]} -eq 3 ]]; then
+  udid="${positionals[2]}"
+fi
+
+if [[ $build_only -eq 0 && -z "$udid" ]]; then
+  echo "error: device UDID is required unless --build-only is set" >&2
+  exit 2
+fi
+
+body="$(
+cat <<'BODY'
+set -euo pipefail
+
+project=$1
+scheme=$2
+udid=$3
+configuration=$4
+build_only=$5
+
+if [[ "$project" != /* ]]; then
+  project="$HOME/src/$project"
+fi
+
+if [[ ! -d "$project" ]]; then
+  echo "error: project directory not found: $project" >&2
+  exit 1
+fi
+
+if ! command -v xcodebuild >/dev/null 2>&1; then
+  echo "error: xcodebuild not found; install Xcode and select it with xcode-select" >&2
+  exit 1
+fi
+
+shopt -s nullglob
+workspaces=("$project"/*.xcworkspace)
+xcodeproj=("$project"/*.xcodeproj)
+
+target_args=()
+if (( ${#workspaces[@]} > 0 )); then
+  target_args=(-workspace "${workspaces[0]}")
+elif (( ${#xcodeproj[@]} > 0 )); then
+  target_args=(-project "${xcodeproj[0]}")
+else
+  echo "error: no .xcworkspace or .xcodeproj at the root of $project" >&2
+  exit 1
+fi
+
+derived="/tmp/anix-ios-$scheme"
+printf '==>'
+printf ' %q' xcodebuild "${target_args[@]}" -scheme "$scheme" -configuration "$configuration" -destination "generic/platform=iOS" -derivedDataPath "$derived" build
+printf '\n'
+xcodebuild "${target_args[@]}" -scheme "$scheme" -configuration "$configuration" -destination "generic/platform=iOS" -derivedDataPath "$derived" build
+
+app="$derived/Build/Products/$configuration-iphoneos/$scheme.app"
+if [[ ! -d "$app" ]]; then
+  echo "error: built app not found: $app" >&2
+  exit 1
+fi
+
+if [[ "$build_only" == "1" ]]; then
+  echo "==> build complete: $app"
+  exit 0
+fi
+
+printf '==>'
+printf ' %q' xcrun devicectl device install app --device "$udid" "$app"
+printf '\n'
+xcrun devicectl device install app --device "$udid" "$app"
+BODY
+)"
+
+host_os="$(uname -s)"
+if [[ "$host_os" == "Linux" ]]; then
+  if ! command -v ssh >/dev/null 2>&1; then
+    echo "error: ssh not found on PATH" >&2
+    exit 1
+  fi
+  printf '==> ssh amac bash -s -- %q %q %q %q %q\n' "$project" "$scheme" "$udid" "$configuration" "$build_only"
+  printf '%s\n' "$body" | ssh amac bash -s -- "$project" "$scheme" "$udid" "$configuration" "$build_only"
+elif [[ "$host_os" == "Darwin" ]]; then
+  printf '==> bash -s -- %q %q %q %q %q\n' "$project" "$scheme" "$udid" "$configuration" "$build_only"
+  printf '%s\n' "$body" | bash -s -- "$project" "$scheme" "$udid" "$configuration" "$build_only"
+else
+  echo "error: unsupported operating system: $host_os" >&2
+  exit 1
+fi
