@@ -15,7 +15,8 @@ runtime failure, and `2` for a usage error.
 | `ios` | WSL or macOS | Build an iOS app on the Mac and install it |
 | `install-herdr-plugins.sh` | Both | Link the first-party Herdr plugin |
 | `herdr-ide` | Both | Build the sidebar, agent, and ttt layout |
-| `check.sh` | Both | Evaluate both hosts and lint the scripts |
+| `spellcheck` | Both | Run typos over the repository |
+| `check.sh` | Both | Evaluate both hosts, lint the scripts, and spellcheck |
 | `mount-src` | macOS | Mount the NFS export at `/Users/winona/src` |
 
 ## scripts/rebuild
@@ -134,6 +135,16 @@ ttt with a per-workspace `TMPDIR`, stamps the `hs-ttt-workspace` and
 `hs-ttt-tmpdir` tokens, opens the sidebar, and focuses the agent. The Herdr
 config binds it to `prefix+i`. Home Manager links it to `~/.local/bin/herdr-ide`.
 
+## scripts/spellcheck
+
+```text
+scripts/spellcheck [PATH...]
+```
+
+Runs `typos` with `typos.toml` at the repository root. With no arguments it
+checks the whole repository. The Nix hosts install `typos` and a Hunspell
+dictionary; use `hunspell -l file.md` for an interactive prose check.
+
 ## scripts/check.sh
 
 ```text
@@ -147,10 +158,10 @@ Evaluates both system derivations:
 .#darwinConfigurations.amac.config.system.build.toplevel.drvPath
 ```
 
-Then runs `bash -n` on every shell script in `scripts/`, and `shellcheck` when
-it is on `PATH`. The PowerShell script is skipped. It stops on the first
-failure and prints `check: ok` on success. It requires `nix`; it does not
-install anything.
+Then runs `bash -n` on every shell script in `scripts/`, `shellcheck` when it is
+on `PATH`, and `typos` when it is on `PATH`. The PowerShell script is skipped.
+It stops on the first failure and prints `check: ok` on success. It requires
+`nix`; it does not install anything.
 
 ## scripts/mount-src
 

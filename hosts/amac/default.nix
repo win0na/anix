@@ -37,12 +37,14 @@ in
     fff-mcp
     git
     herdr
+    (hunspell.withDicts (dicts: [ dicts.en_US ]))
     iina
     jq
     nuvio
     sops
     ssh-to-age
     ttt
+    typos
   ];
 
   nix.settings = {

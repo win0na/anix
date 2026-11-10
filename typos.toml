@@ -1,0 +1,44 @@
+[files]
+extend-exclude = [
+  "flake.lock",
+  "secrets/**",
+  "pkgs/herdr/patches/**",
+  "home/winona/ttt/plugins/**",
+  "pkgs/opencode-dcp-fix/**",
+]
+
+[default.extend-words]
+amac = "amac"
+anix = "anix"
+cachix = "cachix"
+catppuccin = "catppuccin"
+darwin = "darwin"
+dcp = "dcp"
+devicectl = "devicectl"
+exportfs = "exportfs"
+disablesleep = "disablesleep"
+dscl = "dscl"
+fsid = "fsid"
+herdr = "herdr"
+hibernatemode = "hibernatemode"
+iina = "iina"
+launchd = "launchd"
+mountd = "mountd"
+nixos = "nixos"
+nixpkgs = "nixpkgs"
+nuvio = "nuvio"
+opencode = "opencode"
+pmset = "pmset"
+rpcbind = "rpcbind"
+rsize = "rsize"
+sops = "sops"
+sysadminctl = "sysadminctl"
+tailscale = "tailscale"
+tcc = "tcc"
+tccutil = "tccutil"
+ttt = "ttt"
+udid = "udid"
+wsize = "wsize"
+wsl = "wsl"
+xcodes = "xcodes"
+xcodebuild = "xcodebuild"

@@ -9,6 +9,7 @@ Validate the repository without installing anything:
   - evaluate the anix and amac system derivations
   - run bash -n on every file in scripts/
   - run shellcheck on every scripts/ file when shellcheck is on PATH
+  - run typos over the repository when typos is on PATH
 
 Options:
   -h, --help  Show this help and exit.
@@ -68,6 +69,13 @@ if command -v shellcheck >/dev/null 2>&1; then
   done < <(find "$repo_root/scripts" -maxdepth 1 -type f ! -name '*.ps1' -print0)
 else
   echo "check: shellcheck not found; skipping"
+fi
+
+if command -v typos >/dev/null 2>&1; then
+  echo "==> typos"
+  "$repo_root/scripts/spellcheck" "$repo_root" || fail "typos found spelling errors"
+else
+  echo "check: typos not found; skipping"
 fi
 
 echo "check: ok"

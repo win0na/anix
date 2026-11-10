@@ -96,6 +96,14 @@ for Rust, TypeScript and JavaScript, Go, Swift, Nix, Python, and Markdown.
 The exact settings and LSP commands are in
 [Herdr reference](herdr-reference.md).
 
+## VS Code and code-server
+
+This setup does not install VS Code or code-server. ttt is the editor, Herdr is
+the workspace, and the sidebar replaces the VS Code explorer and source control.
+The Catppuccin theme under
+`home/winona/ttt/plugins/theme-catppuccin-mocha` is a port of the official VS Code
+theme. A browser IDE would be a separate service and is not part of the flake.
+
 ## What stays manual
 
 - The sidebar's `custom_editor_on_click` state and `editor-command.txt` must
