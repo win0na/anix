@@ -77,6 +77,10 @@ Passwords.app.
 personal key lets either host edit the file. The recovery key survives a lost
 laptop or a lost host key.
 
+The personal key was generated with `age-keygen` at
+`~/.config/sops/age/keys.txt`. The builder key was generated at
+`~/.ssh/mac-builder`.
+
 **Consequence.** A FIDO2 passkey cannot be an age recipient; `ssh-to-age` and
 age reject `sk-ecdsa-sha2-nistp256`. On macOS, the `sops` CLI needs
 `SOPS_AGE_KEY_FILE` to use the shared path. `neededForUsers` has no effect on
@@ -136,22 +140,25 @@ can reset `disablesleep`; the activation script restores it.
 ## D11: Herdr from the rootshell fork
 
 **Decision.** Pin `github:kitknox/herdr/rootshell-v0.1.10` and apply two
-patches: `herdr-hide-tab-bar-only.patch` and `herdr-palette-fallback.patch`.
-Build with `HERDR_BUILD_CHANNEL=rootshell` and `HERDR_BUILD_ID=0.1.10`.
+patches through a Nix overlay: `herdr-hide-tab-bar-only.patch` and
+`herdr-palette-fallback.patch`. Build with `HERDR_BUILD_CHANNEL=rootshell` and
+`HERDR_BUILD_ID=0.1.10`.
 
 **Why.** The fork is the base. The patches add a palette setting and a hidden
 tab bar, two core features that plugins cannot provide. Everything else stays
 in plugins.
 
 **Consequence.** Each new rootshell tag needs the patches rebased. The two
-patches are the only core divergence.
+patches are the accepted exception to the plugin-only goal. They stay in the
+overlay until the rootshell fork accepts them.
 
 ## D12: VSCode-shaped layout with one ttt pane
 
 **Decision.** The left pane toggles Explorer and Source Control. The center
 pane runs the agent or terminal. The bottom pane runs ttt at 35 percent. Each
-workspace has one ttt instance. A patched `herdr-sidebar` opens files in that
-pane and focuses it.
+workspace has one ttt instance. The ttt pane carries a stable marker token. A
+patched `herdr-sidebar` finds that token, spawns `ttt <file>` so the call
+forwards to the running instance, then focuses the pane.
 
 **Why.** The layout matches the editor the user already knows. One ttt instance
 avoids a tab per file. Focusing the pane after the open keeps the keyboard on
@@ -159,7 +166,8 @@ the file.
 
 **Consequence.** The patch must spawn `ttt <file>` with the workspace `TMPDIR`
 and then call `pane.focus`. `pane.send_input` would type into the ttt TUI. The
-patch is not shipped in this skeleton.
+marker token must survive pane recreation, so the layout action sets it on every
+run. The patch is not shipped in this skeleton.
 
 ## D13: ttt settings
 
@@ -176,8 +184,10 @@ debugger.
 
 ## D14: Shared OpenCode, latest plugins
 
-**Decision.** One OpenCode config on both hosts. Caveman and Moshi are removed.
-`opencode-dcp-fix` is vendored. npm plugins follow latest.
+**Decision.** One OpenCode config on both hosts. The full config lives in the
+repository; skills are provisioned separately. Caveman and Moshi are removed.
+`opencode-dcp-fix` is vendored. npm plugins follow latest. Provider keys stay in
+sops and are read with `{file:/run/secrets/...}`.
 
 **Why.** The user wants the same agent setup on both hosts and fewer forks.
 Vendoring the DCP fix keeps the local change in the repository. Latest plugins
