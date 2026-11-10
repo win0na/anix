@@ -1,0 +1,101 @@
+diff --git a/src/actions.rs b/src/actions.rs
+index 1dae401..80ab084 100644
+--- a/src/actions.rs
++++ b/src/actions.rs
+@@ -16,6 +16,10 @@ pub enum MenuAction {
+     /// `git add` the target — the Explorer's staging entry (issue #20).
+     Stage,
+     OpenExternal,
++    /// Hand the file to the `ttt-handoff` helper's code-server target.
++    OpenCodeServer,
++    /// Hand the file to the `ttt-handoff` helper's VS Code (mac) target.
++    OpenVsCode,
+     Reveal,
+     ChangeFolder,
+     ChangeFolderTyped,
+@@ -44,6 +48,8 @@ pub fn menu_entries(target: Option<bool>, in_repo: bool) -> Vec<MenuEntry> {
+         entries.extend([
+             MenuEntry::Separator,
+             MenuEntry::Action(MenuAction::OpenExternal, "Open with Default App"),
++            MenuEntry::Action(MenuAction::OpenCodeServer, "Open in code-server"),
++            MenuEntry::Action(MenuAction::OpenVsCode, "Open in VS Code"),
+         ]);
+     }
+     if target.is_some() && in_repo {
+@@ -474,6 +480,24 @@ pub fn open_external(path: &Path) -> io::Result<()> {
+         .map(|_| ())
+ }
+ 
++/// Hand a file to the `ttt-handoff` helper, which validates the absolute path
++/// and the target (`code-server`, `mac`) and launches the app detached from the
++/// sidebar. No shell and no wait: the child gets null stdio and is reaped on a
++/// helper thread so the menu stays responsive.
++pub fn open_handoff(target: &str, path: &Path) -> io::Result<()> {
++    let mut child = std::process::Command::new("ttt-handoff")
++        .arg(target)
++        .arg(path)
++        .stdin(std::process::Stdio::null())
++        .stdout(std::process::Stdio::null())
++        .stderr(std::process::Stdio::null())
++        .spawn()?;
++    std::thread::spawn(move || {
++        let _ = child.wait();
++    });
++    Ok(())
++}
++
+ const EDITOR_COMMAND_ENV: &str = "HERDR_SIDEBAR_EDITOR";
+ const EDITOR_FILE_ENV: &str = "HERDR_SIDEBAR_EDITOR_FILE";
+ const EDITOR_FILE_TOKEN_ENV: &str = "HERDR_SIDEBAR_EDITOR_FILE_TOKEN";
+@@ -955,6 +979,24 @@ mod tests {
+         assert!(has(&menu_entries(Some(true), true), MenuAction::Rename));
+     }
+ 
++    #[test]
++    fn handoff_entries_are_offered_for_files_only() {
++        for action in [MenuAction::OpenCodeServer, MenuAction::OpenVsCode] {
++            assert!(
++                has(&menu_entries(Some(false), true), action),
++                "file row: {action:?}"
++            );
++            assert!(
++                !has(&menu_entries(Some(true), true), action),
++                "directory row: {action:?}"
++            );
++            assert!(
++                !has(&menu_entries(None, true), action),
++                "empty space: {action:?}"
++            );
++        }
++    }
++
+     #[test]
+     fn stage_is_offered_for_rows_inside_a_repo_only() {
+         assert!(
+diff --git a/src/explorer_app.rs b/src/explorer_app.rs
+index 4f69580..325d347 100644
+--- a/src/explorer_app.rs
++++ b/src/explorer_app.rs
+@@ -2832,6 +2832,22 @@ impl App {
+                     Err(err) => format!("open failed: {err}"),
+                 });
+             }
++            MenuAction::OpenCodeServer | MenuAction::OpenVsCode => {
++                let Some((path, false)) = &target else { return };
++                let (target_name, label) = if action == MenuAction::OpenCodeServer {
++                    ("code-server", "code-server")
++                } else {
++                    ("mac", "VS Code")
++                };
++                let name = path
++                    .file_name()
++                    .unwrap_or(path.as_os_str())
++                    .to_string_lossy();
++                self.notice = Some(match actions::open_handoff(target_name, path) {
++                    Ok(()) => format!("opened in {label}: {name}"),
++                    Err(err) => format!("open failed: {err}"),
++                });
++            }
+             MenuAction::Stage => {
+                 let Some((path, _)) = target else { return };
+                 self.stage(&path);

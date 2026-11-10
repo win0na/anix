@@ -2,6 +2,9 @@
 
 let
   secretsFile = ../../secrets/secrets.yaml;
+  extensionLines = lib.filter
+    (line: line != "" && !(lib.hasPrefix "#" line))
+    (lib.splitString "\n" (builtins.readFile ../../home/winona/editors/extensions.txt));
 in
 {
   imports = [
@@ -33,18 +36,26 @@ in
 
   environment.systemPackages = with pkgs; [
     age
+    basedpyright
     curl
     fff-mcp
     git
+    gopls
     herdr
     (hunspell.withDicts (dicts: [ dicts.en_US ]))
     iina
     jq
+    marksman
+    nil
+    nixfmt
     nuvio
+    python3
+    rust-analyzer
     sops
     ssh-to-age
     ttt
     typos
+    typescript-language-server
   ];
 
   nix.settings = {
@@ -65,7 +76,9 @@ in
       "ghostty"
       "macs-fan-control"
       "stats"
+      "visual-studio-code"
     ];
+    vscode = extensionLines;
   };
 
   system.defaults = {

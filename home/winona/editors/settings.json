@@ -1,0 +1,170 @@
+{
+  "workbench.colorTheme": "Catppuccin Mocha",
+  "workbench.iconTheme": "catppuccin-mocha",
+  "workbench.startupEditor": "none",
+  "window.openFoldersInNewWindow": "off",
+  "window.restoreWindows": "all",
+
+  "files.autoSave": "off",
+  "files.trimTrailingWhitespace": false,
+  "files.insertFinalNewline": true,
+  "files.eol": "\n",
+  "files.exclude": {
+    "**/.git": true,
+    "**/result": true,
+    "**/result-*": true
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/target/**": true,
+    "**/node_modules/**": true,
+    "**/result*/**": true
+  },
+  "search.useIgnoreFiles": false,
+  "search.followSymlinks": false,
+  "search.exclude": {
+    "**/result": true,
+    "**/result-*": true,
+    "**/node_modules": true,
+    "**/.git": true
+  },
+
+  "editor.formatOnSave": false,
+  "editor.formatOnPaste": false,
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": true,
+  "editor.wordWrap": "off",
+  "editor.lineNumbers": "on",
+  "editor.bracketPairColorization.enabled": false,
+  "editor.hover.delay": 500,
+  "editor.quickSuggestions": {
+    "other": true,
+    "comments": false,
+    "strings": false
+  },
+  "editor.suggestOnTriggerCharacters": true,
+  "editor.parameterHints.enabled": true,
+  "editor.minimap.enabled": false,
+
+  "explorer.autoReveal": false,
+  "explorer.compactFolders": true,
+  "explorer.confirmDelete": false,
+  "explorer.confirmDragAndDrop": false,
+
+  "terminal.integrated.scrollback": 1000,
+  "terminal.integrated.defaultProfile.linux": "zsh",
+  "terminal.integrated.profiles.linux": {
+    "zsh": {
+      "path": "/run/current-system/sw/bin/zsh",
+      "args": ["-l"]
+    }
+  },
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.profiles.osx": {
+    "zsh": {
+      "path": "/bin/zsh",
+      "args": ["-l"]
+    }
+  },
+
+  "rust-analyzer.server.path": null,
+  "rust-analyzer.cargo.sysroot": "discover",
+  "go.alternateTools": {
+    "gopls": "gopls",
+    "go": "go"
+  },
+  "nix.enableLanguageServer": true,
+  "nix.serverPath": "nil",
+  "nix.formatterPath": "nixfmt",
+  "swift.sourcekit-lsp.serverPath": "sourcekit-lsp",
+
+  "python.defaultInterpreterPath": "python3",
+  "python.languageServer": "None",
+  "basedpyright.importStrategy": "fromEnvironment",
+  "basedpyright.analysis.typeCheckingMode": "recommended",
+
+  "markdown.validate.enabled": true,
+  "markdown.validate.fileLinks.enabled": "warning",
+  "markdown.validate.fragmentLinks.enabled": "warning",
+  "markdown.validate.fileLinks.markdownFragmentLinks": "warning",
+  "markdown.validate.referenceLinks.enabled": "warning",
+  "markdown.updateLinksOnFileMove.enabled": "prompt",
+  "[markdown]": {
+    "editor.wordWrap": "wordWrapColumn",
+    "editor.wordWrapColumn": 80,
+    "files.trimTrailingWhitespace": false
+  },
+  "[nix]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  },
+
+  "git.autorefresh": false,
+  "git.autofetch": false,
+  "telemetry.telemetryLevel": "off",
+  "security.workspace.trust.enabled": true,
+  "update.mode": "default",
+
+  "catppuccin.accentColor": "mauve",
+  "catppuccin.workbenchMode": "default",
+  "catppuccin.bracketMode": "rainbow",
+  "catppuccin.italicComments": true,
+  "catppuccin.italicKeywords": true,
+  "catppuccin.boldKeywords": true,
+
+  "cSpell.language": "en",
+  "cSpell.allowCompoundWords": false,
+  "cSpell.words": [
+    "amac",
+    "anix",
+    "basedpyright",
+    "cachix",
+    "catppuccin",
+    "darwin",
+    "dcp",
+    "devicectl",
+    "disablesleep",
+    "dscl",
+    "exportfs",
+    "fsid",
+    "gopls",
+    "herdr",
+    "hibernatemode",
+    "iina",
+    "launchd",
+    "markdownlint",
+    "mountd",
+    "nil",
+    "nixfmt",
+    "nixos",
+    "nixpkgs",
+    "nuvio",
+    "opencode",
+    "pmset",
+    "rpcbind",
+    "rsize",
+    "rustfmt",
+    "sops",
+    "sourcekit",
+    "sysadminctl",
+    "tailscale",
+    "tcc",
+    "tccutil",
+    "ttt",
+    "udid",
+    "wsize",
+    "wsl",
+    "xcodebuild",
+    "xcodes"
+  ],
+  "cSpell.ignorePaths": [
+    "flake.lock",
+    "secrets/**",
+    "pkgs/herdr/patches/**",
+    "home/winona/ttt/plugins/**",
+    "pkgs/opencode-dcp-fix/**",
+    "node_modules/**",
+    ".git/**"
+  ]
+}

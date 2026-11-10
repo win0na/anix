@@ -72,7 +72,7 @@ scripts/bootstrap-windows.ps1 [-Yes] [-SkipWslUpdate] [-SkipFirewall]
 ```
 
 Run in an elevated PowerShell. It updates WSL, writes
-`%UserProfile%\.wslconfig`, opens TCP 2049 for the WSL VM, downloads and
+`%UserProfile%\.wslconfig`, opens TCP 2049 and 8080 for the WSL VM, downloads and
 verifies the NixOS-WSL 2605.7.2 image, installs it as `NixOS`, runs the first
 switch, clones the repository to `~/src/anix` as `winona`, and registers the
 `anix-wsl` logon task. `-Yes` accepts the prompts.
@@ -133,6 +133,19 @@ Runs on both hosts. Finds the focused pane, splits it down at 35 percent, starts
 ttt with a per-workspace `TMPDIR`, stamps the `hs-ttt-workspace` and
 `hs-ttt-tmpdir` tokens, opens the sidebar, and focuses the agent. The Herdr
 config binds it to `prefix+i`. Home Manager links it to `~/.local/bin/herdr-ide`.
+
+## scripts/ttt-handoff
+
+```text
+scripts/ttt-handoff code-server|mac <path> [line] [col]
+```
+
+Opens a file from the ttt plugin or the Herdr sidebar. The path must be under
+`/home/winona/src`. `code-server` calls `code-server --reuse-window` and ignores
+the line and column. `mac` maps the path to `/Users/winona/src` or
+`/Users/winona/.config/anix`, checks that VS Code is running, and runs
+`code --reuse-window --goto` over SSH. The script never passes a shell string
+to the remote side.
 
 ## typos
 

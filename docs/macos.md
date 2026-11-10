@@ -80,6 +80,7 @@ cost of building as the login user without a separate builder account.
 | IINA | nixpkgs 26.05 | 1.4.2 |
 | Xcode | `xcodes` | 26.6 |
 | Command Line Tools | Apple | Current |
+| VS Code | Homebrew cask | Current |
 
 Homebrew itself comes from `nix-homebrew`; the casks are declared in
 `hosts/amac`. Xcode 26.6 is the last universal Xcode. Xcode 27 is
@@ -90,6 +91,27 @@ Apple-silicon-only. Install Xcode once with `xcodes install 26.6`, then run
 Nuvio is an unsigned Intel alpha. The Nix package fetches the DMG, so the app
 has no quarantine attribute. A manually downloaded copy needs
 `xattr -dr com.apple.quarantine /Applications/Nuvio.app`.
+
+## VS Code
+
+VS Code is the official Microsoft cask. Home Manager links
+`settings.json` and `keybindings.json` from `home/winona/editors` to
+`~/Library/Application Support/Code/User`. nix-darwin's `homebrew.vscode`
+installs the extension list from `home/winona/editors/extensions.txt`. The
+`code` binary is `/usr/local/bin/code` on the Intel Homebrew prefix; the app
+bundle path is
+`/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`.
+
+Open a project folder, not `/Users/winona/src`. NFS file watching is
+unreliable, so an edit made on anix may not refresh the Mac buffer. The shared
+settings exclude `target`, `node_modules`, and `result*` from watching and
+search. Reopen a file after a large change from the other host. Remote-SSH
+would fix watching, but anix has no sshd; code-server is the browser editor for
+that case.
+
+`scripts/ttt-handoff mac <path> [line] [col]` opens the file on the Mac through
+SSH and `--reuse-window --goto`. VS Code must already be running in the GUI
+session; start it once while the lid is open.
 
 ## Dock
 

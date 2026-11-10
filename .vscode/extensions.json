@@ -1,0 +1,16 @@
+{
+  "recommendations": [
+    "rust-lang.rust-analyzer",
+    "golang.go",
+    "swiftlang.swift-vscode",
+    "jnoortheen.nix-ide",
+    "ms-python.python",
+    "detachhead.basedpyright",
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+    "catppuccin.catppuccin-vsc",
+    "catppuccin.catppuccin-vsc-icons",
+    "streetsidesoftware.code-spell-checker",
+    "editorconfig.editorconfig"
+  ]
+}

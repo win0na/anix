@@ -2,6 +2,7 @@
 
 {
   imports = [
+    ./editors
     ./herdr
     ./opencode
     ./ttt

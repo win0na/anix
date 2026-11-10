@@ -15,6 +15,21 @@
     "grantsVersion": 2
   },
   {
+    "name": "handoff",
+    "displayName": "Editor Handoff",
+    "repo": "",
+    "path": "handoff",
+    "version": "0.1.0",
+    "enabled": true,
+    "permissions": {
+      "commands": true,
+      "keybindings": true,
+      "editor.read": true,
+      "system.exec": ["ttt-handoff"]
+    },
+    "grantsVersion": 2
+  },
+  {
     "name": "theme-catppuccin-mocha",
     "displayName": "Catppuccin Mocha Theme",
     "repo": "https://github.com/eugenioenko/ttt-plugins",

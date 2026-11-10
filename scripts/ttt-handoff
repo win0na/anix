@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "usage: ttt-handoff code-server|mac <path> [line] [col]" >&2
+  exit 2
+}
+
+target=${1:-}
+[[ -n $target ]] || usage
+shift
+
+file=${1:-}
+[[ -n $file ]] || usage
+line=${2:-1}
+col=${3:-1}
+
+case $file in
+  *$'\n'*|*$'\r'*)
+    echo "ttt-handoff: invalid path" >&2
+    exit 2
+    ;;
+esac
+
+case $file in
+  /home/winona/src/*) ;;
+  *)
+    echo "ttt-handoff: path outside /home/winona/src" >&2
+    exit 2
+    ;;
+esac
+
+[[ -e $file ]] || {
+  echo "ttt-handoff: file not found: $file" >&2
+  exit 1
+}
+
+[[ $line =~ ^[0-9]+$ ]] || line=1
+[[ $col =~ ^[0-9]+$ ]] || col=1
+
+case $target in
+  code-server)
+    command -v code-server >/dev/null 2>&1 || {
+      echo "ttt-handoff: code-server is not on PATH" >&2
+      exit 1
+    }
+    exec code-server --reuse-window "$file"
+    ;;
+  mac)
+    mac_file=${file/\/home\/winona\/src\//\/Users\/winona\/src\/}
+    if [[ $file == /home/winona/src/anix* ]]; then
+      mac_file=${file/\/home\/winona\/src\/anix/\/Users\/winona\/.config\/anix}
+    fi
+
+    command -v ssh >/dev/null 2>&1 || {
+      echo "ttt-handoff: ssh is not on PATH" >&2
+      exit 1
+    }
+
+    ssh -o BatchMode=yes -o ConnectTimeout=5 amac \
+      'pgrep -x "Visual Studio Code" >/dev/null' || {
+      echo "ttt-handoff: VS Code is not running on amac" >&2
+      exit 1
+    }
+
+    printf '%s\n' "$mac_file:$line:$col" |
+      ssh -o BatchMode=yes -o ConnectTimeout=5 amac '
+        IFS= read -r p || exit 2
+        case $p in
+          /Users/winona/src/*|/Users/winona/.config/anix/*) ;;
+          *) echo "ttt-handoff: path outside the Mac workspace" >&2; exit 3 ;;
+        esac
+        exec "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" \
+          --reuse-window --goto "$p"
+      '
+    ;;
+  *)
+    usage
+    ;;
+esac

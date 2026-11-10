@@ -166,11 +166,28 @@ in `winona`'s `~/.ssh/authorized_keys` on the Mac, managed by Home Manager. Add 
 `known_hosts` on WSL, for example with `programs.ssh.knownHosts`, or the
 nix-daemon SSH fails host-key verification.
 
+## code-server
+
+`code-server` runs on anix as a systemd service. It serves the same
+`/home/winona/src` tree as ttt at `http://anix:8080`. The password is the
+`code-server-password` sops secret; the service reads it through
+`LoadCredential`, so it never appears in argv or the Nix store.
+
+The service binds `0.0.0.0:8080`. The nftables input rule accepts 8080 only
+from `100.64.0.0/10`, and the Windows bootstrap opens 8080 on the Hyper-V
+firewall. The Mac opens `http://anix:8080`; `http://anix:8080/healthz` is the
+health check.
+
+The Mac runs VS Code desktop against `/Users/winona/src` over NFS. code-server
+is browser-only; it cannot attach to the desktop app. Use `scripts/ttt-handoff`
+or the Herdr sidebar actions to open the same file in either editor.
+
 ## Ports
 
 | Port | Host | Direction | Purpose |
 | --- | --- | --- | --- |
 | 2049/tcp | WSL via Windows | Mac to WSL | NFSv4.1 |
+| 8080/tcp | WSL via Windows | Mac to WSL | code-server |
 | 22/tcp | Mac | WSL to Mac | SSH, `darwin-rebuild`, `ssh-ng` |
 | 41641/udp | Windows, Mac | Tailscale | NAT traversal |
 

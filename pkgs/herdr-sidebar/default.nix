@@ -17,7 +17,10 @@ rustPlatform.buildRustPackage {
 
   cargoLock.lockFile = ./Cargo.lock;
 
-  patches = [ ../herdr-sidebar-patch/herdr-sidebar-ttt.patch ];
+  patches = [
+    ../herdr-sidebar-patch/herdr-sidebar-ttt.patch
+    ../herdr-sidebar-patch/herdr-sidebar-handoff.patch
+  ];
 
   doCheck = false;
 

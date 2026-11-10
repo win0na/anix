@@ -1,0 +1,15 @@
+{
+  "name": "handoff",
+  "displayName": "Editor Handoff",
+  "description": "Open the current file in code-server or VS Code",
+  "version": "0.1.0",
+  "author": "winona",
+  "entry": "plugin.lua",
+  "api": 1,
+  "permissions": {
+    "commands": true,
+    "keybindings": true,
+    "editor.read": true,
+    "system.exec": ["ttt-handoff"]
+  }
+}

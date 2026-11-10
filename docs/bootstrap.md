@@ -34,7 +34,7 @@ cd $env:USERPROFILE\anix
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-windows.ps1
 ```
 
-The script updates WSL, writes `%UserProfile%\.wslconfig` with 16 GB of memory and 8 processors, opens TCP 2049 for the WSL VM, downloads the 2605.7.2 image, installs it as `NixOS`, runs the first switch, clones the repository to `~/src/anix` as `winona`, and creates the `anix-wsl` logon task.
+The script updates WSL, writes `%UserProfile%\.wslconfig` with 16 GB of memory and 8 processors, opens TCP 2049 and 8080 for the WSL VM, downloads the 2605.7.2 image, installs it as `NixOS`, runs the first switch, clones the repository to `~/src/anix` as `winona`, and creates the `anix-wsl` logon task.
 
 The first switch builds the pushed `main` without `secrets/secrets.yaml`. Push your changes before you run it. A rerun on an already configured `NixOS` distribution skips the install and the first switch.
 
@@ -66,6 +66,12 @@ cd ~/src/anix
 ```
 
 The script checks the host, the age key, the builder key, and the encrypted secrets. It adds the anix host key to `.sops.yaml`, updates the sops recipients, commits with your confirmation, and runs the switch that activates sops. It then installs the pinned Herdr plugins and sets the sidebar click state. A successful run leaves the builder key at `/etc/nix/mac-builder`.
+
+The code-server password is generated when left blank. Read it with:
+
+```sh
+sops -d --extract '["code-server-password"]' secrets/secrets.yaml
+```
 
 The Mac login password and the Cachix token can stay empty here. Set the password on the Mac.
 

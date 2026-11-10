@@ -17,6 +17,7 @@ generates it.
 | `mac-login-password` | macOS auto-login at boot |
 | `cachix-token` | Pushing to the `anix` cache |
 | `mac-builder-key` | WSL to Mac SSH for remote builds |
+| `code-server-password` | code-server login on anix |
 | `opencode-api-keys` | OpenCode providers |
 
 Add a secret only when a host or a service reads it. The encrypted file is

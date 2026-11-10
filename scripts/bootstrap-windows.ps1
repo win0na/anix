@@ -111,6 +111,21 @@ if (-not $SkipFirewall) {
         -LocalPorts 2049
     }
   }
+
+  if (Confirm "Open TCP 8080 for the WSL VM (code-server)?") {
+    $ruleName = "WSL-code-server-8080"
+    $existingRule = Get-NetFirewallHyperVRule -Name $ruleName -ErrorAction SilentlyContinue
+    if (-not $existingRule) {
+      New-NetFirewallHyperVRule `
+        -Name $ruleName `
+        -DisplayName "WSL code-server TCP 8080" `
+        -Direction Inbound `
+        -Action Allow `
+        -VMCreatorId "{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}" `
+        -Protocol TCP `
+        -LocalPorts 8080
+    }
+  }
 }
 
 $savedPreference = $ErrorActionPreference

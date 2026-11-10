@@ -1,0 +1,16 @@
+[
+  { "key": "ctrl+k p", "mac": "cmd+k p", "command": "workbench.action.quickOpen" },
+  { "key": "ctrl+k y", "mac": "cmd+k y", "command": "workbench.action.openGlobalKeybindings" },
+  { "key": "ctrl+k ,", "mac": "cmd+k ,", "command": "workbench.action.openSettings" },
+  { "key": "ctrl+k b", "mac": "cmd+k b", "command": "workbench.action.togglePanel" },
+  { "key": "ctrl+k e", "mac": "cmd+k e", "command": "workbench.view.explorer" },
+  { "key": "ctrl+k f", "mac": "cmd+k f", "command": "workbench.action.findInFiles" },
+  { "key": "ctrl+k c", "mac": "cmd+k c", "command": "workbench.view.scm" },
+  { "key": "ctrl+k l", "mac": "cmd+k l", "command": "editor.action.selectHighlights" },
+  { "key": "ctrl+k u", "mac": "cmd+k u", "command": "cursorUndo" },
+  { "key": "ctrl+l f", "mac": "cmd+l f", "command": "editor.action.formatDocument" },
+  { "key": "ctrl+l s", "mac": "cmd+l s", "command": "editor.action.formatSelection" },
+  { "key": "ctrl+l i", "mac": "cmd+l i", "command": "editor.action.goToImplementation" },
+  { "key": "alt+.", "mac": "alt+.", "command": "workbench.action.nextEditor" },
+  { "key": "alt+,", "mac": "alt+,", "command": "workbench.action.previousEditor" }
+]

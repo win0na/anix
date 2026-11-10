@@ -31,17 +31,25 @@ in
 
   environment.systemPackages = with pkgs; [
     age
+    basedpyright
+    code-server
     curl
     fff-mcp
     git
+    gopls
     herdr
     (hunspell.withDicts (dicts: [ dicts.en_US ]))
     jq
+    marksman
+    nil
+    nixfmt
     python3
+    rust-analyzer
     sops
     ssh-to-age
     ttt
     typos
+    typescript-language-server
     zsh
   ];
 
