@@ -134,10 +134,10 @@ Mounts `ANIX_NFS_HOST:/` at `ANIX_MOUNT_POINT` with
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `ANIX_NFS_HOST` | `anix` | NFS server. Set it to the Windows Tailscale node. |
+| `ANIX_NFS_HOST` | `anix` | Windows Tailscale node that forwards to WSL nfsd |
 | `ANIX_MOUNT_POINT` | `/Users/winona/src` | Local mount point |
 
-The default host is a placeholder: `anix` is the WSL hostname, not the Windows
-Tailscale name. The script warns when `ANIX_NFS_HOST` is unset. It waits up to
-60 seconds for Tailscale and TCP 2049, exits `0` when the mount already exists,
-and uses `sudo` only when it is not root.
+The default `anix` is the Windows Tailscale node, which forwards TCP 2049 to the
+WSL NFS server. Set `ANIX_NFS_HOST` only when the tailnet name differs. The
+script waits up to 60 seconds for Tailscale and TCP 2049, exits `0` when the
+mount already exists, and uses `sudo` only when it is not root.

@@ -31,8 +31,8 @@ D:\backup\ubuntu.tar` gives you a rollback.
    The version is 2.4.4 or later. `wsl --install -d NixOS` is not supported;
    use the image file in Part 2.
 
-2. Install Tailscale on Windows and sign in. Note the Windows node name and
-   address:
+2. Install Tailscale on Windows and sign in. The Windows node is named `anix`;
+   note its `100.x` address:
 
    ```powershell
    tailscale status
@@ -286,10 +286,9 @@ script is for directories that already exist in the home directory.
    chmod 600 ~/.config/sops/age/keys.txt
    ```
 
-   If SSH is enabled on the WSL host, `scp` from
-   `winona@WINDOWS_TAILSCALE_HOST:~/.config/sops/age/keys.txt` is an
-   alternative. The personal key is for editing secrets; activation uses the
-   Mac host key.
+   The personal key is for editing secrets; activation uses the Mac host key.
+   The Mac's `anix` resolves to the Windows node, so an SSH copy would need a
+   separate port proxy. Use Passwords.app instead.
 
 6. Clone the repository and run the first switch from a GUI Terminal:
 
@@ -315,7 +314,7 @@ script is for directories that already exist in the home directory.
    If it is missing, run:
 
    ```sh
-   sudo ANIX_NFS_HOST=WINDOWS_TAILSCALE_HOST ~/.config/anix/scripts/mount-src
+   sudo ~/.config/anix/scripts/mount-src
    ```
 
 2. On the WSL host, confirm SSH to the Mac:

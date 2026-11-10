@@ -55,8 +55,9 @@ switch. A dirty checkout stops the rebuild.
 
 ## D5: NFSv4.1, no SMB
 
-**Decision.** The WSL host exports `~/src` over NFSv4.1. The Mac mounts it at
-`/Users/winona/src`. There is no SMB fallback.
+**Decision.** The WSL host exports `~/src` over NFSv4.1. The Mac mounts
+`anix:/`, the Windows Tailscale node, at `/Users/winona/src`. The WSL hostname
+is also `anix`. There is no SMB fallback.
 
 **Why.** macOS has a native NFS client. NFSv4.1 needs one TCP port, maps cleanly
 with `all_squash`, and avoids a second daemon and credential store.
@@ -255,11 +256,11 @@ points at the standard paths: `~/.config/opencode/skills` and
 
 ## Open values
 
-These values are filled at bootstrap. They are not design decisions.
+These values are fixed or filled at bootstrap. They are not design decisions.
 
 | Value | Where |
 | --- | --- |
-| `WINDOWS_TAILSCALE_HOST` | Windows Tailscale node name |
+| Windows Tailscale node | `anix`; the Mac mounts `anix:/` |
 | `MAC_TAILSCALE_IP` | Mac `100.x` address |
 | `AGE_RECIPIENT_ANIX` | anix SSH host key, converted with `ssh-to-age` |
 | `AGE_RECIPIENT_AMAC` | amac SSH host key, converted with `ssh-to-age` |

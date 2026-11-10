@@ -9,9 +9,8 @@ Mount the NFS export from the WSL host at the macOS source directory. Run as
 root, or let the script use sudo for the mount.
 
 Environment:
-  ANIX_NFS_HOST    NFS server hostname. The default anix is a placeholder; set
-                   this to the Windows Tailscale node that forwards to the
-                   WSL NFS server.
+  ANIX_NFS_HOST    NFS server hostname. Defaults to anix, the Windows
+                   Tailscale node that forwards to the WSL NFS server.
   ANIX_MOUNT_POINT Local mount point. Defaults to /Users/winona/src.
 
 Options:
@@ -35,12 +34,6 @@ done
 
 MOUNT_POINT=${ANIX_MOUNT_POINT:-/Users/winona/src}
 NFS_HOST=${ANIX_NFS_HOST:-anix}
-
-if [[ -z "${ANIX_NFS_HOST:-}" ]]; then
-  echo "warning: ANIX_NFS_HOST is unset; using 'anix' as a placeholder." >&2
-  echo "warning: set ANIX_NFS_HOST to the Windows Tailscale node that forwards" >&2
-  echo "warning: to the WSL NFS server." >&2
-fi
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "error: mount-src runs on macOS, found $(uname -s)" >&2

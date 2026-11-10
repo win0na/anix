@@ -11,7 +11,7 @@ empty.
 Check the Mac can reach the server:
 
 ```sh
-nc -vz WINDOWS_TAILSCALE_HOST 2049
+nc -vz anix 2049
 ```
 
 Check the WSL host is listening and exporting:
@@ -27,7 +27,7 @@ Fix:
 2. Confirm the Hyper-V firewall rule allows TCP 2049 from the Mac.
 3. Confirm the NixOS firewall allows 2049 from `MAC_TAILSCALE_IP`.
 4. Confirm the export names `MAC_TAILSCALE_IP/32`, not a stale address.
-5. Retry with `sudo ANIX_NFS_HOST=WINDOWS_TAILSCALE_HOST scripts/mount-src`.
+5. Retry with `sudo scripts/mount-src`.
 6. If `mount_nfs` rejects `vers=4.1`, retry with `vers=4`.
 
 `scripts/mount-src` waits 60 seconds for Tailscale and port 2049 before it
@@ -80,14 +80,14 @@ Check the mount and the server:
 
 ```sh
 mount | grep /Users/winona/src
-ping -c 1 WINDOWS_TAILSCALE_HOST
+ping -c 1 anix
 ```
 
 Fix:
 
 ```sh
 sudo umount -f /Users/winona/src
-sudo ANIX_NFS_HOST=WINDOWS_TAILSCALE_HOST ~/.config/anix/scripts/mount-src
+sudo ~/.config/anix/scripts/mount-src
 ```
 
 If the WSL VM was stopped, start it on Windows and wait for `nfsd`. `hard`

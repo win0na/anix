@@ -17,8 +17,8 @@ configuration fail until it exists.
 
 - **Two hosts, one flake:** `anix` runs NixOS-WSL on nixos-unstable; `amac`
   runs nix-darwin 26.05 on x86_64-darwin.
-- **Shared projects:** NFSv4.1 exports `~/src` from anix to
-  `/Users/winona/src` on the Mac.
+- **Shared projects:** NFSv4.1 exports `~/src` from the WSL host; the Mac
+  mounts `anix:/` (the Windows Tailscale node) at `/Users/winona/src`.
 - **Pinned Herdr:** the rootshell fork, two core patches, four pinned plugins,
   and one ttt pane per workspace.
 - **Shared OpenCode:** one config, first-party `opencode-dcp-fix`, no caveman

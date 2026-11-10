@@ -8,12 +8,12 @@ explains every address in the setup.
 
 ```text
 Tailnet
-  windows-node (Tailscale on Windows)
+  anix (Tailscale node on Windows)
     WSL2, mirrored networking
-      anix, 172.x inside the VM
+      anix (NixOS-WSL hostname, 172.x inside the VM)
       nfsd on TCP 2049
   amac (Tailscale on macOS)
-    NFS client of windows-node:/  ->  /Users/winona/src
+    NFS client of anix:/  ->  /Users/winona/src
     sshd on TCP 22
 ```
 
@@ -21,21 +21,24 @@ WSL runs in mirrored networking mode. It shares the Windows interfaces and the
 Windows tailnet address. A second Tailscale client inside WSL would conflict
 with the Windows client, so there is only one.
 
-The Mac reaches the NFS export at the Windows Tailscale name, not at `anix`.
-`anix` resolves only inside the WSL network. The WSL host reaches the Mac at
-`amac` through MagicDNS, which Windows provides to WSL.
+The Windows Tailscale node is named `anix`, the same as the WSL hostname. From
+the Mac, `anix` resolves to the Windows node; from WSL, `anix` resolves to the
+local host. The Mac mounts `anix:/`, and the Windows node forwards TCP 2049 to
+the WSL NFS server. The WSL host reaches the Mac at `amac` through MagicDNS,
+which Windows provides to WSL.
 
 ## Addresses
 
 | From | To | Address | Used for |
 | --- | --- | --- | --- |
 | WSL | Mac | `amac` | SSH, `darwin-rebuild`, remote builds |
-| Mac | WSL NFS | Windows Tailscale name or `100.x` | NFSv4.1 |
-| Mac | WSL NFS | `100.x/32` source | Export and firewall scope |
+| Mac | WSL NFS | `anix` (Windows node) or its `100.x` | NFSv4.1 |
+| Mac | WSL NFS | `MAC_TAILSCALE_IP/32` source | Export and firewall scope |
 | Windows | Mac | `amac` | Tailscale only |
 
-`WINDOWS_TAILSCALE_HOST` is the Windows node name. `MAC_TAILSCALE_IP` is the
-Mac's `100.x` address. Both are filled at bootstrap.
+`anix` is the Windows node name and the NFS server name for the Mac.
+`MAC_TAILSCALE_IP` is the Mac's `100.x` address and the only client the export
+accepts.
 
 ## WSL networking
 

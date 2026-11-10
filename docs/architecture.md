@@ -8,7 +8,7 @@ Both hosts read the same home configuration and the same project tree.
 
 ```text
 Windows 11
-  Tailscale node (Windows)
+  anix (Tailscale node on Windows)
   WSL2, mirrored networking
     anix (NixOS-WSL, x86_64-linux)
       ~/src  ------------ NFSv4.1 ----------->  amac (macOS 26, x86_64-darwin)
@@ -17,9 +17,10 @@ Windows 11
 ```
 
 The Mac runs nix-darwin on top of macOS. The WSL host is not a Tailscale node;
-it uses the Windows node through mirrored networking. The Mac reaches the NFS
-server at the Windows Tailscale name, and the WSL host reaches the Mac at its
-MagicDNS name. [Networking](networking.md) covers the address asymmetry.
+it uses the Windows node through mirrored networking. The Windows node and the
+WSL host share the name `anix`; from the Mac the name resolves to Windows, and
+from WSL it resolves locally. The WSL host reaches the Mac at `amac` through
+MagicDNS. [Networking](networking.md) covers the address asymmetry.
 
 ## Flake inputs
 
