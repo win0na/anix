@@ -88,9 +88,10 @@ request is part of the work, not a later cleanup.
 
 ttt is a Go TUI editor with built-in LSP, ripgrep search, a multi-root tree,
 tabs, git staging, and an integrated terminal. It has no debug adapter, no VSIX
-extensions, and no per-root LSP instances. The config sets Catppuccin mocha,
-`reuseWindow`, `focusOnOpen`, `formatOnSave`, and LSP servers for Rust,
-TypeScript and JavaScript, Go, Swift, Nix, Python, and Markdown.
+extensions, and no per-root LSP instances. The config copies the current user
+settings: Catppuccin mocha, `reuseWindow`, a collapsed sidebar, and LSP servers
+for Rust, TypeScript and JavaScript, Go, Swift, Nix, Python, and Markdown.
+`focusOnOpen` and `formatOnSave` are off in that file.
 
 The exact settings and LSP commands are in
 [Herdr reference](herdr-reference.md).

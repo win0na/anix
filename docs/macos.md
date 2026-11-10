@@ -81,9 +81,11 @@ cost of building as the login user without a separate builder account.
 | Xcode | `xcodes` | 26.6 |
 | Command Line Tools | Apple | Current |
 
-Xcode 26.6 is the last universal Xcode. Xcode 27 is Apple-silicon-only. Install
-Xcode once with `xcodes install 26.6`, then run `xcode-select -s`,
-`xcodebuild -license accept`, and `xcodebuild -runFirstLaunch`.
+Homebrew itself comes from `nix-homebrew`; the casks are declared in
+`hosts/amac`. Xcode 26.6 is the last universal Xcode. Xcode 27 is
+Apple-silicon-only. Install Xcode once with `xcodes install 26.6`, then run
+`xcode-select -s`, `xcodebuild -license accept`, and
+`xcodebuild -runFirstLaunch`.
 
 Nuvio is an unsigned Intel alpha. The Nix package fetches the DMG, so the app
 has no quarantine attribute. A manually downloaded copy needs
@@ -125,12 +127,13 @@ Stats and Macs Fan Control stay in the menu bar, not the Dock.
 | `com.apple.WindowManager` | `StandardHideWidgets` | `true` |
 | `com.apple.WindowManager` | `StandardHideDesktopIcons` | `true` |
 | `com.apple.loginwindow` | `GuestEnabled` | `false` |
-| `com.apple.loginwindow` | `HideUserAvatarAndName` | `true` |
+| `com.apple.loginwindow` | `autoLoginUser` | `winona` |
 | `com.apple.AppleMultitouchTrackpad` | `Clicking` | `true` |
 | `com.apple.AppleMultitouchTrackpad` | `Dragging` | `true` |
-| `com.apple.AppleMultitouchTrackpad` | `RightClick` | `true` |
+| `com.apple.AppleMultitouchTrackpad` | `TrackpadRightClick` | `true` |
 
-Dock `persistent-apps` replaces the whole array. Nix apps live under
+nix-darwin 26.05 has no option for hiding the login avatar, so that row is
+absent. Dock `persistent-apps` replaces the whole array. Nix apps live under
 `/Applications/Nix Apps`; Homebrew apps live under `/Applications`.
 
 ## Media

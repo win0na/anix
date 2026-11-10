@@ -36,9 +36,9 @@ GitHub install.
 | Binary version | 1.11.0 |
 | Theme | `catppuccin-mocha` |
 | Reuse window | `true` |
-| Focus on open | `true` |
-| Format on save | `true` |
-| Sidebar | Hidden |
+| Focus on open | `false` |
+| Format on save | `false` |
+| Sidebar | Collapsed (width 0; toggle with `Ctrl+B`) |
 | Socket directory | `$TMPDIR/ttt-uid/` |
 | Forward override | `TTT_FORWARD_SOCKET` |
 
