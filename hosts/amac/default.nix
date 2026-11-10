@@ -142,7 +142,7 @@ in
   # FileVault must be off for this to work. sops creates the secret after
   # activation on the first run, so a second switch applies it.
   system.activationScripts.anixAutoLogin.text = ''
-    if [ -r /run/secrets/mac-login-password ]; then
+    if [ -s /run/secrets/mac-login-password ]; then
       console_uid=$(/usr/bin/stat -f%u /dev/console)
       if [ "$console_uid" = "0" ]; then
         /usr/sbin/sysadminctl -autologin set -userName winona -password - \
