@@ -397,22 +397,13 @@ ensure_secrets() {
       warn "secrets are missing; the switch will run without sops"
       return 0
     fi
-    local api_key cachix macpass code_server tmp
+    local api_key cachix macpass tmp
     ask_secret "9router API key (blank to skip):" api_key || true
     ask_secret "Cachix token (blank to skip):" cachix || true
     if [[ $host == amac ]]; then
       ask_secret "Mac login password (blank to skip):" macpass || true
     else
       macpass=""
-    fi
-    if [[ $host == anix ]]; then
-      ask_secret "code-server password (blank to generate):" code_server || true
-      if [[ -z $code_server ]]; then
-        code_server="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
-        say "generated a code-server password; read it with sops"
-      fi
-    else
-      code_server=""
     fi
     local tmpdir
     tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/anix-secrets.XXXXXX")"
@@ -425,7 +416,6 @@ ensure_secrets() {
       sed 's/^/  /' "$builder_key"
       printf "cachix-token: %s\n" "$(yaml_quote "$cachix")"
       printf "mac-login-password: %s\n" "$(yaml_quote "$macpass")"
-      printf "code-server-password: %s\n" "$(yaml_quote "$code_server")"
     } > "$tmp"
     ( cd "$tmpdir" && sops_cmd encrypt --age "$age_pub" "$tmp" > "$secrets_file" )
     chmod 600 "$secrets_file"
@@ -474,15 +464,6 @@ ensure_secrets() {
     if [[ -n $macpass ]]; then
       secrets_set_value '["mac-login-password"]' "$macpass"
     fi
-  fi
-  if [[ $host == anix && -z "$(secrets_get '["code-server-password"]')" ]]; then
-    local code_server
-    ask_secret "code-server password (blank to generate):" code_server || true
-    if [[ -z $code_server ]]; then
-      code_server="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
-      say "generated a code-server password; read it with sops"
-    fi
-    secrets_set_value '["code-server-password"]' "$code_server"
   fi
 }
 
@@ -557,6 +538,22 @@ switch_anix() {
     return 0
   fi
   run sudo nixos-rebuild switch --flake "$repo_root#anix"
+}
+
+ensure_code_tunnel() {
+  if [[ $do_switch -eq 0 ]]; then
+    return 0
+  fi
+  local token="$HOME/.vscode/cli/token.json"
+  if [[ -s $token ]]; then
+    say "code tunnel: already logged in"
+  elif [[ $assume_yes -eq 1 ]]; then
+    warn "code tunnel is not logged in; run as winona:"
+    warn "  VSCODE_CLI_USE_FILE_KEYCHAIN=1 code tunnel user login --provider github"
+  else
+    run env VSCODE_CLI_USE_FILE_KEYCHAIN=1 code tunnel user login --provider github
+  fi
+  run sudo systemctl restart code-tunnel
 }
 
 switch_mac() {
@@ -724,6 +721,7 @@ bootstrap_anix() {
 
   if [[ $dry_run -eq 1 ]]; then
     switch_anix
+    ensure_code_tunnel
     say "would install the Herdr plugins and set the sidebar state"
     return 0
   fi
@@ -736,6 +734,7 @@ bootstrap_anix() {
   fi
 
   switch_anix
+  ensure_code_tunnel
   if [[ $do_switch -eq 1 ]]; then
     if [[ ! -s $secrets_file ]]; then
       warn "secrets are missing; sops stays off"

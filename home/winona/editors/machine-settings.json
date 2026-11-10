@@ -1,0 +1,17 @@
+{
+  "nix.serverPath": "nil",
+  "nix.formatterPath": "nixfmt",
+  "python.defaultInterpreterPath": "python3",
+  "rust-analyzer.server.path": null,
+  "go.alternateTools": {
+    "gopls": "gopls",
+    "go": "go"
+  },
+  "terminal.integrated.defaultProfile.linux": "zsh",
+  "terminal.integrated.profiles.linux": {
+    "zsh": {
+      "path": "/run/current-system/sw/bin/zsh",
+      "args": [ "-l" ]
+    }
+  }
+}

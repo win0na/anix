@@ -265,6 +265,23 @@ config commit.
 points at the standard paths: `~/.config/opencode/skills` and
 `~/.agents/skills`.
 
+## D21: VS Code uses the official code tunnel
+
+**Decision.** anix runs Microsoft's official `code tunnel` as a declarative
+systemd system service as `winona`. VS Code desktop on amac connects through
+Remote - Tunnels; browser access is `vscode.dev`. Coder code-server, its
+password, and its 8080 exposure are removed. NFS remains for Finder and other
+Mac tools.
+
+**Why.** The tunnel removes the inbound port and password, gives the Mac
+desktop a real remote workspace, and keeps the GitHub account as the access
+boundary. It replaces code-server's browser-only model.
+
+**Consequence.** The CLI and server are unfree; the server downloads and
+updates outside Nix, so `programs.nix-ld` is required. The token is user state
+at `~/.vscode/cli/token.json`, not a sops secret. The Mac and anix must use the
+same GitHub account. NFS is no longer in the VS Code path.
+
 ## Open values
 
 These values are fixed or filled at bootstrap. They are not design decisions.
@@ -273,6 +290,7 @@ These values are fixed or filled at bootstrap. They are not design decisions.
 | --- | --- |
 | Windows Tailscale node | `anix`; the Mac mounts `anix:/` |
 | NFS client name | `amac` (MagicDNS) |
+| VS Code tunnel name | `anix` |
 | `AGE_RECIPIENT_ANIX` | anix SSH host key, converted with `ssh-to-age` |
 | `AGE_RECIPIENT_AMAC` | amac SSH host key, converted with `ssh-to-age` |
 | `AGE_RECIPIENT_WINONA` | personal X25519 age key |

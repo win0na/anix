@@ -1,0 +1,11 @@
+# Extensions preloaded on the anix tunnel remote.
+# UI-only extensions stay on the Mac in extensions.txt.
+rust-lang.rust-analyzer
+golang.go
+jnoortheen.nix-ide
+ms-python.python
+detachhead.basedpyright
+yzhang.markdown-all-in-one
+davidanson.vscode-markdownlint
+streetsidesoftware.code-spell-checker
+editorconfig.editorconfig

@@ -1,4 +1,4 @@
-# Shared VS Code and code-server extensions.
+# VS Code extensions for the Mac desktop.
 rust-lang.rust-analyzer
 golang.go
 swiftlang.swift-vscode
@@ -11,3 +11,4 @@ catppuccin.catppuccin-vsc
 catppuccin.catppuccin-vsc-icons
 streetsidesoftware.code-spell-checker
 editorconfig.editorconfig
+ms-vscode.remote-server

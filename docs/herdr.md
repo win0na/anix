@@ -96,19 +96,20 @@ for Rust, TypeScript and JavaScript, Go, Swift, Nix, Python, and Markdown.
 The exact settings and LSP commands are in
 [Herdr reference](herdr-reference.md).
 
-## VS Code and code-server
+## VS Code and code tunnel
 
-VS Code desktop runs on amac against the NFS workspace at `/Users/winona/src`.
-code-server runs on anix at `http://anix:8080` against `/home/winona/src`. Both
-use the project root as the workspace and share the settings, keybindings, and
-extension list under `home/winona/editors`.
+VS Code desktop runs on amac and connects to the anix `code tunnel`. The remote
+workspace is `/home/winona/src`; the NFS mount at `/Users/winona/src` remains
+for Finder and other Mac tools, not for VS Code. The tunnel gives VS Code
+remote file watching, LSP, terminal, and search on anix.
 
-The handoff is one-way, from ttt or the Herdr sidebar to the chosen editor. The
-ttt plugin reads the current file and cursor and calls `scripts/ttt-handoff`.
-The patched sidebar has "Open in code-server" and "Open in VS Code" menu
-entries for the selected file. code-server reuses the running browser instance;
-VS Code opens through SSH with `--reuse-window --goto`. There is no live tab or
-cursor sync, and code-server cannot attach to the desktop app.
+The handoff is one-way, from ttt or the Herdr sidebar to VS Code. The ttt plugin
+reads the current file and cursor and calls `scripts/ttt-handoff`. The patched
+sidebar has one "Open in VS Code" menu entry for the selected file. VS Code
+opens through SSH with `--reuse-window --remote tunnel+anix --folder-uri
+vscode-remote://tunnel+anix/home/winona/src --goto`. Browser access is
+`https://vscode.dev/tunnel/anix/home/winona/src`. There is no live tab or cursor
+sync.
 
 The Catppuccin theme under `home/winona/ttt/plugins/theme-catppuccin-mocha` is a
 port of the official VS Code theme. The VS Code side uses the Catppuccin

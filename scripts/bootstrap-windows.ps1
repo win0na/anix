@@ -112,19 +112,10 @@ if (-not $SkipFirewall) {
     }
   }
 
-  if (Confirm "Open TCP 8080 for the WSL VM (code-server)?") {
-    $ruleName = "WSL-code-server-8080"
-    $existingRule = Get-NetFirewallHyperVRule -Name $ruleName -ErrorAction SilentlyContinue
-    if (-not $existingRule) {
-      New-NetFirewallHyperVRule `
-        -Name $ruleName `
-        -DisplayName "WSL code-server TCP 8080" `
-        -Direction Inbound `
-        -Action Allow `
-        -VMCreatorId "{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}" `
-        -Protocol TCP `
-        -LocalPorts 8080
-    }
+  $staleRule = Get-NetFirewallHyperVRule -Name "WSL-code-server-8080" -ErrorAction SilentlyContinue
+  if ($staleRule) {
+    Write-Host "==> removing the stale WSL-code-server-8080 rule"
+    Remove-NetFirewallHyperVRule -Name "WSL-code-server-8080"
   }
 }
 
@@ -186,12 +177,10 @@ Write-Host "==> clone the repository for winona"
 wsl -d $Distro -u winona -- bash -lc "set -euo pipefail; mkdir -p ~/src; if [ ! -d ~/src/anix/.git ]; then git clone https://github.com/win0na/anix.git ~/src/anix; fi"
 
 $taskName = "anix-wsl"
-if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) {
-  $action = New-ScheduledTaskAction -Execute "wsl.exe" -Argument "-d $Distro -u winona --exec /bin/true"
-  $trigger = New-ScheduledTaskTrigger -AtLogOn
-  $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
-  Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
-}
+$action = New-ScheduledTaskAction -Execute "wsl.exe" -Argument "-d $Distro -u winona --exec /run/current-system/sw/bin/sleep infinity"
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
 
 Write-Host ""
 Write-Host "Windows is ready."

@@ -166,28 +166,27 @@ in `winona`'s `~/.ssh/authorized_keys` on the Mac, managed by Home Manager. Add 
 `known_hosts` on WSL, for example with `programs.ssh.knownHosts`, or the
 nix-daemon SSH fails host-key verification.
 
-## code-server
+## VS Code tunnel
 
-`code-server` runs on anix as a systemd service. It serves the same
-`/home/winona/src` tree as ttt at `http://anix:8080`. The password is the
-`code-server-password` sops secret; the service reads it through
-`LoadCredential`, so it never appears in argv or the Nix store.
+The `code tunnel` service runs on anix as `winona` and connects outbound to
+Microsoft dev tunnels over TCP 443. It does not listen for inbound connections.
+No firewall rule is needed. The old code-server 8080 rule and the Windows 8080
+Hyper-V rule are removed.
 
-The service binds `0.0.0.0:8080`. The nftables input rule accepts 8080 only
-from `100.64.0.0/10`, and the Windows bootstrap opens 8080 on the Hyper-V
-firewall. The Mac opens `http://anix:8080`; `http://anix:8080/healthz` is the
-health check.
+The Mac VS Code desktop signs into the same GitHub account and opens
+`vscode-remote://tunnel+anix/home/winona/src`. The browser URL is
+`https://vscode.dev/tunnel/anix/home/winona/src`. The tunnel is private to the
+account; `code tunnel` has no public sharing flag.
 
-The Mac runs VS Code desktop against `/Users/winona/src` over NFS. code-server
-is browser-only; it cannot attach to the desktop app. Use `scripts/ttt-handoff`
-or the Herdr sidebar actions to open the same file in either editor.
+The Mac keeps the NFS mount at `/Users/winona/src` for Finder and other tools.
+VS Code uses the tunnel and the remote `/home/winona/src` path.
 
 ## Ports
 
 | Port | Host | Direction | Purpose |
 | --- | --- | --- | --- |
 | 2049/tcp | WSL via Windows | Mac to WSL | NFSv4.1 |
-| 8080/tcp | WSL via Windows | Mac to WSL | code-server |
+| 443/tcp | WSL via Windows | WSL to Microsoft | code tunnel |
 | 22/tcp | Mac | WSL to Mac | SSH, `darwin-rebuild`, `ssh-ng` |
 | 41641/udp | Windows, Mac | Tailscale | NAT traversal |
 

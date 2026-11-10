@@ -1,7 +1,7 @@
 {
   "name": "handoff",
   "displayName": "Editor Handoff",
-  "description": "Open the current file in code-server or VS Code",
+  "description": "Open the current file in VS Code over the anix code tunnel",
   "version": "0.1.0",
   "author": "winona",
   "entry": "plugin.lua",

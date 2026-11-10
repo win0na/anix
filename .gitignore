@@ -7,3 +7,5 @@ result-*
 __pycache__/
 *.pyc
 node_modules/
+
+.serena/

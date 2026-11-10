@@ -7,3 +7,6 @@ final: prev:
 // prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
   nuvio = final.callPackage ../pkgs/nuvio { };
 }
+// prev.lib.optionalAttrs prev.stdenv.hostPlatform.isLinux {
+  vscode-cli = final.callPackage ../pkgs/vscode-cli { };
+}

@@ -3,7 +3,6 @@
 {
   imports = [
     inputs.sops-nix.nixosModules.sops
-    ../../modules/nixos/code-server.nix
   ];
 
   sops = {
@@ -16,8 +15,6 @@
     };
 
     secrets."cachix-token" = { };
-
-    secrets."code-server-password" = { };
 
     secrets."opencode-9router-api-key" = {
       key = "opencode/9router-api-key";

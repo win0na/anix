@@ -12,6 +12,7 @@ in
   ] ++ lib.optional (builtins.pathExists secretsFile) ./sops.nix;
 
   nixpkgs.hostPlatform = "x86_64-linux";
+  nixpkgs.config.allowUnfreePredicate = p: builtins.elem (lib.getName p) [ "vscode-cli" ];
   nixpkgs.overlays = [
     inputs.rust-overlay.overlays.default
     (import ../../overlays/herdr.nix { inherit (inputs) herdr-src; })
@@ -32,7 +33,6 @@ in
   environment.systemPackages = with pkgs; [
     age
     basedpyright
-    code-server
     curl
     fff-mcp
     git
@@ -50,6 +50,7 @@ in
     ttt
     typos
     typescript-language-server
+    vscode-cli
     zsh
   ];
 

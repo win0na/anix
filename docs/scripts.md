@@ -58,6 +58,10 @@ over SSH; the default refuses because macOS App Management can block
 prompts default to no. `--repo` changes the clone URL named in the
 missing-checkout error.
 
+On anix, after the switch, it offers the GitHub device login for the VS Code
+tunnel. The token is user state at `~/.vscode/cli/token.json`, not a sops
+secret. `--yes` prints the login command instead of running it.
+
 The script is idempotent. It skips an existing key, an existing secret, and an
 existing recipient. It never unregisters a distribution and never force-pushes.
 
@@ -72,10 +76,10 @@ scripts/bootstrap-windows.ps1 [-Yes] [-SkipWslUpdate] [-SkipFirewall]
 ```
 
 Run in an elevated PowerShell. It updates WSL, writes
-`%UserProfile%\.wslconfig`, opens TCP 2049 and 8080 for the WSL VM, downloads and
+`%UserProfile%\.wslconfig`, opens TCP 2049 for the WSL VM, downloads and
 verifies the NixOS-WSL 2605.7.2 image, installs it as `NixOS`, runs the first
 switch, clones the repository to `~/src/anix` as `winona`, and registers the
-`anix-wsl` logon task. `-Yes` accepts the prompts.
+`anix-wsl` logon task that keeps WSL alive. `-Yes` accepts the prompts.
 
 If `NixOS` already exists, it offers to skip the install and run the remaining
 steps. It never deletes or unregisters a distribution.
@@ -137,15 +141,15 @@ config binds it to `prefix+i`. Home Manager links it to `~/.local/bin/herdr-ide`
 ## scripts/ttt-handoff
 
 ```text
-scripts/ttt-handoff code-server|mac <path> [line] [col]
+scripts/ttt-handoff vscode <path> [line] [col]
 ```
 
-Opens a file from the ttt plugin or the Herdr sidebar. The path must be under
-`/home/winona/src`. `code-server` calls `code-server --reuse-window` and ignores
-the line and column. `mac` maps the path to `/Users/winona/src` or
-`/Users/winona/.config/anix`, checks that VS Code is running, and runs
-`code --reuse-window --goto` over SSH. The script never passes a shell string
-to the remote side.
+Opens a file from the ttt plugin or the Herdr sidebar. The path must resolve
+under `/home/winona/src`; `/../` escapes are rejected. `vscode` SSHes to amac
+and runs the app-bundle CLI with `--reuse-window --remote tunnel+anix
+--folder-uri vscode-remote://tunnel+anix/home/winona/src --goto path:line:col`.
+The path travels on stdin; there is no NFS path mapping. VS Code must run in
+the GUI session.
 
 ## typos
 

@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+readonly remote_root=/home/winona/src
+readonly remote_host=amac
+
 usage() {
-  echo "usage: ttt-handoff code-server|mac <path> [line] [col]" >&2
+  echo "usage: ttt-handoff vscode <path> [line] [col]" >&2
   exit 2
 }
 
-target=${1:-}
-[[ -n $target ]] || usage
-shift
+[[ $# -ge 2 ]] || usage
 
-file=${1:-}
-[[ -n $file ]] || usage
-line=${2:-1}
-col=${3:-1}
+target=$1
+file=$2
+line=${3:-1}
+col=${4:-1}
+
+[[ $target == vscode ]] || usage
+[[ $line =~ ^[0-9]+$ ]] || line=1
+[[ $col =~ ^[0-9]+$ ]] || col=1
 
 case $file in
   *$'\n'*|*$'\r'*)
@@ -22,59 +27,57 @@ case $file in
     ;;
 esac
 
-case $file in
-  /home/winona/src/*) ;;
+# -m collapses ".." without requiring the path to exist, so an escape such as
+# /home/winona/src/../../etc/passwd is rejected before the existence check.
+resolved=$(realpath -m -- "$file")
+case $resolved in
+  "$remote_root"/*) ;;
   *)
-    echo "ttt-handoff: path outside /home/winona/src" >&2
+    echo "ttt-handoff: path outside $remote_root" >&2
     exit 2
     ;;
 esac
 
-[[ -e $file ]] || {
-  echo "ttt-handoff: file not found: $file" >&2
+[[ -f $resolved ]] || {
+  echo "ttt-handoff: file not found: $resolved" >&2
   exit 1
 }
 
-[[ $line =~ ^[0-9]+$ ]] || line=1
-[[ $col =~ ^[0-9]+$ ]] || col=1
+if ! command -v systemctl >/dev/null 2>&1; then
+  echo "ttt-handoff: systemctl is not available" >&2
+  exit 1
+fi
+if ! systemctl is-active --quiet code-tunnel; then
+  echo "ttt-handoff: code-tunnel is not running; start it with: sudo systemctl start code-tunnel" >&2
+  exit 1
+fi
 
-case $target in
-  code-server)
-    command -v code-server >/dev/null 2>&1 || {
-      echo "ttt-handoff: code-server is not on PATH" >&2
-      exit 1
-    }
-    exec code-server --reuse-window "$file"
-    ;;
-  mac)
-    mac_file=${file/\/home\/winona\/src\//\/Users\/winona\/src\/}
-    if [[ $file == /home/winona/src/anix* ]]; then
-      mac_file=${file/\/home\/winona\/src\/anix/\/Users\/winona\/.config\/anix}
-    fi
+if ! command -v ssh >/dev/null 2>&1; then
+  echo "ttt-handoff: ssh is not on PATH" >&2
+  exit 1
+fi
 
-    command -v ssh >/dev/null 2>&1 || {
-      echo "ttt-handoff: ssh is not on PATH" >&2
-      exit 1
-    }
+p="$resolved:$line:$col"
 
-    ssh -o BatchMode=yes -o ConnectTimeout=5 amac \
-      'pgrep -x "Visual Studio Code" >/dev/null' || {
-      echo "ttt-handoff: VS Code is not running on amac" >&2
-      exit 1
-    }
+status=0
+printf '%s\n' "$p" | ssh -o BatchMode=yes -o ConnectTimeout=5 "$remote_host" '
+  IFS= read -r p || exit 2
+  case $p in
+    /home/winona/src/*) ;;
+    *) echo "ttt-handoff: path outside /home/winona/src" >&2; exit 3 ;;
+  esac
+  cli="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+  if [ ! -x "$cli" ]; then
+    echo "ttt-handoff: VS Code is not installed on amac at $cli" >&2
+    exit 4
+  fi
+  exec "$cli" --reuse-window --remote tunnel+anix --folder-uri "vscode-remote://tunnel+anix/home/winona/src" --goto "$p"
+' || status=$?
 
-    printf '%s\n' "$mac_file:$line:$col" |
-      ssh -o BatchMode=yes -o ConnectTimeout=5 amac '
-        IFS= read -r p || exit 2
-        case $p in
-          /Users/winona/src/*|/Users/winona/.config/anix/*) ;;
-          *) echo "ttt-handoff: path outside the Mac workspace" >&2; exit 3 ;;
-        esac
-        exec "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" \
-          --reuse-window --goto "$p"
-      '
-    ;;
-  *)
-    usage
-    ;;
-esac
+if [[ $status -eq 255 ]]; then
+  echo "ttt-handoff: ssh to $remote_host failed; check the host and your key" >&2
+  exit "$status"
+fi
+if [[ $status -ne 0 ]]; then
+  exit "$status"
+fi
