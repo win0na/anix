@@ -66,8 +66,9 @@ D:\backup\ubuntu.tar` gives you a rollback.
    wsl --shutdown
    ```
 
-5. Allow inbound TCP 2049 from the Mac's Tailscale address. Run this in an
-   elevated PowerShell, after confirming the WSL creator GUID:
+5. Allow inbound TCP 2049 from the tailnet. The NFS export itself is scoped to
+   `amac`. Run this in an elevated PowerShell, after confirming the WSL creator
+   GUID:
 
    ```powershell
    Get-NetFirewallHyperVVMCreator

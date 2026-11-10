@@ -25,8 +25,8 @@ Fix:
 
 1. Confirm Tailscale is up on Windows and the Mac.
 2. Confirm the Hyper-V firewall rule allows TCP 2049 from the Mac.
-3. Confirm the NixOS firewall allows 2049 from `MAC_TAILSCALE_IP`.
-4. Confirm the export names `MAC_TAILSCALE_IP/32`, not a stale address.
+3. Confirm the NixOS firewall allows 2049 from `100.64.0.0/10`.
+4. Confirm the export names `amac`, not a stale client.
 5. Retry with `sudo scripts/mount-src`.
 6. If `mount_nfs` rejects `vers=4.1`, retry with `vers=4`.
 

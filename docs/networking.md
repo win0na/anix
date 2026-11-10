@@ -33,12 +33,11 @@ which Windows provides to WSL.
 | --- | --- | --- | --- |
 | WSL | Mac | `amac` | SSH, `darwin-rebuild`, remote builds |
 | Mac | WSL NFS | `anix` (Windows node) or its `100.x` | NFSv4.1 |
-| Mac | WSL NFS | `MAC_TAILSCALE_IP/32` source | Export and firewall scope |
+| Mac | WSL NFS | `amac` client name | Export scope |
 | Windows | Mac | `amac` | Tailscale only |
 
-`anix` is the Windows node name and the NFS server name for the Mac.
-`MAC_TAILSCALE_IP` is the Mac's `100.x` address and the only client the export
-accepts.
+`anix` is the Windows node name and the NFS server name for the Mac. `amac` is
+the Mac's MagicDNS name and the only client the export accepts.
 
 ## WSL networking
 
@@ -88,7 +87,7 @@ Get-NetFirewallHyperVVMCreator
 
 If the Tailscale interface is classified as Public, add `-Profiles Any`, or set
 the Tailscale network to Private. The NixOS firewall must also allow TCP 2049
-from `MAC_TAILSCALE_IP`.
+from the Tailscale CGNAT range, `100.64.0.0/10`.
 
 ## NFS
 
@@ -98,14 +97,14 @@ The WSL host exports `~/src` as the NFSv4.1 pseudo-root:
 services.nfs.server.enable = true;
 services.nfs.server.createMountPoints = true;
 services.nfs.server.exports = ''
-  /home/winona/src  MAC_TAILSCALE_IP(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
+  /home/winona/src  amac(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
 '';
 ```
 
 `fsid=0` makes the export the pseudo-root, so the Mac mounts `windows-node:/`.
 `all_squash` maps every request to uid 1000 and gid 1000 on the WSL host.
-`insecure` accepts the source port macOS uses. The export is scoped to the
-Mac's single Tailscale address.
+`insecure` accepts the source port macOS uses. The export is scoped to `amac`,
+the Mac's MagicDNS name; the firewall allows 2049 from the Tailscale range.
 
 The Mac mount uses NFSv4.1 only:
 
@@ -193,5 +192,5 @@ SSH is needed on WSL.
   `instanceIdleTimeout` and the `bg` mount option reduce the impact.
 - MagicDNS is off: `amac` does not resolve. Use the Tailscale IP as a temporary
   fallback.
-- The export is not scoped to the Mac: `exportfs` shows the wrong client, and
+- The export is not scoped to `amac`: `exportfs` shows the wrong client, and
   the Mac gets `Permission denied`.

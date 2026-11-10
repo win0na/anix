@@ -261,7 +261,7 @@ These values are fixed or filled at bootstrap. They are not design decisions.
 | Value | Where |
 | --- | --- |
 | Windows Tailscale node | `anix`; the Mac mounts `anix:/` |
-| `MAC_TAILSCALE_IP` | Mac `100.x` address |
+| NFS client name | `amac` (MagicDNS) |
 | `AGE_RECIPIENT_ANIX` | anix SSH host key, converted with `ssh-to-age` |
 | `AGE_RECIPIENT_AMAC` | amac SSH host key, converted with `ssh-to-age` |
 | `AGE_RECIPIENT_WINONA` | personal X25519 age key |
