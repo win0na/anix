@@ -173,8 +173,9 @@ if [[ "$host_os" == "Linux" ]]; then
     echo "error: ssh not found on PATH" >&2
     exit 1
   fi
-  printf '==> ssh amac bash -s -- %q %q %q %q %q\n' "$project" "$scheme" "$udid" "$configuration" "$build_only"
-  ssh amac bash -s -- "$project" "$scheme" "$udid" "$configuration" "$build_only" <"$body_file"
+  remote_args="$(printf '%q ' "$project" "$scheme" "$udid" "$configuration" "$build_only")"
+  printf '==> ssh amac bash -s -- %s\n' "$remote_args"
+  ssh amac "bash -s -- $remote_args" <"$body_file"
 elif [[ "$host_os" == "Darwin" ]]; then
   printf '==> bash -s -- %q %q %q %q %q\n' "$project" "$scheme" "$udid" "$configuration" "$build_only"
   bash -s -- "$project" "$scheme" "$udid" "$configuration" "$build_only" <"$body_file"

@@ -141,9 +141,13 @@ desktop icons.
 
 ## First switch
 
-Run the first `darwin-rebuild` from a GUI Terminal, not over SSH. macOS App
-Management can block writes to `/Applications/Nix Apps` from an SSH session.
-After the first switch approves the app, later switches work over SSH.
+Run the first switch from a GUI Terminal, not over SSH. macOS App Management
+can block writes to `/Applications/Nix Apps` from an SSH session. The bootstrap
+script moves the upstream installer's `/etc/nix/nix.conf`, `/etc/bashrc`, and
+`/etc/zshrc` to `*.before-nix-darwin`, then runs
+`nix run github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild`, because
+`darwin-rebuild` is not installed yet. After the first switch approves the app,
+later switches work over SSH.
 
 ## Verify
 

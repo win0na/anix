@@ -1,7 +1,7 @@
 # The AGE_RECIPIENT_* placeholders are replaced at bootstrap.
 keys:
   anix: &anix AGE_RECIPIENT_ANIX
-  amac: &amac AGE_RECIPIENT_AMAC
+  # amac: &amac AGE_RECIPIENT_AMAC  # add in Part 5 after the Mac host key exists
   winona: &winona AGE_RECIPIENT_WINONA
   recovery: &recovery AGE_RECIPIENT_RECOVERY
 
@@ -9,6 +9,6 @@ creation_rules:
   - path_regex: ^secrets/[^/]+\.yaml$
     age:
       - *anix
-      - *amac
+      # - *amac
       - *winona
       - *recovery

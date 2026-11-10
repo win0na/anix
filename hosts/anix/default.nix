@@ -13,6 +13,7 @@
   # - wsl.enable = true
   # - wsl.defaultUser = "winona"
   # - services.openssh.enable = true; services.openssh.openFirewall = false
+  #   services.openssh.listenAddresses = [ { addr = "127.0.0.1"; port = 22; } ]
   #   (local sshd generates the host key used by sops)
   # - nix.settings.trusted-users
   # - NFS export of ~/src for amac

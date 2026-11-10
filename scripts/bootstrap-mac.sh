@@ -80,6 +80,11 @@ if ! xcode-select -p >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v nix >/dev/null 2>&1 && [[ -x /nix/var/nix/profiles/default/bin/nix ]]; then
+  PATH="/nix/var/nix/profiles/default/bin:$PATH"
+  export PATH
+fi
+
 if ! command -v nix >/dev/null 2>&1; then
   if [[ $install_nix -eq 1 ]]; then
     echo "==> curl -L https://nixos.org/nix/install | sh -s -- --daemon"
@@ -135,5 +140,21 @@ if [[ $no_switch -eq 1 ]]; then
   exit 0
 fi
 
-echo "==> sudo darwin-rebuild switch --flake $checkout#amac"
-sudo darwin-rebuild switch --flake "$checkout#amac"
+if command -v darwin-rebuild >/dev/null 2>&1; then
+  echo "==> sudo darwin-rebuild switch --flake $checkout#amac"
+  sudo darwin-rebuild switch --flake "$checkout#amac"
+else
+  echo "==> first switch; moving the installer's /etc files aside"
+  for file in /etc/nix/nix.conf /etc/bashrc /etc/zshrc; do
+    if [[ -e "$file" && ! -e "$file.before-nix-darwin" ]]; then
+      echo "==> sudo mv $file $file.before-nix-darwin"
+      sudo mv "$file" "$file.before-nix-darwin"
+    fi
+  done
+
+  nix_bin="$(command -v nix)"
+  echo "==> sudo $nix_bin run github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild -- switch"
+  sudo "$nix_bin" --extra-experimental-features 'nix-command flakes' run \
+    github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild -- \
+    switch --flake "$checkout#amac"
+fi

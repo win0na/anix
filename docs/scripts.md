@@ -58,8 +58,11 @@ It clones to `$HOME/.config/anix`, warns when the age key is missing, and runs
 `sudo darwin-rebuild switch --flake $HOME/.config/anix#amac`.
 
 The script warns when `SSH_CONNECTION` is set: the first switch should run from
-a GUI Terminal because of macOS App Management. It never pulls an existing
-checkout.
+a GUI Terminal because of macOS App Management. On a machine without
+`darwin-rebuild`, it moves the installer's `/etc/nix/nix.conf`, `/etc/bashrc`,
+and `/etc/zshrc` to `*.before-nix-darwin`, then runs
+`nix run github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild`. It never pulls
+an existing checkout.
 
 ## scripts/migrate-projects.sh
 

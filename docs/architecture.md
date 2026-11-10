@@ -85,10 +85,11 @@ both platforms. A platform-specific module belongs in `modules/nixos` or
 ## Configuration and state
 
 The repository is the source of truth. On the WSL host the checkout lives at
-`~/src/anix`. On the Mac it lives at `~/.config/anix`, not on NFS. A local
-clone keeps `darwin-rebuild` working when the NFS mount is down, avoids Git
-`dubious ownership` across the NFS uid mapping, and prevents a broken switch
-from removing the source it is building from.
+`~/src/anix`. On the Mac it builds from `~/.config/anix`. The WSL checkout is
+visible through the export at `/Users/winona/src/anix`, but the Mac does not
+build from that copy. A local clone keeps `darwin-rebuild` working when the NFS
+mount is down, avoids Git `dubious ownership` across the NFS uid mapping, and
+prevents a broken switch from removing the source it is building from.
 
 `~/src` holds projects, not configuration. The Mac mounts the WSL export at
 `/Users/winona/src`, so both hosts see the same files at the same relative
@@ -114,7 +115,7 @@ and config directories.
 
 ## Boundaries
 
-- The config repository never lives on NFS.
+- The Mac never builds from the NFS copy of the config repository.
 - Projects live on NFS; build artifacts do not.
 - Secrets are encrypted at rest; no plaintext key enters the repository.
 - Herdr core changes stay small and patch-based. Behavior lives in plugins.

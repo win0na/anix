@@ -111,6 +111,9 @@ The host module imports sops-nix only when `secrets/secrets.yaml` exists. That
 guard lets the first switch run before the key and the encrypted file are ready.
 After the file exists, the next switch enables decryption.
 
+A flake only sees tracked files. Commit `secrets/secrets.yaml` and `.sops.yaml`
+before the switch, or the guard stays off and activation skips sops.
+
 The host configuration sets:
 
 ```nix

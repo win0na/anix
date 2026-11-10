@@ -143,11 +143,17 @@ D:\backup\ubuntu.tar` gives you a rollback.
    The task runs at logon. Enable Windows auto-login if the machine reboots
    without a person present.
 
-6. Clone the repository as `winona`:
+6. Clone the repository as `winona`, then generate and commit the lockfile so
+   both hosts resolve the same inputs:
 
    ```sh
    mkdir -p ~/src
    git clone https://github.com/win0na/anix.git ~/src/anix
+   cd ~/src/anix
+   nix flake lock
+   git add flake.lock
+   git commit -m "flake: lock inputs"
+   git push
    ```
 
 ## Part 3: Create the secrets
@@ -172,7 +178,8 @@ D:\backup\ubuntu.tar` gives you a rollback.
    ```
 
 3. Fill `.sops.yaml` with the anix host key, the personal key, and the
-   recovery key. Leave the Mac recipient for Part 5.
+   recovery key. The `amac` anchor and `*amac` entry are commented out in the
+   skeleton; leave them for Part 5.
 
 4. Create the encrypted file and add the secrets:
 
@@ -191,6 +198,14 @@ D:\backup\ubuntu.tar` gives you a rollback.
    Add the private key as `mac-builder-key`. Keep the public key for the Mac
    host config; the configuration pass installs it in `winona`'s
    `authorizedKeys`. The [Secrets](secrets.md) page lists the keys.
+
+   Commit the encrypted file before the next switch. A flake only sees tracked
+   files, so an untracked `secrets/secrets.yaml` keeps the sops guard off:
+
+   ```sh
+   git add .sops.yaml secrets/secrets.yaml
+   git commit -m "secrets: add encrypted secrets"
+   ```
 
 5. Switch again. The sops module now sees the file and decrypts at activation:
 
@@ -248,10 +263,11 @@ script is for directories that already exist in the home directory.
    Open a new shell, then:
 
    ```sh
-   nix shell nixpkgs#ssh-to-age -c ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub
+   nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#ssh-to-age -c ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub
    ```
 
-4. On the WSL host, add the Mac recipient to `.sops.yaml`, then
+4. On the WSL host, uncomment the `amac` anchor and `*amac` entry in
+   `.sops.yaml`, replace the placeholder with the Mac recipient, then
    re-encrypt and push:
 
    ```sh
@@ -266,6 +282,7 @@ script is for directories that already exist in the home directory.
 
    ```sh
    mkdir -p ~/.config/sops/age
+   # Copy the key from Passwords.app to ~/.config/sops/age/keys.txt, then:
    chmod 600 ~/.config/sops/age/keys.txt
    ```
 
@@ -281,8 +298,11 @@ script is for directories that already exist in the home directory.
    ~/.config/anix/scripts/bootstrap-mac.sh
    ```
 
-   Approve the App Management prompt for `/Applications/Nix Apps`. A switch
-   over SSH can fail at this step.
+   On the first run, the script moves the installer's `/etc/nix/nix.conf`,
+   `/etc/bashrc`, and `/etc/zshrc` aside, then uses
+   `nix run github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild` because
+   `darwin-rebuild` is not installed yet. Approve the App Management prompt for
+   `/Applications/Nix Apps`. A switch over SSH can fail at this step.
 
 ## Part 6: Connect the hosts
 

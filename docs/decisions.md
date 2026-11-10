@@ -41,8 +41,10 @@ exists on one platform is gated by the host module.
 
 ## D4: Local config clone on the Mac
 
-**Decision.** The Mac keeps the repository at `~/.config/anix`. The WSL host
-keeps it at `~/src/anix`. The Mac does not read the config repository over NFS.
+**Decision.** The Mac builds from a local clone at `~/.config/anix`. The WSL
+host keeps its checkout at `~/src/anix`. The WSL checkout is visible to the Mac
+through the export at `/Users/winona/src/anix`, but the Mac does not build from
+that copy.
 
 **Why.** A local clone keeps `darwin-rebuild` working when the NFS mount is
 down, avoids Git `dubious ownership` from the uid mapping, and prevents a

@@ -125,6 +125,26 @@ Fix:
    "ssh-ng"`.
 4. Run `scripts/rebuild amac` once to apply the Mac config.
 
+## First Mac switch fails
+
+Symptom: `darwin-rebuild: command not found`, or nix-darwin stops with
+`Unexpected files in /etc`.
+
+A fresh Mac has no `darwin-rebuild`. The upstream installer also leaves
+`/etc/nix/nix.conf`, `/etc/bashrc`, and `/etc/zshrc` behind, which nix-darwin
+refuses on the first activation.
+
+Fix: run `scripts/bootstrap-mac.sh`. It moves those files to
+`*.before-nix-darwin` and runs:
+
+```sh
+sudo nix --extra-experimental-features 'nix-command flakes' run \
+  github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild -- \
+  switch --flake ~/.config/anix#amac
+```
+
+After the first switch, `darwin-rebuild` is on `PATH`.
+
 ## Mac switch fails over SSH
 
 Symptom: `darwin-rebuild` stops while writing to `/Applications/Nix Apps`, or
@@ -274,7 +294,8 @@ nix shell nixpkgs#ssh-to-age -c ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub
 
 The host recipient must appear in `.sops.yaml` and in the encrypted
 file. After adding a recipient, run `sops updatekeys secrets/secrets.yaml` and
-commit the result.
+commit the result. If activation skips sops entirely, check that the file is
+tracked: `git ls-files secrets/secrets.yaml`.
 
 On macOS, set `SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt`. The `sops`
 CLI defaults to `~/Library/Application Support/sops/age/`.
@@ -297,6 +318,9 @@ Fix:
 3. Confirm the scheme exists: `xcodebuild -list -project PATH`.
 4. Confirm the device is paired and trusted. `xcrun devicectl list devices`
    shows the identifier.
+5. If signing fails over SSH, unlock the login keychain in that session with
+   `security unlock-keychain ~/Library/Keychains/login.keychain-db`, or run
+   the first signing build from the GUI.
 
 The build uses a `mktemp` directory under `/tmp`, so artifacts stay off NFS.
 The script passes `-allowProvisioningUpdates`; automatic signing needs the
