@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/bootstrap-mac-remote [options]
+
+Run on anix after the anix bootstrap. Prepares a fresh Intel Mac over SSH,
+adds its host key as a sops recipient, and starts the first darwin-rebuild in
+the Mac's logged-in Terminal. The macOS TCC prompts are approved on the Mac.
+
+Options:
+  --mac-host HOST   Tailscale/MagicDNS name. Default amac.
+  --mac-user USER   Mac login. Default from users.nix.
+  --anix-user USER  anix login. Default from users.nix.
+  -y, --yes         Accept prompts; never removes anything.
+  --dry-run         Print actions without changing either host.
+  --no-first-switch Stop after the Mac host key is a recipient.
+  -h, --help        Show this help.
+EOF
+}
+
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+warn() { printf 'warning: %s\n' "$*" >&2; }
+say() { printf '\n==> %s\n' "$*"; }
+assume_yes=0
+dry_run=0
+do_switch=1
+mac_host=amac
+mac_user=
+anix_user=
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --mac-host) [[ $# -ge 2 ]] || die "--mac-host needs a value"; mac_host=$2; shift 2 ;;
+    --mac-host=*) mac_host=${1#*=}; shift ;;
+    --mac-user) [[ $# -ge 2 ]] || die "--mac-user needs a value"; mac_user=$2; shift 2 ;;
+    --mac-user=*) mac_user=${1#*=}; shift ;;
+    --anix-user) [[ $# -ge 2 ]] || die "--anix-user needs a value"; anix_user=$2; shift 2 ;;
+    --anix-user=*) anix_user=${1#*=}; shift ;;
+    -y|--yes) assume_yes=1; shift ;;
+    --dry-run) dry_run=1; shift ;;
+    --no-first-switch) do_switch=0; shift ;;
+    *) die "unknown argument: $1" ;;
+  esac
+done
+
+ask() {
+  local prompt=$1 default=${2:-n} reply
+  if [[ $assume_yes -eq 1 ]]; then [[ $default == y ]]; return; fi
+  if [[ $default == y ]]; then prompt="$prompt [Y/n]"; else prompt="$prompt [y/N]"; fi
+  read -r -p "$prompt " reply || true
+  reply=${reply:-$default}
+  [[ $reply == [Yy]* ]]
+}
+
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+repo_root=$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || true)
+[[ -n $repo_root ]] || die "not a git checkout"
+cd "$repo_root"
+[[ -s $HOME/.config/sops/age/keys.txt ]] || die "missing personal age key"
+[[ -s secrets/secrets.yaml ]] || die "missing secrets/secrets.yaml"
+
+value_from_users() {
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$repo_root/users.nix" | head -1
+}
+[[ -n $mac_user ]] || mac_user=$(value_from_users amac)
+[[ -n $anix_user ]] || anix_user=$(value_from_users anix)
+[[ -n $mac_user && -n $anix_user ]] || die "could not read users.nix"
+for n in "$mac_host" "$mac_user" "$anix_user"; do
+  [[ $n =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid name or host: $n"
+done
+
+sops_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#sops -c sops "$@"; }
+ssh_to_age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#ssh-to-age -c ssh-to-age; }
+control="/tmp/anix-mac-${mac_user}@${mac_host}.sock"
+SSH=(ssh -o BatchMode=no -o ConnectTimeout=8 -o ControlMaster=auto -o "ControlPath=$control" -o ControlPersist=900 -o PreferredAuthentications=password,keyboard-interactive,publickey -i "$HOME/.ssh/mac-builder" "$mac_user@$mac_host")
+
+if [[ $dry_run -eq 1 ]]; then
+  say "Dry run: Mac host $mac_host, user $mac_user"
+  echo "  check SSH, install Nix if missing, copy ~/.config/anix, add the amac recipient,"
+  echo "  write ~/anix-first-switch/first-switch.command, open Terminal, poll post.ok"
+  exit 0
+fi
+
+say "Waiting for SSH to $mac_user@$mac_host"
+echo "  On the Mac: connect Tailscale, then System Settings > Sharing > Remote Login."
+while ! "${SSH[@]}" true 2>/dev/null; do
+  if ! ask "SSH is not available yet. Retry?" y; then die "enable Remote Login and rerun"; fi
+done
+
+say "Checking the Mac"
+"${SSH[@]}" 'test "$(uname -m)" = x86_64' || die "the Mac is not Intel x86_64"
+if ! "${SSH[@]}" 'command -v nix >/dev/null 2>&1'; then
+  if ! "${SSH[@]}" 'xcode-select -p >/dev/null 2>&1'; then
+    echo "  Install the Command Line Tools on the Mac: xcode-select --install"
+    ask "Continue once the installer is finished?" y || die "CLT is required"
+  fi
+  ask "Install Nix on the Mac now? It asks for the Mac sudo password once." y || die "Nix is required"
+  "${SSH[@]}" -tt 'curl -L https://nixos.org/nix/install | sh -s -- --daemon'
+  "${SSH[@]}" 'test -x /nix/var/nix/profiles/default/bin/nix' || die "Nix was not installed"
+fi
+
+say "Copying the repository to ~/.config/anix"
+tar -C "$repo_root" --exclude=.git -cf - . | "${SSH[@]}" 'set -e; rm -rf "$HOME/.config/anix"; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
+
+say "Generating the Mac host key"
+"${SSH[@]}" -tt 'sudo ssh-keygen -A'
+recipient=$("${SSH[@]}" 'cat /etc/ssh/ssh_host_ed25519_key.pub' | ssh_to_age_cmd)
+[[ $recipient == age1* ]] || die "could not convert the Mac host key"
+if ! grep -q '^  amac:' "$repo_root/.sops.yaml"; then
+  sed -i "s|^  # amac: &amac age1...|  amac: \&amac $recipient|" "$repo_root/.sops.yaml"
+  grep -q '^  amac:' "$repo_root/.sops.yaml" || sed -i "/^  personal:/a\\  amac: \&amac $recipient" "$repo_root/.sops.yaml"
+  if ! grep -q '^      - \*amac$' "$repo_root/.sops.yaml"; then
+    sed -i '/^      - \*personal$/a\      - *amac' "$repo_root/.sops.yaml"
+  fi
+fi
+if [[ $dry_run -eq 0 ]]; then
+  SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt sops_cmd updatekeys -y secrets/secrets.yaml
+  git add .sops.yaml secrets/secrets.yaml
+  if ! git diff --cached --quiet; then
+    git commit -m "bootstrap: add the amac sops recipient"
+  fi
+  tar -C "$repo_root" -cf - .sops.yaml secrets/secrets.yaml | "${SSH[@]}" 'tar -xf - -C "$HOME/.config/anix"'
+fi
+
+if [[ $do_switch -eq 0 ]]; then
+  say "Mac host key added; first switch skipped"
+  exit 0
+fi
+
+say "Writing the first switch command"
+"${SSH[@]}" 'mkdir -p "$HOME/anix-first-switch"' 
+"${SSH[@]}" 'cat > "$HOME/anix-first-switch/first-switch.command"' <<'EOS'
+#!/bin/zsh
+set -euo pipefail
+export PATH=/nix/var/nix/profiles/default/bin:$PATH
+dir="$HOME/anix-first-switch"
+mkdir -p "$dir"
+exec > >(tee -a "$dir/first-switch.log") 2>&1
+for f in /etc/nix/nix.conf /etc/bashrc /etc/zshrc; do
+  if [ -e "$f" ] && [ ! -e "$f.before-nix-darwin" ]; then
+    sudo mv "$f" "$f.before-nix-darwin"
+  fi
+done
+sudo mkdir -p /etc/nix
+sudo env PATH="/nix/var/nix/profiles/default/bin:$PATH" \
+  NIX_CONFIG='experimental-features = nix-command flakes' \
+  nix run github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild -- \
+  switch --flake "$HOME/.config/anix#amac"
+touch "$dir/post.ok"
+EOS
+"${SSH[@]}" 'chmod +x "$HOME/anix-first-switch/first-switch.command"'
+
+console_uid=$("${SSH[@]}" 'stat -f%u /dev/console')
+if [[ $console_uid != 0 ]]; then
+  "${SSH[@]}" "launchctl asuser $console_uid sudo -u $mac_user open -a Terminal /Users/$mac_user/anix-first-switch/first-switch.command" || true
+else
+  echo "  The Mac is at the login window. Sign in, then open:"
+  echo "  /Users/$mac_user/anix-first-switch/first-switch.command"
+fi
+
+say "Waiting for the Mac first switch"
+for _ in $(seq 1 180); do
+  if "${SSH[@]}" 'test -s "$HOME/anix-first-switch/post.ok"' 2>/dev/null; then
+    say "Mac first switch finished"
+    "${SSH[@]}" 'uname -m; mount | grep "/Users/.*/src" || true; herdr plugin list 2>/dev/null || true'
+    exit 0
+  fi
+  sleep 10
+done
+warn "no post.ok yet; inspect /Users/$mac_user/anix-first-switch/first-switch.log"
+exit 1

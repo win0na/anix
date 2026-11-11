@@ -23,12 +23,22 @@ param(
   [switch]$Yes,
   [switch]$SkipWslUpdate,
   [switch]$SkipFirewall,
+  [switch]$NoShutdown,
+  [switch]$NoFirstSwitch,
+  [switch]$NoClone,
+  [switch]$NoTask,
+  [string]$DistroName = "NixOS",
+  [string]$AnixUser = "winona",
   [string]$ImageUrl = "https://github.com/nix-community/NixOS-WSL/releases/download/2605.7.2/nixos.wsl",
-  [string]$ImageSha256 = "e7180ad555fdcb8e1e057e2ef056de467603a5e502ff8531053738371be3f6b9"
+  [string]$ImageSha256 = "e7180ad555fdcb8e1e057e2ef056de467603a5e502ff8531053738371be3f6b9",
+  [string]$ImagePath = "",
+  [string]$Location = ""
 )
 
 $ErrorActionPreference = "Stop"
-$Distro = "NixOS"
+$Distro = $DistroName
+if ([string]::IsNullOrWhiteSpace($Distro)) { throw "DistroName is empty" }
+if ([string]::IsNullOrWhiteSpace($AnixUser)) { throw "AnixUser is empty" }
 
 function Confirm([string]$Message) {
   if ($Yes) { return $true }
@@ -129,30 +139,37 @@ if ($distroExists) {
     throw "Install cancelled."
   }
 } else {
-  $image = Join-Path $env:TEMP "nixos.wsl"
-  $expected = $ImageSha256.ToLower()
-  if (Test-Path $image) {
-    $actual = (Get-FileHash $image -Algorithm SHA256).Hash.ToLower()
-    if ($actual -ne $expected) {
-      Remove-Item $image -Force
+  if ($ImagePath) {
+    $image = $ImagePath
+    if (-not (Test-Path $image)) { throw "image not found: $image" }
+  } else {
+    $image = Join-Path $env:TEMP "nixos.wsl"
+    $expected = $ImageSha256.ToLower()
+    if (Test-Path $image) {
+      $actual = (Get-FileHash $image -Algorithm SHA256).Hash.ToLower()
+      if ($actual -ne $expected) {
+        Remove-Item $image -Force
+      }
     }
-  }
-  if (-not (Test-Path $image)) {
-    Write-Host "==> downloading $ImageUrl"
-    $part = "$image.part"
-    Invoke-WebRequest -Uri $ImageUrl -OutFile $part
-    $actual = (Get-FileHash $part -Algorithm SHA256).Hash.ToLower()
-    if ($actual -ne $expected) {
-      Remove-Item $part -Force
-      throw "image checksum mismatch: $actual"
+    if (-not (Test-Path $image)) {
+      Write-Host "==> downloading $ImageUrl"
+      $part = "$image.part"
+      Invoke-WebRequest -Uri $ImageUrl -OutFile $part
+      $actual = (Get-FileHash $part -Algorithm SHA256).Hash.ToLower()
+      if ($actual -ne $expected) {
+        Remove-Item $part -Force
+        throw "image checksum mismatch: $actual"
+      }
+      Move-Item $part $image -Force
     }
-    Move-Item $part $image -Force
   }
   if (-not (Confirm "Install $Distro from $image?")) {
     throw "Install cancelled."
   }
-  wsl --shutdown
-  wsl --install --from-file $image --no-launch
+  if (-not $NoShutdown) { wsl --shutdown }
+  $installArgs = @("--install", "--from-file", $image, "--name", $Distro, "--no-launch")
+  if ($Location) { $installArgs += @("--location", $Location) }
+  & wsl @installArgs
   if ($LASTEXITCODE -ne 0) { throw "wsl --install failed" }
 }
 
@@ -160,29 +177,37 @@ $needsFirstSwitch = -not $distroExists
 if ($distroExists) {
   $savedPreference = $ErrorActionPreference
   $ErrorActionPreference = "Continue"
-  wsl -d $Distro -u root -- id winona *> $null
+  wsl -d $Distro -u root -- id $AnixUser *> $null
   $needsFirstSwitch = ($LASTEXITCODE -ne 0)
   $ErrorActionPreference = $savedPreference
+}
+if ($NoFirstSwitch) {
+  Write-Host "==> first switch skipped (NoFirstSwitch)"
+  $needsFirstSwitch = $false
 }
 
 if ($needsFirstSwitch) {
   Write-Host "==> first switch in $Distro"
   wsl -d $Distro -u nixos -- bash -lc "set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:`$PATH; nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone https://github.com/win0na/anix.git /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; sudo NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild switch --flake /tmp/anix#anix"
   if ($LASTEXITCODE -ne 0) { throw "the first NixOS switch failed" }
-} else {
+} elseif (-not $NoFirstSwitch) {
   Write-Host "==> $Distro is already configured; skipping the first switch"
 }
 
-Write-Host "==> clone the repository for winona"
-wsl -d $Distro -u winona -- bash -lc "set -euo pipefail; mkdir -p ~/src; if [ ! -d ~/src/anix/.git ]; then git clone https://github.com/win0na/anix.git ~/src/anix; fi"
+if (-not $NoClone) {
+  Write-Host "==> clone the repository for $AnixUser"
+  wsl -d $Distro -u $AnixUser -- bash -lc "set -euo pipefail; mkdir -p ~/src; if [ ! -d ~/src/anix/.git ]; then git clone https://github.com/win0na/anix.git ~/src/anix; fi"
+}
 
-$taskName = "anix-wsl"
-$action = New-ScheduledTaskAction -Execute "wsl.exe" -Argument "-d $Distro -u winona --exec /run/current-system/sw/bin/sleep infinity"
-$trigger = New-ScheduledTaskTrigger -AtLogOn
-$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
+if (-not $NoTask) {
+  $taskName = "anix-wsl"
+  $action = New-ScheduledTaskAction -Execute "wsl.exe" -Argument "-d $Distro -u $AnixUser --exec /run/current-system/sw/bin/sleep infinity"
+  $trigger = New-ScheduledTaskTrigger -AtLogOn
+  $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
+  Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
+}
 
 Write-Host ""
 Write-Host "Windows is ready."
-Write-Host "Next: open $Distro as winona, copy the age key, builder key, and secrets file, then run:"
+Write-Host "Next: open $Distro as $AnixUser, copy the age key, builder key, and secrets file, then run:"
 Write-Host "  ~/src/anix/scripts/bootstrap"

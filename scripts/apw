@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: apw <command> [args]
+
+Stub for the Passwords.app adapter. The real apw port is a separate project.
+This host has no supported Passwords.app CLI, so every storage command exits 5
+and prints the manual instruction.
+
+Commands:
+  secret exists NAME        exit 0 if present (or 5 when unavailable)
+  secret get NAME           print the value (or 5 when unavailable)
+  secret set NAME --stdin   store a value (or 5 when unavailable)
+  secret delete NAME        remove a value (or 5 when unavailable)
+  secret verify NAME        verify a value (or 5 when unavailable)
+  backup check [NAME]       check the backup state (or 5 when unavailable)
+  version                   print the adapter version
+EOF
+}
+
+mode=${APW_MODE:-auto}
+case "$mode" in
+  auto|off|required) ;;
+  *) printf 'apw: invalid APW_MODE: %s\n' "$mode" >&2; exit 2 ;;
+esac
+
+cmd=${1:-}
+[[ $# -gt 0 ]] && shift || true
+case "$cmd" in
+  -h|--help|help)
+    usage
+    exit 0
+    ;;
+  version)
+    printf 'apw 0.0.0-stub\n'
+    exit 0
+    ;;
+  secret)
+    sub=${1:-}
+    [[ $# -gt 0 ]] && shift || true
+    name=${1:-}
+    case "$sub" in
+      exists|get|set|delete|verify)
+        [[ -n $name ]] || { printf 'apw: secret %s needs NAME\n' "$sub" >&2; exit 2; }
+        printf 'apw: Passwords.app CLI unavailable; store %s manually and use APW_MODE=off\n' "$name" >&2
+        exit 5
+        ;;
+      *)
+        printf 'apw: unknown secret command: %s\n' "${sub:-}" >&2
+        exit 2
+        ;;
+    esac
+    ;;
+  backup)
+    sub=${1:-}
+    [[ $# -gt 0 ]] && shift || true
+    name=${1:-keys}
+    case "$sub" in
+      check)
+        printf 'apw: backup check for %s is unavailable without Passwords.app\n' "$name" >&2
+        exit 5
+        ;;
+      *)
+        printf 'apw: unknown backup command: %s\n' "${sub:-}" >&2
+        exit 2
+        ;;
+    esac
+    ;;
+  '')
+    usage >&2
+    exit 2
+    ;;
+  *)
+    printf 'apw: unknown command: %s\n' "$cmd" >&2
+    exit 2
+    ;;
+esac

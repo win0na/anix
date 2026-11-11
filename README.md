@@ -19,7 +19,7 @@ The first switch still needs the bootstrap sequence in
 - **Two hosts, one flake:** `anix` runs NixOS-WSL on nixos-unstable; `amac`
   runs nix-darwin 26.05 on x86_64-darwin.
 - **Shared projects:** NFSv4.1 exports `~/src` from the WSL host; the Mac
-  mounts `anix:/` (the Windows Tailscale node) at `/Users/winona/src`.
+  mounts `anix:/` (the Windows Tailscale node) at `$ANIX_MAC_HOME/src`.
 - **Pinned Herdr:** the rootshell fork, two core patches, four pinned plugins,
   and one ttt pane per workspace.
 - **Shared OpenCode:** one config, first-party `opencode-dcp-fix`, no caveman
@@ -38,18 +38,18 @@ The first switch still needs the bootstrap sequence in
 
 ## Bootstrap
 
-Prepare Windows with `scripts\bootstrap-windows.ps1`, then run the interactive script on each host:
+Start in the old Ubuntu WSL checkout:
 
 ```sh
-# On the NixOS-WSL host, as winona
-~/src/anix/scripts/bootstrap
-
-# On the Mac, as winona
-~/.config/anix/scripts/bootstrap
+cd ~/src/anix
+./scripts/provision
 ```
 
-The first NixOS-WSL switch runs as the image's `nixos` user. See
-[docs/bootstrap.md](docs/bootstrap.md) for the full order.
+The script prompts for the anix and Mac usernames, the directories to transfer,
+and an Ubuntu backup. It installs NixOS-WSL alongside Ubuntu, runs the first
+switch, transfers the keys and selected trees, runs the anix bootstrap, and then
+prepares the Mac. Ubuntu stays until both hosts pass and you confirm removal.
+See [docs/bootstrap.md](docs/bootstrap.md) for the phases and the Mac TCC step.
 
 ## Rebuild
 

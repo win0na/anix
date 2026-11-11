@@ -7,16 +7,70 @@ runtime failure, and `2` for a usage error.
 | Script | Runs on | Purpose |
 | --- | --- | --- |
 | `rebuild` | Both | Rebuild and activate one host |
-| `bootstrap` | Both | Interactive first run: keys, secrets, recipients, and switch |
+| `provision` | Ubuntu WSL | Orchestrate the NixOS-WSL replacement, transfer, anix bootstrap, and Mac phase |
+| `bootstrap` | Both | Interactive first run for one host: keys, secrets, recipients, and switch |
+| `bootstrap-mac-remote` | anix | Prepare a fresh Mac over SSH and start its first switch |
 | `bootstrap-windows.ps1` | Windows | Prepare WSL, the firewall, the NixOS image, and the logon task |
 | `bootstrap-wsl.sh` | NixOS-WSL | Alias for `bootstrap --host anix` |
 | `bootstrap-mac.sh` | macOS | Alias for `bootstrap --host amac` |
+| `apw` | Both | Stub for the Passwords.app adapter; storage commands exit 5 |
 | `migrate-projects.sh` | Linux or WSL | Move projects into `~/src` and leave symlinks |
 | `ios` | WSL or macOS | Build an iOS app on the Mac and install it |
 | `install-herdr-plugins.sh` | Both | Link the first-party Herdr plugin |
 | `herdr-ide` | Both | Build the sidebar, agent, and ttt layout |
 | `check.sh` | Both | Evaluate both hosts, lint the scripts, and run typos |
-| `mount-src` | macOS | Mount the NFS export at `/Users/winona/src` |
+| `mount-src` | macOS | Mount the NFS export at `$ANIX_MAC_HOME/src` |
+
+## scripts/provision
+
+```text
+scripts/provision [--distro NAME] [--anix-user USER] [--mac-user USER]
+                  [--mac-host HOST] [--dir PATH] [--backup PATH]
+                  [--image-url URL] [--image-sha SHA]
+                  [--no-transfer] [--no-mac] [--no-finalize]
+                  [--skip-backup] [--dry-run] [--yes]
+```
+
+Run in the old Ubuntu WSL distribution. It installs NixOS-WSL alongside
+Ubuntu, runs the first boot as `nixos`, transfers the selected trees and keys,
+runs `scripts/bootstrap --host anix`, and calls
+`scripts/bootstrap-mac-remote`. It backs up Ubuntu first and leaves it in place
+unless you confirm removal at the end. `--yes` accepts defaults but never
+unregisters Ubuntu. `--no-transfer` skips projects and keys; the anix bootstrap
+then needs another copy. `--dry-run` prints the phases without changing either
+host.
+
+The project checklist scans the top level of `$HOME` and `$HOME/src`. It
+excludes hidden directories, `src/anix`, `target`, `node_modules`,
+`DerivedData`, and other build outputs.
+
+## scripts/bootstrap-mac-remote
+
+```text
+scripts/bootstrap-mac-remote [--mac-host HOST] [--mac-user USER]
+                             [--anix-user USER] [--yes] [--dry-run]
+                             [--no-first-switch]
+```
+
+Run on anix after the anix bootstrap. It waits for SSH to the Mac, checks the
+Intel architecture, installs Nix if needed, copies the repository to
+`~/.config/anix`, generates the Mac host key, adds the amac recipient with
+`sops updatekeys`, writes `~/anix-first-switch/first-switch.command`, opens it
+in the logged-in Terminal, and polls for `post.ok`. The macOS App Management,
+Homebrew, and sudo prompts happen in that Terminal. `--no-first-switch` stops
+after the recipient is added.
+
+## scripts/apw
+
+```text
+scripts/apw secret exists|get|set|delete|verify NAME
+scripts/apw backup check [NAME]
+scripts/apw version
+```
+
+A stub for the future Passwords.app adapter. It never reads or writes a secret
+on Linux; storage commands print the manual instruction and exit 5. `APW_MODE`
+accepts `auto`, `required`, or `off`.
 
 ## scripts/rebuild
 
@@ -72,17 +126,21 @@ existing recipient. It never unregisters a distribution and never force-pushes.
 
 ```text
 scripts/bootstrap-windows.ps1 [-Yes] [-SkipWslUpdate] [-SkipFirewall]
+                              [-NoShutdown] [-NoFirstSwitch] [-NoClone] [-NoTask]
+                              [-DistroName NAME] [-AnixUser USER]
                               [-ImageUrl URL] [-ImageSha256 HASH]
+                              [-ImagePath PATH] [-Location PATH]
 ```
 
 Run in an elevated PowerShell. It updates WSL, writes
 `%UserProfile%\.wslconfig`, opens TCP 2049 for the WSL VM, downloads and
-verifies the NixOS-WSL 2605.7.2 image, installs it as `NixOS`, runs the first
-switch, clones the repository to `~/src/anix` as `winona`, and registers the
-`anix-wsl` logon task that keeps WSL alive. `-Yes` accepts the prompts.
+verifies the NixOS-WSL 2605.7.2 image, and installs it under the requested
+name. By default it also runs the first switch, clones the repository for the
+anix user, and registers the `anix-wsl` logon task. `scripts/provision` calls it
+with `-NoShutdown -NoFirstSwitch -NoClone`, so the orchestrator owns those steps.
 
-If `NixOS` already exists, it offers to skip the install and run the remaining
-steps. It never deletes or unregisters a distribution.
+If the distribution already exists, it offers to skip the install and run the
+remaining steps. It never deletes or unregisters a distribution.
 
 ## scripts/migrate-projects.sh
 
@@ -191,7 +249,7 @@ Mounts `ANIX_NFS_HOST:/` at `ANIX_MOUNT_POINT` with
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `ANIX_NFS_HOST` | `anix` | Windows Tailscale node that forwards to WSL nfsd |
-| `ANIX_MOUNT_POINT` | `/Users/winona/src` | Local mount point |
+| `ANIX_MOUNT_POINT` | `$ANIX_MAC_HOME/src` | Local mount point |
 
 The default `anix` is the Windows Tailscale node, which forwards TCP 2049 to the
 WSL NFS server. Set `ANIX_NFS_HOST` only when the tailnet name differs. The

@@ -1,116 +1,131 @@
 # Bootstrap
 
-This page takes a Windows 11 machine and an Intel Mac from a clean checkout to `anix` and `amac` on one flake. The scripts prompt for each choice. Rerun a script if a step stops; it skips work that already exists.
+This page takes the old Ubuntu WSL distribution and a fresh Intel Mac to `anix`
+on NixOS-WSL and `amac` on nix-darwin. Run one script from Ubuntu. It prompts
+for every choice and keeps Ubuntu until both hosts pass.
 
 ## Before you start
 
 You need:
 
-- Windows 11 22H2 or later with WSL 2.4.4 or later and Git for Windows.
-- An Intel MacBookPro16,1 on macOS 26.2 or later.
-- Tailscale installed on Windows and macOS, signed in to the same tailnet.
+- Windows 11 with WSL 3.0.5 or later.
+- Tailscale signed in on Windows and macOS.
+- A fresh Intel MacBookPro16,1 on macOS 26.2 or later.
 - A Cachix account with a cache named `anix`.
-- The personal age key, or a backup of it.
+- The personal age key at `~/.config/sops/age/keys.txt`.
+- `secrets/secrets.yaml` in the checkout.
 
-The encrypted `secrets/secrets.yaml` is committed to the public repository. It
-contains the builder private key and the provider keys, protected only by age.
-Keep the personal key and the offline recovery key out of the repository.
+The personal age key is the only irreplaceable file. Keep a copy in
+Passwords.app and an offline copy before you start. The encrypted
+`secrets/secrets.yaml` is safe to commit to the public repository; the private
+age key and the offline recovery key are not.
 
-Back up the old WSL distribution before you replace it:
+## 1. Start in Ubuntu
 
-```powershell
-wsl --export Ubuntu D:\backup\ubuntu.tar
-```
-
-The bootstrap never unregisters the old distribution.
-
-## 1. Prepare Windows
-
-Open PowerShell as Administrator, clone the repository, and run the Windows script:
-
-```powershell
-git clone https://github.com/win0na/anix.git $env:USERPROFILE\anix
-cd $env:USERPROFILE\anix
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-windows.ps1
-```
-
-The script updates WSL, writes `%UserProfile%\.wslconfig` with 16 GB of memory and 8 processors, opens TCP 2049 for the WSL VM, downloads the 2605.7.2 image, installs it as `NixOS`, runs the first switch, clones the repository to `~/src/anix` as `winona`, and creates the `anix-wsl` logon task that keeps WSL alive.
-
-The first switch builds the pushed `main` without `secrets/secrets.yaml`. Push your changes before you run it. A rerun on an already configured `NixOS` distribution skips the install and the first switch.
-
-## 2. Bootstrap anix
-
-Open the `NixOS` distribution as `winona`. Create the key directories:
-
-```sh
-mkdir -p ~/.config/sops/age ~/.ssh
-```
-
-Copy the personal age key, the Mac builder key, and the encrypted secrets from the old Ubuntu checkout. In Windows Explorer:
-
-- Copy `\\wsl$\Ubuntu\home\winona\.config\sops\age\keys.txt` to `\\wsl$\NixOS\home\winona\.config\sops\age\keys.txt`.
-- Copy `\\wsl$\Ubuntu\home\winona\.ssh\mac-builder` to `\\wsl$\NixOS\home\winona\.ssh\mac-builder`.
-- Copy `\\wsl$\Ubuntu\home\winona\anix\secrets\secrets.yaml` to `\\wsl$\NixOS\home\winona\src\anix\secrets\secrets.yaml`.
-
-Then fix the modes:
-
-```sh
-chmod 600 ~/.config/sops/age/keys.txt ~/.ssh/mac-builder ~/src/anix/secrets/secrets.yaml
-```
-
-The public builder key is derived from the private key if it is missing. Then run:
+Run the orchestrator from the existing Ubuntu checkout:
 
 ```sh
 cd ~/src/anix
-./scripts/bootstrap
+./scripts/provision
 ```
 
-The script checks the host, the age key, the builder key, and the encrypted secrets. It adds the anix host key to `.sops.yaml`, updates the sops recipients, commits with your confirmation, and runs the switch that activates sops. It then installs the pinned Herdr plugins, sets the sidebar click state, and offers the GitHub device login for the VS Code tunnel. Open the printed URL, enter the code, and authorize the same account you use in VS Code. The token is stored at `~/.vscode/cli/token.json`. If you run with `--yes`, run the printed `code tunnel user login --provider github` later and restart the unit.
+The script checks WSL, the age key, the encrypted secrets, and the repository.
+It then:
 
-The Mac login password and the Cachix token can stay empty here. Set the password on the Mac.
+1. Writes `users.nix` if you enter new usernames.
+2. Offers an Ubuntu export before changing anything.
+3. Installs NixOS-WSL alongside Ubuntu through the elevated Windows helper.
+4. Stages the repository without secrets, runs the first `nixos-rebuild boot`
+   as `nixos`, and starts the `NixOS` distribution as the anix user.
+5. Transfers the keys, the encrypted secrets, and the directories you select.
+6. Runs `scripts/bootstrap --host anix` inside NixOS.
+7. Calls `scripts/bootstrap-mac-remote` for the Mac.
 
-## 3. Bootstrap amac
+Useful options:
 
-On the Mac, open **Terminal**. Restore the personal age key from Passwords.app, clone the repository, and run the script:
-
-```sh
-mkdir -p ~/.config/sops/age
-# Copy keys.txt from Passwords.app to ~/.config/sops/age/keys.txt.
-chmod 600 ~/.config/sops/age/keys.txt
-git clone https://github.com/win0na/anix.git ~/.config/anix
-~/.config/anix/scripts/bootstrap
+```text
+--anix-user NAME   --mac-user NAME   --mac-host HOST
+--dir PATH        transfer an extra directory (repeatable)
+--backup PATH     Windows path for the Ubuntu export
+--no-transfer     skip projects and keys
+--no-mac          stop after anix
+--skip-backup     do not export Ubuntu
+--dry-run         print the plan only
+--yes             accept defaults; never unregisters Ubuntu
 ```
 
-The script checks macOS, the command line tools, and Nix. It generates the Mac host key, adds the amac recipient, updates the sops file, prompts for the Mac login password and the Cachix token, commits with your confirmation, and runs the first switch. The first switch must run from Terminal, not SSH, because macOS App Management writes to `/Applications/Nix Apps`.
+The project checklist scans the top level of `$HOME` and `$HOME/src`. Select by
+number. Build outputs and caches such as `target`, `node_modules`, and
+`DerivedData` are excluded.
 
-After the switch, the script offers to mount `/Users/winona/src`, build the Darwin Herdr package, install the Herdr plugins, and install Xcode 26.6. It asks before pushing the amac recipient commit; push it so anix can pull the updated secrets.
+## 2. anix finishes
 
-## 4. Verify
+`scripts/bootstrap --host anix` adds the anix host key to `.sops.yaml`, runs
+`sops updatekeys`, commits the encrypted file with your confirmation, and
+switches. It then offers the GitHub device login for the VS Code tunnel. The
+token lives at `~/.vscode/cli/token.json`; it is not a sops secret.
 
-On anix:
+The Cachix token and the Mac login password can stay empty during this phase.
+
+## 3. Prepare the Mac
+
+The Mac must already have:
+
+- A local account and an internet connection.
+- Tailscale signed in.
+- Remote Login enabled in System Settings > Sharing.
+- Terminal allowed in App Management when the first switch asks.
+
+The remote script waits for SSH, installs Nix with one sudo prompt, copies the
+repository to `~/.config/anix`, generates the Mac host key, and adds the amac
+recipient to sops. It then writes
+`~/anix-first-switch/first-switch.command` and opens it in the Mac's logged-in
+Terminal. The Terminal runs the first `darwin-rebuild`; App Management and
+Homebrew prompts happen there. The script polls for `post.ok`.
+
+The Mac does not need the personal age key for activation. Its host key
+decrypts the sops file after the amac recipient is added.
+
+After the first switch the script verifies the architecture, the NFS mount, and
+the Herdr plugin list. Xcode 26.6 still needs the Apple ID and 2FA; the script
+offers `xcodes`.
+
+## 4. Finish
+
+When both hosts pass, the script offers to export and unregister Ubuntu. The
+default is to keep it. The export is a tar archive under the Windows profile;
+it contains the age key and must be protected or deleted.
+
+Run the checks:
 
 ```sh
-~/src/anix/scripts/check.sh
-getent hosts amac
+scripts/check.sh
 ssh amac uname -m
 ```
 
 `ssh amac uname -m` prints `x86_64`.
 
-On amac:
+## Keys and backups
 
-```sh
-mount | grep /Users/winona/src
-pmset -g | grep -E 'disablesleep|autorestart'
-herdr plugin list
-```
-
-`herdr plugin list` shows the four pinned plugins. Run `herdr-ide` with `prefix+i` after a Herdr restart to build the sidebar, agent, and ttt layout.
+- The personal age key lives at `~/.config/sops/age/keys.txt` on anix and amac.
+- Keep a secure note in Passwords.app and one offline copy. The `apw` stub
+  reports that the Passwords.app CLI is unavailable on Linux; store the file
+  manually until the separate apw port exists.
+- Add the offline recovery key as a `recovery` recipient, run
+  `sops updatekeys secrets/secrets.yaml`, and keep the private key offline.
+- The encrypted `secrets/secrets.yaml` in git is the ciphertext backup. Never
+  commit a decrypted copy.
+- Host SSH keys are not backed up. Regenerate a lost host key and update the
+  recipients with the personal or recovery key.
 
 ## If a step stops
 
-Every check prints the file or command that failed. Fix that item and rerun the script. `--dry-run` prints the actions without changing anything. `--no-switch` stops before the switch. [Troubleshooting](troubleshooting.md) covers the first switch, NFS, and Tailscale failures.
+Every phase prints the command or file that failed. Fix that item and rerun;
+the provision skips completed phases. `--dry-run` prints the plan, and
+`--no-mac` stops after anix. [Troubleshooting](troubleshooting.md) covers WSL,
+NFS, Tailscale, and first-switch failures.
 
 ## Next
 
-Read [Networking](networking.md) before you change the NFS or Tailscale setup, and [Herdr](herdr.md) before you change the layout.
+Read [Networking](networking.md) before changing NFS or Tailscale, and
+[Herdr](herdr.md) before changing the layout or the ttt handoff.

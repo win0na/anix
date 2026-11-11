@@ -8,6 +8,7 @@ extend-exclude = [
 ]
 
 [default.extend-words]
+apw = "apw"
 amac = "amac"
 anix = "anix"
 cachix = "cachix"
@@ -40,5 +41,6 @@ ttt = "ttt"
 udid = "udid"
 wsize = "wsize"
 wsl = "wsl"
+wslpath = "wslpath"
 xcodes = "xcodes"
 xcodebuild = "xcodebuild"
