@@ -458,6 +458,36 @@ ensure_secrets() {
   fi
 }
 
+ensure_recovery_key() {
+  if grep -q '^  recovery: &recovery ' .sops.yaml; then
+    say "recovery recipient: present"
+    return 0
+  fi
+  if [[ $dry_run -eq 1 ]]; then
+    say "would generate an offline recovery key and add the recovery recipient"
+    return 0
+  fi
+  if ! ask "Generate an offline recovery age key now?" y; then
+    warn "no recovery recipient; if the personal key is lost the secrets are unrecoverable"
+    return 0
+  fi
+  local path pub
+  read -r -p "Recovery key path [$HOME/anix-recovery-$(date +%Y%m%d).txt]: " path || true
+  path=${path:-$HOME/anix-recovery-$(date +%Y%m%d).txt}
+  [[ ! -e $path ]] || die "refusing to overwrite $path"
+  umask 077
+  age_keygen -o "$path"
+  chmod 600 "$path"
+  pub=$(age_keygen -y "$path")
+  add_recipient recovery "$pub"
+  say "Recovery key written to $path"
+  warn "move it to offline media and remove it from this host"
+  if [[ $path == "$HOME"/* ]] && ask "Delete $path now after copying it offline?" n; then
+    rm -f "$path"
+  fi
+  commit_secrets "secrets: add the recovery recipient"
+}
+
 add_recipient() {
   local name=$1 recipient=$2
   if [[ $dry_run -eq 1 ]]; then
@@ -708,6 +738,7 @@ bootstrap_anix() {
   ensure_builder_key
   ensure_secrets
   ensure_sops_personal
+  ensure_recovery_key
   ensure_anix_host_key
 
   if [[ $dry_run -eq 1 ]]; then

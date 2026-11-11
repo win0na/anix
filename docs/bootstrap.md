@@ -111,8 +111,9 @@ ssh amac uname -m
 - Keep a secure note in Passwords.app and one offline copy. The `apw` stub
   reports that the Passwords.app CLI is unavailable on Linux; store the file
   manually until the separate apw port exists.
-- Add the offline recovery key as a `recovery` recipient, run
-  `sops updatekeys secrets/secrets.yaml`, and keep the private key offline.
+- The anix bootstrap offers to generate the offline recovery key, add it as a
+  `recovery` recipient, and update the sops file. Choose a path on offline media
+  and move the private key there.
 - The encrypted `secrets/secrets.yaml` in git is the ciphertext backup. Never
   commit a decrypted copy.
 - Host SSH keys are not backed up. Regenerate a lost host key and update the
