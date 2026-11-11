@@ -1,6 +1,6 @@
-First-party vendored code, loaded by OpenCode as a local plugin. This repository is the source of truth.
-
 # opencode-dcp-fix
+
+First-party vendored code, loaded by OpenCode as a local plugin. This repository is the source of truth.
 
 Keeps internal context-management metadata out of OpenCode v2 sessions.
 
@@ -9,8 +9,8 @@ Three sentinels leak into what you see and what the model re-reads:
 | Leak | Source |
 | --- | --- |
 | `<system-reminder>…</system-reminder>` | runtime notices, editor selection context |
-| `<dcp-system-reminder>…</dcp-system-reminder>` | DCP pruning nudges |
-| `@12@`, `@b3@` | DCP message and compressed-block references |
+| `<dcp-system-reminder>` | DCP pruning nudges |
+| `@N@`, `@bN@` | DCP message and compressed-block references |
 
 They are addressed to the agent and are meant to be invisible.
 
@@ -23,7 +23,7 @@ against a running 2.2.5 server.
 before the prompt is admitted, so a reminder that was pasted or re-sent never
 becomes a stored user message. Submitting
 `… Ignore this: <system-reminder>SECRET-MARKER</system-reminder>` stored
-`"… Ignore this: "` — `instr(data,'SECRET-MARKER')` on the `session_message` row
+`"… Ignore this: "`, `instr(data,'SECRET-MARKER')` on the `session_message` row
 returns `0`.
 
 **Reply scrubbing.** `ctx.session.hook("http.response")` wraps the provider
@@ -36,8 +36,8 @@ Checked by asking a model to repeat a file verbatim, where the file contained
 `<system-reminder>ECHOLEAK99</system-reminder>`. The stored reply was
 `"MARKER-START\n\nMARKER-END"`; the tag never reached the transcript.
 
-Why not `ctx.aisdk.hook("language")`: it looks like the right seam — it hands
-over a `LanguageModelV3` that can be wrapped — and it registers, but it never
+Why not `ctx.aisdk.hook("language")`: it looks like the right seam, it hands
+over a `LanguageModelV3` that can be wrapped, and it registers, but it never
 fires. Instrumented runs on 2.2.5 logged `language hook registered` and then no
 event at all, across two providers and two SDK adapters (`opencode-go`,
 `@ai-sdk/openai-compatible`). `http.response` does fire, and the core Snowflake
@@ -49,7 +49,7 @@ provider already replaces whole responses through it.
 message renders:
 
 - the TUI slot tree (`SlotMap`) exposes footers, `session.panel` and
-  `sidebar.content` — no transcript slot;
+  `sidebar.content`, no transcript slot;
 - `session.message` is read-only in both the server API and the TUI `Data` API;
 - session parts have no write surface.
 
@@ -66,7 +66,7 @@ Add the directory to `~/.config/opencode/opencode.json`:
 
 ```json
 {
-  "plugins": ["/home/winona/opencode-dcp-fix"]
+  "plugins": ["~/.config/opencode/plugins/opencode-dcp-fix"]
 }
 ```
 
@@ -83,7 +83,7 @@ notices a change to a file already in the module graph. Adding a new module (as
 Alternatively, symlink it into the auto-discovered plugin directory:
 
 ```sh
-ln -s /home/winona/opencode-dcp-fix ~/.config/opencode/plugin/opencode-dcp-fix
+ln -s ~/.config/opencode/plugins/opencode-dcp-fix ~/.config/opencode/plugin/opencode-dcp-fix
 ```
 
 ## Options
@@ -94,7 +94,7 @@ The object form of a plugin entry carries options:
 {
   "plugins": [
     {
-      "package": "/home/winona/opencode-dcp-fix",
+      "package": "~/.config/opencode/plugins/opencode-dcp-fix",
       "options": { "messageRefs": false }
     }
   ]
@@ -105,14 +105,14 @@ The object form of a plugin entry carries options:
 | --- | --- | --- |
 | `systemReminders` | `true` | Strip `<system-reminder>` blocks |
 | `dcpReminders` | `true` | Strip `<dcp-system-reminder>` blocks |
-| `messageRefs` | `true` | Strip `@12@` / `@b3@` references |
+| `messageRefs` | `true` | Strip `@N@` / `@bN@` references |
 | `collapseBlankLines` | `true` | Collapse the blank lines a removed block leaves behind |
 
 ## Trade-offs
 
 Scrubbing means the plugin cannot tell a leak from a citation: if you paste a
-tag, it is removed. The same applies to a reference — asking a model to explain
-`@12@` yields nothing. Turn off `messageRefs` if you need to discuss them.
+tag, it is removed. The same applies to a reference, asking a model to explain
+`@N@` yields nothing. Turn off `messageRefs` if you need to discuss them.
 Indentation, code fences and tool arguments are untouched.
 
 `<tag>` blocks are only removed when they are closed. A lone `<system-reminder>`
@@ -134,16 +134,16 @@ plugin wiring against a stub context.
 The display half belongs in the TUI, where user and assistant text is rendered
 straight from storage:
 
-- `packages/tui/src/routes/session/index.tsx` — transcript rendering and the
+- `packages/tui/src/routes/session/index.tsx`, transcript rendering and the
   `## User` export path;
-- `packages/tui/src/routes/session/dialog-message.tsx` — copy to clipboard.
+- `packages/tui/src/routes/session/dialog-message.tsx`, copy to clipboard.
 
 `tui-display.patch` in this repo adds a `filterSystemMetadata()` pass over
 `message.text` at those three call sites. Apply it to an OpenCode checkout:
 
 ```sh
-git -C /path/to/opencode apply /home/winona/opencode-dcp-fix/tui-display.patch
+git -C /path/to/opencode apply ~/.config/opencode/plugins/opencode-dcp-fix/tui-display.patch
 ```
 
-It needs to land upstream, or into a locally built TUI, before it helps — the
+It needs to land upstream, or into a locally built TUI, before it helps, the
 shipped binary renders from storage and cannot be patched from outside.

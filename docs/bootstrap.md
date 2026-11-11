@@ -8,7 +8,7 @@ for every choice and keeps Ubuntu until both hosts pass.
 
 You need:
 
-- Windows 11 with WSL 3.0.5 or later.
+- Windows 11 with WSL 2.4.4 or later.
 - Tailscale signed in on Windows and macOS.
 - A fresh Intel MacBookPro16,1 on macOS 26.2 or later, with the first
   Setup Assistant account (uid 501) and the requested mac username.

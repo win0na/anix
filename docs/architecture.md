@@ -53,7 +53,7 @@ hosts/anix  ->  modules/common  ->  modules/nixos   ->  home-manager
 hosts/amac  ->  modules/common  ->  modules/darwin  ->  home-manager
 
 home/default/default  ->  shared home configuration
-home/default/anix     ->  /home/default
+home/default/anix     ->  /home/winona
 home/default/amac     ->  /Users/winona
 ```
 
@@ -78,8 +78,10 @@ both platforms. A platform-specific module belongs in `modules/nixos` or
 | `home/default/herdr` | Herdr config, palette, and the sidebar plugin activation. |
 | `pkgs/herdr` | Pinned Herdr source with the two core patches. |
 | `pkgs/herdr-sidebar` | Pinned sidebar plugin with the single-ttt-pane patch. |
-| `pkgs/herdr-sidebar-patch` | The patch applied to the sidebar plugin. |
+| `pkgs/herdr-sidebar-patch` | The two sidebar patches. |
 | `pkgs/fff-mcp` | Pinned fff MCP binary for Linux and Darwin. |
+| `pkgs/ttt` | Pinned ttt 1.11.0 release binary. |
+| `pkgs/vscode-cli` | Microsoft code tunnel CLI for anix. |
 | `pkgs/nuvio` | Pinned Nuvio desktop DMG. |
 | `pkgs/opencode-dcp-fix` | First-party OpenCode plugin, vendored. |
 | `pkgs/herdr-plugins` | First-party Herdr plugins packaged in Nix. |
@@ -131,4 +133,4 @@ and config directories.
 - x86_64-darwin support ends with nixpkgs 26.05 on 2026-12-31.
 - The first `darwin-rebuild` over SSH can hit the macOS App Management prompt.
 - NFS file watching from the Mac side is unreliable. Local builds are the fix.
-- Tailscale with WSL mirrored networking has open regressions in 2026.
+- Tailscale with WSL mirrored networking remains hardware-unverified.

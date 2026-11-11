@@ -27,7 +27,7 @@ Fix:
 2. Confirm the Hyper-V firewall rule allows TCP 2049 from the Mac.
 3. Confirm the NixOS firewall allows 2049 from `100.64.0.0/10`.
 4. Confirm the export names `amac`, not a stale client.
-5. Retry with `sudo scripts/mount-src`.
+5. Retry with `sudo ~/.config/anix/scripts/mount-src`.
 6. If `mount_nfs` rejects `vers=4.1`, retry with `vers=4`.
 
 `scripts/mount-src` waits 60 seconds for Tailscale and port 2049 before it
@@ -46,7 +46,7 @@ schtasks /Query /TN "anix-wsl"
 Fix: create the task if it is missing:
 
 ```powershell
-schtasks /Create /SC ONLOGON /TN "anix-wsl" /TR "wsl.exe -d NixOS -u winona --exec /bin/true" /RL HIGHEST /F
+schtasks /Create /SC ONLOGON /TN "anix-wsl" /TR "wsl.exe -d NixOS -u winona --exec /run/current-system/sw/bin/sleep infinity" /RL HIGHEST /F
 ```
 
 The task runs at logon. If the machine reboots unattended, enable Windows
@@ -66,7 +66,7 @@ The export needs `all_squash,anonuid=1000,anongid=1000`. The Mac mounts with
 `noowners`. Check the directory mode on WSL:
 
 ```sh
-stat -c '%U %G %a' /home/default/src
+stat -c '%U %G %a' /home/winona/src
 ```
 
 Fix the export options or the directory ownership. A Mac uid of 501 is squashed
@@ -134,7 +134,7 @@ A fresh Mac has no `darwin-rebuild`. The upstream installer also leaves
 `/etc/nix/nix.conf`, `/etc/bashrc`, and `/etc/zshrc` behind, which nix-darwin
 refuses on the first activation.
 
-Fix: run `scripts/bootstrap`. It moves those files to
+Fix: run `~/.config/anix/scripts/bootstrap`. It moves those files to
 `*.before-nix-darwin` and runs:
 
 ```sh
@@ -248,7 +248,10 @@ Check:
 
 ```sh
 herdr plugin list
-herdr plugin link /home/default/src/anix/pkgs/herdr-plugins/responsive-sidebar
+# On anix:
+herdr plugin link ~/src/anix/pkgs/herdr-plugins/responsive-sidebar
+# On amac:
+herdr plugin link ~/.config/anix/pkgs/herdr-plugins/responsive-sidebar
 ```
 
 `herdr plugin link` registers the plugin enabled by default; `--disabled` registers it off.
@@ -256,9 +259,11 @@ The three remote plugins are installed from pinned commits:
 
 ```sh
 herdr plugin install jeffarese/herdr-bar --ref d9cdd88cb734615e96b1c37ed17fc39be904f060
-herdr plugin install alexarthurs/herdr-sidebar/plugins/herdr-sidebar --ref 081ed133f3faa377438b51ce435fe8a87c439593
 herdr plugin install eugenioenko/ttt/herdr-plugin --ref b51ae983e0f60599090e0b0061093dbece9b541f
 ```
+
+The patched `herdr-sidebar` comes from Home Manager, not from a GitHub install.
+Installing the upstream plugin would replace it with an unpatched copy.
 
 If a plugin loads but its pane is blank, check the Herdr log in the state
 directory. `HERDR_PLUGIN_STATE_DIR` names the location.
@@ -268,8 +273,8 @@ directory. `HERDR_PLUGIN_STATE_DIR` names the location.
 Symptom: clicking a file creates a new editor tab instead of using the ttt pane.
 
 The editor-pane patch is not applied. Confirm the pinned `herdr-sidebar` commit
-is `081ed13` and that the overlay builds the patched plugin. Until the patch
-lands, the stock plugin creates one tab per unseen file.
+is `081ed13` and that the overlay builds the patched plugin. If the patched
+build is missing, run `scripts/rebuild` and check `herdr plugin list`.
 
 ## ttt opens in the wrong workspace
 
@@ -343,11 +348,12 @@ Nuvio 0.1.35-alpha is unsigned. Gatekeeper can still warn on first launch.
 
 Symptom: `cachix push anix` returns 403.
 
-Check the token and the cache:
+Check the token and the cache. The repository does not install the `cachix` CLI
+yet; run these through `nix shell nixpkgs#cachix -c ...`:
 
 ```sh
-cachix authtoken
-cachix use anix
+nix shell nixpkgs#cachix -c cachix authtoken
+nix shell nixpkgs#cachix -c cachix use anix
 ```
 
 The token is the `cachix-token` secret. The public key in the Nix config must

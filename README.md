@@ -26,12 +26,13 @@ The first switch still needs the bootstrap sequence in
   or moshi.
 - **Secrets:** sops-nix with age, host keys, a personal key, and an offline
   recovery key.
-- **Simple rebuild:** `scripts/rebuild` detects the host; `scripts/rebuild
+- **Host-aware rebuild:** `scripts/rebuild` detects the host; `scripts/rebuild
   amac` works from WSL.
 
 ## Requirements
 
-- Windows 11 with WSL 2.4.4 or later, and NixOS-WSL 26.05.
+- Windows 11 with WSL 2.4.4 or later. The bootstrap installs the NixOS-WSL
+  2605.7.2 image; anix runs nixos-unstable.
 - Intel MacBookPro16,1 with macOS 26.2 or later. Xcode 26.6 requires 26.2.
 - Tailscale on Windows and macOS. WSL uses mirrored networking.
 - A Cachix cache named `anix`.
@@ -49,7 +50,8 @@ The script prompts for the anix and Mac usernames, the directories to transfer,
 and an Ubuntu backup. It installs NixOS-WSL alongside Ubuntu, runs the first
 switch, transfers the keys and selected trees, runs the anix bootstrap, and then
 prepares the Mac. Ubuntu stays until both hosts pass and you confirm removal.
-See [docs/bootstrap.md](docs/bootstrap.md) for the phases and the Mac TCC step.
+See [docs/bootstrap.md](docs/bootstrap.md) for the phases and the Mac App
+Management step.
 
 ## Rebuild
 
@@ -66,7 +68,7 @@ flake.nix
 hosts/{anix,amac}
 modules/{common,nixos,darwin,home}
 home/default
-pkgs/{herdr,nuvio,opencode-dcp-fix,herdr-plugins,herdr-sidebar-patch}
+pkgs/{herdr,herdr-sidebar,herdr-sidebar-patch,herdr-plugins,ttt,fff-mcp,vscode-cli,nuvio,opencode-dcp-fix}
 secrets
 scripts
 docs

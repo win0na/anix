@@ -2,7 +2,7 @@
 
 Herdr is the workspace manager. ttt is the editor. The agent or terminal sits in
 the center, the file sidebar sits on the left, and one ttt pane sits at the
-bottom of each workspace. The goal is a VSCode-shaped layout without forking the
+bottom of each workspace. The goal is a VS Code-shaped layout without forking the
 Herdr core for every feature.
 
 ## The layout
@@ -21,7 +21,8 @@ The left pane switches between Explorer and Source Control in place. The center
 pane runs the agent or a shell. The bottom pane runs ttt at 35 percent height.
 The Herdr tab bar is hidden. The `herdr-ide` script runs on `prefix+i`: it
 splits the focused pane, starts ttt with a workspace `TMPDIR`, sets the
-`hs-ttt-workspace` marker, opens the sidebar, and focuses the agent again.
+`hs-ttt-workspace` and `hs-ttt-tmpdir` tokens, opens the sidebar, and focuses
+the agent again.
 
 ## The pieces
 
@@ -81,17 +82,17 @@ that path:
 
 The patch targets commit `081ed133f3faa377438b51ce435fe8a87c439593`. The package
 at `pkgs/herdr-sidebar` builds it and the Home Manager activation links the
-result over the GitHub install. The patch is small enough to upstream; the pull
-request is part of the work, not a later cleanup.
+result over the GitHub install. The sidebar patch stays local; upstream it when
+the plugin API settles.
 
 ## ttt
 
 ttt is a Go TUI editor with built-in LSP, ripgrep search, a multi-root tree,
 tabs, git staging, and an integrated terminal. It has no debug adapter, no VSIX
 extensions, and no per-root LSP instances. The config copies the current user
-settings: Catppuccin mocha, `reuseWindow`, a collapsed sidebar, and LSP servers
-for Rust, TypeScript and JavaScript, Go, Swift, Nix, Python, and Markdown.
-`focusOnOpen` and `formatOnSave` are off in that file.
+settings: Catppuccin mocha, `reuseWindow`, and a collapsed sidebar.
+`focusOnOpen` and `formatOnSave` are off in that file. The shared settings have no
+`lsp.servers` list yet; add one when you want LSP in ttt.
 
 The exact settings and LSP commands are in
 [Herdr reference](herdr-reference.md).
@@ -99,16 +100,16 @@ The exact settings and LSP commands are in
 ## VS Code and code tunnel
 
 VS Code desktop runs on amac and connects to the anix `code tunnel`. The remote
-workspace is `/home/default/src`; the NFS mount at `/Users/winona/src` remains
+workspace is `/home/winona/src`; the NFS mount at `/Users/winona/src` remains
 for Finder and other Mac tools, not for VS Code. The tunnel gives VS Code
 remote file watching, LSP, terminal, and search on anix.
 
 The handoff is one-way, from ttt or the Herdr sidebar to VS Code. The ttt plugin
-reads the current file and cursor and calls `scripts/ttt-handoff`. The patched
+reads the current file and cursor and calls `ttt-handoff` from `PATH`. The patched
 sidebar has one "Open in VS Code" menu entry for the selected file. VS Code
 opens through SSH with `--reuse-window --remote tunnel+anix --folder-uri
-vscode-remote://tunnel+anix/home/default/src --goto`. Browser access is
-`https://vscode.dev/tunnel/anix/home/default/src`. There is no live tab or cursor
+vscode-remote://tunnel+anix/home/winona/src --goto`. Browser access is
+`https://vscode.dev/tunnel/anix/home/winona/src`. There is no live tab or cursor
 sync.
 
 The Catppuccin theme under `home/default/ttt/plugins/theme-catppuccin-mocha` is a

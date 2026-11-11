@@ -97,7 +97,7 @@ The WSL host exports `~/src` as the NFSv4.1 pseudo-root:
 services.nfs.server.enable = true;
 services.nfs.server.createMountPoints = true;
 services.nfs.server.exports = ''
-  /home/default/src  amac(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
+  /home/winona/src  amac(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
 '';
 ```
 
@@ -140,7 +140,7 @@ nix.distributedBuilds = true;
 nix.settings.builders-use-substitutes = true;
 nix.buildMachines = [{
   hostName = "amac";
-  sshUser = "winona";
+  sshUser = "winona"; # the amac user from users.nix
   sshKey = "/etc/nix/mac-builder";
   systems = [ "x86_64-darwin" ];
   protocol = "ssh-ng";
@@ -149,11 +149,11 @@ nix.buildMachines = [{
 }];
 ```
 
-The Mac enables SSH and trusts `winona`:
+The Mac enables SSH and trusts the amac user:
 
 ```nix
 services.openssh.enable = true;
-nix.settings.trusted-users = [ "winona" ];
+nix.settings.trusted-users = [ "winona" ]; # the amac user from users.nix
 ```
 
 `ssh-ng` talks to the remote `nix-daemon`. `trusted-users` is required because
@@ -162,24 +162,23 @@ the Mac; this is the accepted cost of building as the login user.
 
 The builder key is the `mac-builder-key` sops secret. The private key is
 installed at `/etc/nix/mac-builder` with mode `0400` on WSL. The public key goes
-in `winona`'s `~/.ssh/authorized_keys` on the Mac, managed by Home Manager. Add the Mac host key to root's
+in the amac user's `~/.ssh/authorized_keys` on the Mac, managed by Home Manager. Add the Mac host key to root's
 `known_hosts` on WSL, for example with `programs.ssh.knownHosts`, or the
 nix-daemon SSH fails host-key verification.
 
 ## VS Code tunnel
 
-The `code tunnel` service runs on anix as `winona` and connects outbound to
+The `code tunnel` service runs on anix as the anix user and connects outbound to
 Microsoft dev tunnels over TCP 443. It does not listen for inbound connections.
-No firewall rule is needed. The old code-server 8080 rule and the Windows 8080
-Hyper-V rule are removed.
+No firewall rule is needed.
 
 The Mac VS Code desktop signs into the same GitHub account and opens
-`vscode-remote://tunnel+anix/home/default/src`. The browser URL is
-`https://vscode.dev/tunnel/anix/home/default/src`. The tunnel is private to the
+`vscode-remote://tunnel+anix/home/winona/src`. The browser URL is
+`https://vscode.dev/tunnel/anix/home/winona/src`. The tunnel is private to the
 account; `code tunnel` has no public sharing flag.
 
-The Mac keeps the NFS mount at `/Users/winona/src` for Finder and other tools.
-VS Code uses the tunnel and the remote `/home/default/src` path.
+The Mac keeps the NFS mount at `$ANIX_MAC_HOME/src` for Finder and other tools.
+VS Code uses the tunnel and the remote `/home/winona/src` path.
 
 ## Ports
 

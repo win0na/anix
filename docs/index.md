@@ -1,7 +1,8 @@
 # anix docs
 
-The docs follow Diataxis. Each page has one type, so you know whether to read
-it for a lesson, a task, a fact, or an explanation.
+The docs follow Diataxis where a page has one type. Some pages, especially
+macOS, scripts, secrets, and OpenCode, combine reference and how-to material.
+Use the headings to find the part you need.
 
 ## Tutorials
 

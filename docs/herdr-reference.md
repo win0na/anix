@@ -38,7 +38,7 @@ GitHub install.
 | Reuse window | `true` |
 | Focus on open | `false` |
 | Format on save | `false` |
-| Sidebar | Collapsed (width 0; toggle with `Ctrl+B`) |
+| Sidebar | Collapsed in the shared settings |
 | Socket directory | `$TMPDIR/ttt-uid/` |
 | Forward override | `TTT_FORWARD_SOCKET` |
 
@@ -48,18 +48,10 @@ newest socket belongs to that workspace.
 
 ## LSP servers
 
-| Language | Command |
-| --- | --- |
-| Rust | `rust-analyzer` |
-| TypeScript, JavaScript | `typescript-language-server --stdio` |
-| Go | `gopls` |
-| Swift | `sourcekit-lsp` |
-| Nix | `nil` |
-| Python | `basedpyright-langserver --stdio` |
-| Markdown | `marksman server` |
-
-ttt configures LSP with a server command and a language list. It does not
-accept per-server `initializationOptions`, settings, or environment variables.
+The shared settings have no `lsp.servers` list. ttt configures LSP with a server
+command and a language list. It does not accept per-server
+`initializationOptions`, settings, or environment variables. Add entries to
+`home/default/ttt/settings.json` when you want LSP in ttt.
 
 ## Herdr actions
 
@@ -72,7 +64,7 @@ accept per-server `initializationOptions`, settings, or environment variables.
 | Show Source Control | `plugin.herdr-sidebar.show-git` |
 | Quick open | `plugin.herdr-sidebar.quick-open` |
 | Refresh sidebars | `plugin.herdr-sidebar.refresh-sidebars` |
-| Toggle responsive sidebar | `plugin.responsive-sidebar.toggle` |
+| Toggle responsive sidebar | `responsive-sidebar.toggle` |
 | Open status bar | `plugin.herdr-bar.open` |
 
 ## Layout

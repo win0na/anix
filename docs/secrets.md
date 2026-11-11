@@ -75,21 +75,21 @@ Replace the placeholders in `.sops.yaml`:
 keys:
   anix: &anix age1...
   amac: &amac age1...
-  winona: &winona age1...
+  personal: &personal age1...
   recovery: &recovery age1...
 
 creation_rules:
-  - path_regex: secrets/[^/]+\.yaml$
+  - path_regex: ^secrets/[^/]+\.yaml$
     age:
       - *anix
       - *amac
-      - *winona
+      - *personal
       - *recovery
 ```
 
-`anix` and `amac` are the host keys. `winona` is the personal key. `recovery` is
-the offline key. The personal key lets you edit from either host; the host keys
-let sops-nix decrypt at boot without the personal key on disk.
+`anix` and `amac` are the host keys. `personal` is the personal key. `recovery`
+is the offline key. The personal key lets you edit from either host; the host
+keys let sops-nix decrypt at boot without the personal key on disk.
 
 ## Create the encrypted file
 
@@ -122,7 +122,7 @@ The host configuration sets:
 ```nix
 sops.defaultSopsFile = ../secrets/secrets.yaml;
 sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
-sops.secrets."mac-login-password" = { };
+sops.secrets."mac-login-password" = { }; # on amac only
 ```
 
 `sshKeyPaths` is the activation path. The personal key at

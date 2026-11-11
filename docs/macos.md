@@ -85,8 +85,8 @@ cost of building as the login user without a separate builder account.
 Homebrew itself comes from `nix-homebrew`; the casks are declared in
 `hosts/amac`. Xcode 26.6 is the last universal Xcode. Xcode 27 is
 Apple-silicon-only. Install Xcode once with `xcodes install 26.6`, then run
-`xcode-select -s`, `xcodebuild -license accept`, and
-`xcodebuild -runFirstLaunch`.
+`sudo xcode-select -s /Applications/Xcode-26.6.app`,
+`sudo xcodebuild -license accept`, and `sudo xcodebuild -runFirstLaunch`.
 
 Nuvio is an unsigned Intel alpha. The Nix package fetches the DMG, so the app
 has no quarantine attribute. A manually downloaded copy needs
@@ -103,14 +103,14 @@ bundle path is
 `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`.
 
 VS Code opens the anix tunnel, not the NFS copy. The Remote - Tunnels connection
-runs the editor server on anix against `/home/default/src`, so file watching,
+runs the editor server on anix against `/home/winona/src`, so file watching,
 LSP, terminal, and search are local to the files. The NFS mount at
 `/Users/winona/src` remains for Finder and other Mac tools. The shared settings
 still exclude `target`, `node_modules`, and `result*` from watching and search.
 
 Connect with `code --remote tunnel+anix --folder-uri
-vscode-remote://tunnel+anix/home/default/src`, or open
-`https://vscode.dev/tunnel/anix/home/default/src` in a browser. Both require the
+vscode-remote://tunnel+anix/home/winona/src`, or open
+`https://vscode.dev/tunnel/anix/home/winona/src` in a browser. Both require the
 same GitHub account as the tunnel and a GUI session for the desktop client.
 
 `scripts/ttt-handoff vscode <path> [line] [col]` opens the file on the Mac

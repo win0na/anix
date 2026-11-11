@@ -70,8 +70,9 @@ the repository. `auth.json` does not exist in this setup.
 
 ## DCP fix
 
-`opencode-dcp-fix` strips two kinds of internal metadata from the prompt and the
-model output: system reminder blocks and `@N@` message references. The plugin is
+`opencode-dcp-fix` strips three kinds of internal metadata from the prompt and
+the model output: system reminder blocks, DCP nudges, and `@N@` message
+references. The plugin is
 vendored at `pkgs/opencode-dcp-fix` and loaded from
 `~/.config/opencode/plugins/opencode-dcp-fix`. Its tests run with `node --test`.
 
@@ -91,7 +92,7 @@ opencode plugin list
 ```
 
 Check the generated config for absolute paths from the other host. The WSL host
-uses `/home/default`; the Mac uses `/Users/winona`. A shared file with either
+uses `/home/winona`; the Mac uses `/Users/winona`. A shared file with either
 path is a bug. Check that `mcp` has exactly `fff`, `headroom`, and `serena`, and
 that no caveman or moshi entry survives. The checked-in config parses with
 `jq empty home/default/opencode/opencode.json`.

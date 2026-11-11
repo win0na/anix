@@ -1,13 +1,12 @@
 # Decisions
 
-Each entry records a choice that shapes the repository. The date is when the
-choice was made, not a freshness date.
+Each entry records a choice that shapes the repository.
 
 ## D1: Two hosts, one repository
 
 **Decision.** `anix` is a NixOS-WSL host on `x86_64-linux`. `amac` is a
-nix-darwin host on `x86_64-darwin`. Both use the user `winona` and the
-hostnames `anix` and `amac`.
+nix-darwin host on `x86_64-darwin`. Both use the usernames in `users.nix` and
+the hostnames `anix` and `amac`.
 
 **Why.** The two machines share one home configuration, one project tree, and
 one set of editor and agent settings. A single flake keeps those in lockstep.
@@ -86,23 +85,23 @@ age reject `sk-ecdsa-sha2-nistp256`. On macOS, the `sops` CLI needs
 `SOPS_AGE_KEY_FILE` to use the shared path. `neededForUsers` has no effect on
 macOS.
 
-## D7: The Mac builds as winona
+## D7: The Mac builds as the amac user
 
-**Decision.** The remote builder logs in as `winona`. `winona` is in
-`nix.settings.trusted-users` and has NOPASSWD sudo for `darwin-rebuild` and
-`nix`.
+**Decision.** The remote builder logs in as the amac user. That user is in
+`nix.settings.trusted-users`. The bootstrap prompts for sudo; no sudoers rule
+is committed.
 
-**Why.** One user, one home, one SSH identity. A separate builder account adds
-a second key, a second home, and a second permission model.
+**Why.** The Mac is a single-user build appliance. A separate builder account
+adds another key, home, and permission model.
 
-**Consequence.** `winona` is root-equivalent on the Mac. This overrides the
-oracle recommendation for a dedicated builder user. The risk is accepted for a
-single-user build appliance on a tailnet.
+**Consequence.** The amac user is root-equivalent on the Mac. That risk is
+accepted for a single-user appliance on a tailnet.
 
 ## D8: Cachix
 
 **Decision.** Use a Cachix cache named `anix`. The token is a sops secret. The
-public key is added to both hosts when the cache exists.
+substituter is not configured yet; add the public key to both hosts when the
+cache exists.
 
 **Why.** The Mac cannot serve Linux paths, and the WSL host cannot build Darwin
 paths. A shared binary cache covers the gap and speeds up rebuilds.
@@ -172,13 +171,12 @@ activation.
 
 ## D13: ttt settings
 
-**Decision.** ttt uses Catppuccin mocha, `reuseWindow`, `focusOnOpen`,
-`formatOnSave`, and LSP for Rust, TypeScript and JavaScript, Go, Swift, Nix,
-Python, and Markdown. Markdown uses `marksman`.
+**Decision.** ttt uses Catppuccin mocha, `reuseWindow`, and a collapsed
+sidebar. `focusOnOpen` and `formatOnSave` are off. The shared settings have no
+`lsp.servers` list yet; add servers when a project needs them.
 
-**Why.** These are the languages in the active projects. ttt has no debug
-adapter, no VSIX, and no per-root LSP instances; the config stays within what
-ttt supports.
+**Why.** The shared file carries only settings that exist today. ttt has no
+debug adapter, no VSIX, and no per-root LSP instances.
 
 **Consequence.** Debugging and extension-heavy work stays in Xcode or a terminal
 debugger.
@@ -187,8 +185,8 @@ debugger.
 
 **Decision.** One OpenCode config on both hosts. The full config lives in the
 repository; skills are provisioned separately. Caveman and Moshi are removed.
-`opencode-dcp-fix` is vendored. npm plugins follow latest. Provider keys stay in
-sops and are read with `{file:/run/secrets/...}`.
+`opencode-dcp-fix` is vendored. npm plugins follow latest. Provider credentials
+are interactive OAuth logins stored in OpenCode's local state, not sops.
 
 **Why.** The user wants the same agent setup on both hosts and fewer forks.
 Vendoring the DCP fix keeps the local change in the repository. Latest plugins
@@ -246,8 +244,8 @@ the repository.
 **Decision.** The host module imports sops only when `secrets/secrets.yaml`
 exists.
 
-**Why.** The first NixOS-WSL switch creates `winona` before the age key and the
-encrypted file are ready. A guard avoids a chicken-and-egg failure.
+**Why.** The first NixOS-WSL switch creates the anix user before the age key and
+the encrypted file are ready. A guard avoids a chicken-and-egg failure.
 
 **Consequence.** Adding `secrets/secrets.yaml` enables decryption on the next
 switch. The recipients must be correct before that commit.
@@ -268,7 +266,7 @@ points at the standard paths: `~/.config/opencode/skills` and
 ## D21: VS Code uses the official code tunnel
 
 **Decision.** anix runs Microsoft's official `code tunnel` as a declarative
-systemd system service as `winona`. VS Code desktop on amac connects through
+systemd system service as the anix user. VS Code desktop on amac connects through
 Remote - Tunnels; browser access is `vscode.dev`. Coder code-server, its
 password, and its 8080 exposure are removed. NFS remains for Finder and other
 Mac tools.
@@ -293,7 +291,7 @@ These values are fixed or filled at bootstrap. They are not design decisions.
 | VS Code tunnel name | `anix` |
 | `AGE_RECIPIENT_ANIX` | anix SSH host key, converted with `ssh-to-age` |
 | `AGE_RECIPIENT_AMAC` | amac SSH host key, converted with `ssh-to-age` |
-| `AGE_RECIPIENT_WINONA` | personal X25519 age key |
+| `AGE_RECIPIENT_PERSONAL` | personal X25519 age key |
 | `AGE_RECIPIENT_RECOVERY` | offline recovery key |
 | Cachix public key | `anix.cachix.org-1:...` |
 | Apple ID and team | Xcode signing |

@@ -2,7 +2,8 @@
 
 The scripts are the user-facing entry points. They live in `scripts/` and run
 from any directory. Exit codes are `0` for success, `1` for an environment or
-runtime failure, and `2` for a usage error.
+runtime failure, and `2` for a usage error. The `apw` stub uses `5` when the
+Passwords.app adapter is unavailable.
 
 | Script | Runs on | Purpose |
 | --- | --- | --- |
@@ -18,6 +19,7 @@ runtime failure, and `2` for a usage error.
 | `ios` | WSL or macOS | Build an iOS app on the Mac and install it |
 | `install-herdr-plugins.sh` | Both | Link the first-party Herdr plugin |
 | `herdr-ide` | Both | Build the sidebar, agent, and ttt layout |
+| `ttt-handoff` | Both | Open the current file and cursor in VS Code |
 | `check.sh` | Both | Evaluate both hosts, lint the scripts, and run typos |
 | `mount-src` | macOS | Mount the NFS export at `$ANIX_MAC_HOME/src` |
 
@@ -64,7 +66,7 @@ after the recipient is added.
 ## scripts/apw
 
 ```text
-scripts/apw secret exists|get|set|delete|verify NAME
+scripts/apw secret exists|get|set|delete|verify NAME [--stdin]
 scripts/apw backup check [NAME]
 scripts/apw version
 ```
@@ -180,7 +182,8 @@ scripts/install-herdr-plugins.sh
 ```
 
 Links `pkgs/herdr-plugins/responsive-sidebar` with `herdr plugin link`. The
-command registers the plugin enabled by default; `--disabled` registers it off.
+script registers the plugin enabled by default; the underlying `herdr plugin
+link` command accepts `--disabled`, but the script does not expose that flag.
 The script prints the pinned commits for `herdr-bar`, `herdr-sidebar`, and
 `ttt.editor`, then finishes with `herdr plugin list`. Home Manager links the
 patched `herdr-sidebar` build and copies the Herdr config; the other plugins
@@ -204,9 +207,9 @@ scripts/ttt-handoff vscode <path> [line] [col]
 ```
 
 Opens a file from the ttt plugin or the Herdr sidebar. The path must resolve
-under `/home/default/src`; `/../` escapes are rejected. `vscode` SSHes to amac
+under `/home/winona/src`; `/../` escapes are rejected. `vscode` SSHes to amac
 and runs the app-bundle CLI with `--reuse-window --remote tunnel+anix
---folder-uri vscode-remote://tunnel+anix/home/default/src --goto path:line:col`.
+--folder-uri vscode-remote://tunnel+anix/home/winona/src --goto path:line:col`.
 The path travels on stdin; there is no NFS path mapping. VS Code must run in
 the GUI session.
 
@@ -252,7 +255,7 @@ Mounts `ANIX_NFS_HOST:/` at `ANIX_MOUNT_POINT` with
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `ANIX_NFS_HOST` | `anix` | Windows Tailscale node that forwards to WSL nfsd |
-| `ANIX_MOUNT_POINT` | `$ANIX_MAC_HOME/src` | Local mount point |
+| `ANIX_MOUNT_POINT` | `$ANIX_MAC_HOME/src` | Local mount point; falls back to the console user's home or `$HOME/src` |
 
 The default `anix` is the Windows Tailscale node, which forwards TCP 2049 to the
 WSL NFS server. Set `ANIX_NFS_HOST` only when the tailnet name differs. The
