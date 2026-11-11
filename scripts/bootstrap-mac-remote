@@ -74,6 +74,8 @@ done
 sops_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#sops -c sops "$@"; }
 ssh_to_age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#ssh-to-age -c ssh-to-age; }
 control="/tmp/anix-mac-${mac_user}@${mac_host}.sock"
+# The comma is part of the ssh PreferredAuthentications value.
+# shellcheck disable=SC2054
 SSH=(ssh -o BatchMode=no -o ConnectTimeout=8 -o ControlMaster=auto -o "ControlPath=$control" -o ControlPersist=900 -o PreferredAuthentications=password,keyboard-interactive,publickey -i "$HOME/.ssh/mac-builder" "$mac_user@$mac_host")
 
 if [[ $dry_run -eq 1 ]]; then

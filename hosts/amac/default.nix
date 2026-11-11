@@ -52,6 +52,7 @@ in
     nuvio
     python3
     rust-analyzer
+    shellcheck
     sops
     ssh-to-age
     ttt

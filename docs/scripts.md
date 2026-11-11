@@ -233,8 +233,10 @@ Evaluates both system derivations:
 .#darwinConfigurations.amac.config.system.build.toplevel.drvPath
 ```
 
-Then runs `bash -n` on every shell script in `scripts/`, `shellcheck` when it is
-on `PATH`, and `typos` when it is on `PATH`. The PowerShell script is skipped.
+Then runs `bash -n` on every shell script in `scripts/`, `shellcheck` from
+`PATH` or `nixpkgs#shellcheck`, and `typos` from `PATH` or `nixpkgs#typos`. The
+PowerShell script is skipped. `.shellcheckrc` disables SC2016 for the intentional
+PowerShell and remote bash strings.
 It stops on the first failure and prints `check: ok` on success. It requires
 `nix`; it does not install anything.
 

@@ -1,0 +1,2 @@
+# PowerShell and remote bash strings are intentionally single-quoted.
+disable=SC2016

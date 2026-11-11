@@ -129,9 +129,9 @@ age_keygen() {
 
 ssh_to_age() {
   if command -v ssh-to-age >/dev/null 2>&1; then
-    ssh-to-age "$@"
+    ssh-to-age
   else
-    nixc shell --inputs-from "$repo_root" "$(tool_ref ssh-to-age)" -c ssh-to-age "$@"
+    nixc shell --inputs-from "$repo_root" "$(tool_ref ssh-to-age)" -c ssh-to-age
   fi
 }
 
@@ -407,6 +407,8 @@ ensure_secrets() {
     local tmpdir
     tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/anix-secrets.XXXXXX")"
     chmod 700 "$tmpdir"
+    # tmpdir is local; expand the path now so the EXIT trap still has it.
+    # shellcheck disable=SC2064
     trap "rm -rf $(printf '%q' "$tmpdir")" EXIT
     tmp="$tmpdir/secrets.yaml"
     {

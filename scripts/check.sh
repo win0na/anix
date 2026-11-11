@@ -8,7 +8,7 @@ Usage: scripts/check.sh
 Validate the repository without installing anything:
   - evaluate the anix and amac system derivations
   - run bash -n on every file in scripts/
-  - run shellcheck on every scripts/ file when shellcheck is on PATH
+  - run shellcheck on every scripts/ file from PATH or nixpkgs
   - run typos over the repository when typos is on PATH
 
 Options:
@@ -62,20 +62,22 @@ while IFS= read -r -d '' file; do
   bash -n "$file" || fail "syntax error in ${file#"$repo_root"/}"
 done < <(find "$repo_root/scripts" -maxdepth 1 -type f ! -name '*.ps1' -print0)
 
-if command -v shellcheck >/dev/null 2>&1; then
-  echo "==> shellcheck scripts/*"
-  while IFS= read -r -d '' file; do
+echo "==> shellcheck scripts/*"
+while IFS= read -r -d '' file; do
+  if command -v shellcheck >/dev/null 2>&1; then
     shellcheck "$file" || fail "shellcheck failed for ${file#"$repo_root"/}"
-  done < <(find "$repo_root/scripts" -maxdepth 1 -type f ! -name '*.ps1' -print0)
-else
-  echo "check: shellcheck not found; skipping"
-fi
+  else
+    nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#shellcheck -c shellcheck "$file" ||
+      fail "shellcheck failed for ${file#"$repo_root"/}"
+  fi
+done < <(find "$repo_root/scripts" -maxdepth 1 -type f ! -name '*.ps1' -print0)
 
+echo "==> typos"
 if command -v typos >/dev/null 2>&1; then
-  echo "==> typos"
   typos --force-exclude || fail "typos found spelling errors"
 else
-  echo "check: typos not found; skipping"
+  nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#typos -c typos --force-exclude ||
+    fail "typos found spelling errors"
 fi
 
 echo "check: ok"

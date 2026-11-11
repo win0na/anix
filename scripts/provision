@@ -263,8 +263,9 @@ if [[ $do_transfer -eq 1 ]]; then
     for i in "${!candidates[@]}"; do printf '  %3d  %s\n' "$((i+1))" "${candidates[$i]}"; done
     read -r -p "  numbers (blank transfers none): " reply || true
     for n in $reply; do
-      [[ $n =~ ^[0-9]+$ ]] && ((n >= 1 && n <= ${#candidates[@]})) || continue
-      selected+=("${candidates[$((n-1))]}")
+      if [[ $n =~ ^[0-9]+$ ]] && ((n >= 1 && n <= ${#candidates[@]})); then
+        selected+=("${candidates[$((n-1))]}")
+      fi
     done
   fi
 fi

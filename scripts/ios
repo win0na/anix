@@ -175,6 +175,8 @@ if [[ "$host_os" == "Linux" ]]; then
   fi
   remote_args="$(printf '%q ' "$project" "$scheme" "$udid" "$configuration" "$build_only")"
   printf '==> ssh amac bash -s -- %s\n' "$remote_args"
+  # remote_args is already shell-quoted; it must expand on the client side.
+  # shellcheck disable=SC2029
   ssh amac "bash -s -- $remote_args" <"$body_file"
 elif [[ "$host_os" == "Darwin" ]]; then
   printf '==> bash -s -- %q %q %q %q %q\n' "$project" "$scheme" "$udid" "$configuration" "$build_only"
