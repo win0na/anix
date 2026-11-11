@@ -131,39 +131,6 @@
     "background_compaction": true
   },
   "provider": {
-    "9router": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": {
-        "baseURL": "http://127.0.0.1:20128/v1",
-        "apiKey": "{file:/run/secrets/opencode-9router-api-key}"
-      },
-      "models": {
-        "kr/glm-5": {
-          "name": "kr/glm-5",
-          "modalities": {
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "kr/claude-sonnet-4.5": {
-          "name": "kr/claude-sonnet-4.5",
-          "modalities": {
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        }
-      }
-    },
     "headroom": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Headroom Proxy",
@@ -175,5 +142,5 @@
     "opencode-go": {},
     "opencode": {}
   },
-  "model": "9router/kr/claude-sonnet-4.5"
+  "model": "opencode-go/deepseek-v4.1-flash"
 }

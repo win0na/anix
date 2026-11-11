@@ -397,8 +397,7 @@ ensure_secrets() {
       warn "secrets are missing; the switch will run without sops"
       return 0
     fi
-    local api_key cachix macpass tmp
-    ask_secret "9router API key (blank to skip):" api_key || true
+    local cachix macpass tmp
     ask_secret "Cachix token (blank to skip):" cachix || true
     if [[ $host == amac ]]; then
       ask_secret "Mac login password (blank to skip):" macpass || true
@@ -411,7 +410,6 @@ ensure_secrets() {
     trap "rm -rf $(printf '%q' "$tmpdir")" EXIT
     tmp="$tmpdir/secrets.yaml"
     {
-      printf "opencode:\n  9router-api-key: %s\n" "$(yaml_quote "$api_key")"
       printf "mac-builder-key: |\n"
       sed 's/^/  /' "$builder_key"
       printf "cachix-token: %s\n" "$(yaml_quote "$cachix")"
@@ -436,13 +434,6 @@ ensure_secrets() {
     stored_builder="$(secrets_get '["mac-builder-key"]')"
     if [[ -n $stored_builder && "$stored_builder" != "$(cat "$builder_key")" ]]; then
       warn "mac-builder-key in secrets differs from ~/.ssh/mac-builder; the Mac authorized key may not match"
-    fi
-  fi
-  if [[ -z "$(secrets_get '["opencode"]["9router-api-key"]')" ]]; then
-    local api_key
-    ask_secret "9router API key (blank to skip):" api_key || true
-    if [[ -n $api_key ]]; then
-      secrets_set_value '["opencode"]["9router-api-key"]' "$api_key"
     fi
   fi
   if [[ -z "$(secrets_get '["mac-builder-key"]')" ]]; then

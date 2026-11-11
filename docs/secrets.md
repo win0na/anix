@@ -17,7 +17,6 @@ generates it.
 | `mac-login-password` | macOS auto-login at boot |
 | `cachix-token` | Pushing to the `anix` cache |
 | `mac-builder-key` | WSL to Mac SSH for remote builds |
-| `opencode-api-keys` | OpenCode providers |
 
 The VS Code tunnel token is OAuth user state in
 `~/.vscode/cli/token.json`, not a sops secret. It is created by

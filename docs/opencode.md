@@ -62,21 +62,11 @@ Caveman MCP is not configured.
 
 ## Secrets
 
-The 9router key lives in sops and is referenced from `opencode.json`:
-
-```json
-"apiKey": "{file:/run/secrets/opencode-9router-api-key}"
-```
-
-The sops secret is owned by `winona` with mode `0400`; both hosts read it from
-`/run/secrets`. The repository contains no plaintext key. The key name in
-`secrets/secrets.yaml` nests the key as `opencode: 9router-api-key`, so the
-sops module maps it with `key = "opencode/9router-api-key"`. A missing secret
-reads as an empty
-string; the provider then fails auth.
-
-`service.json` is a local secret and stays out of the repository. `auth.json`
-does not exist in this setup.
+OpenCode provider credentials are interactive OAuth logins managed by
+`opencode auth login` and stored in OpenCode's local state, not in sops. The
+Anthropic plugin handles Claude OAuth; the OpenCode Console account covers
+`opencode` and `opencode-go`. `service.json` is a local secret and stays out of
+the repository. `auth.json` does not exist in this setup.
 
 ## DCP fix
 
@@ -112,7 +102,7 @@ that no caveman or moshi entry survives. The checked-in config parses with
   Anthropic auth plugin is the deliberate exception at `2.0.0-next.6`.
 - Skills are large and are not vendored. A missing skill directory is a setup
   error, not a config error.
-- The 9router provider uses `127.0.0.1:20128`; the headroom plugin expects the
-  proxy at `127.0.0.1:8787`. Both must run on each host that uses them.
+- The headroom plugin expects the proxy at `127.0.0.1:8787` and must run on
+  each host that uses it.
 - `opencode.json` and `cli.json` are copies, not links. A manual edit is
   overwritten by the next activation.
