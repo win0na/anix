@@ -284,7 +284,7 @@ else
     --exclude='*/.next' --exclude='*/.venv' --exclude='*/Pods' \
     --exclude='*/xcuserdata' --exclude='*.dSYM' \
     -cf - .config/sops/age/keys.txt .ssh/mac-builder src/anix "${selected[@]}" |
-    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - -C "$HOME"; chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"; chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt" "$HOME/src/anix/secrets/secrets.yaml" 2>/dev/null || true'
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - --skip-old-files -C "$HOME"; chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"; chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt" "$HOME/src/anix/secrets/secrets.yaml" 2>/dev/null || true'
 fi
 
 say "Running the anix bootstrap inside $distro"

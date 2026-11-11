@@ -37,7 +37,8 @@ runs `scripts/bootstrap --host anix`, and calls
 `scripts/bootstrap-mac-remote`. It backs up Ubuntu first and leaves it in place
 unless you confirm removal at the end. `--yes` accepts defaults but never
 unregisters Ubuntu. `--no-transfer` skips the project checklist; the keys and
-repository still transfer. `--dry-run` prints the phases without changing either
+repository still transfer. `--yes` transfers no projects unless you pass
+`--dir`, and it skips recovery-key generation. `--dry-run` prints the phases without changing either
 host.
 
 The project checklist scans the top level of `$HOME` and `$HOME/src`. It

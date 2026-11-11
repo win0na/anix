@@ -467,6 +467,10 @@ ensure_recovery_key() {
     say "would generate an offline recovery key and add the recovery recipient"
     return 0
   fi
+  if [[ $assume_yes -eq 1 ]]; then
+    warn "recovery key generation skipped under --yes; add a recovery recipient manually"
+    return 0
+  fi
   if ! ask "Generate an offline recovery age key now?" y; then
     warn "no recovery recipient; if the personal key is lost the secrets are unrecoverable"
     return 0
@@ -689,8 +693,8 @@ install_herdr() {
   if ! ask "Install the pinned Herdr plugins now?" y; then
     return 0
   fi
-  run herdr plugin install jeffarese/herdr-bar --ref d9cdd88cb734615e96b1c37ed17fc39be904f060 --yes
-  run herdr plugin install eugenioenko/ttt/herdr-plugin --ref b51ae983e0f60599090e0b0061093dbece9b541f --yes
+  run herdr plugin install jeffarese/herdr-bar --ref d9cdd88cb734615e96b1c37ed17fc39be904f060 --yes || warn "herdr-bar install failed"
+  run herdr plugin install eugenioenko/ttt/herdr-plugin --ref b51ae983e0f60599090e0b0061093dbece9b541f --yes || warn "ttt.editor install failed"
   run "$repo_root/scripts/install-herdr-plugins.sh"
   set_sidebar_state
 }

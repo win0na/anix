@@ -54,6 +54,10 @@ Useful options:
 --yes             accept defaults; never unregisters Ubuntu
 ```
 
+`--yes` also skips the recovery-key path prompt and transfers no projects
+unless you pass `--dir`. Run once without `--yes` if you want the recovery key
+generated and added as a recipient.
+
 The project checklist scans the top level of `$HOME` and `$HOME/src`. Select by
 number. Build outputs and caches such as `target`, `node_modules`, and
 `DerivedData` are excluded.
