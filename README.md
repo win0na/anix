@@ -65,7 +65,7 @@ scripts/rebuild amac     # local Mac, or over SSH from WSL
 flake.nix
 hosts/{anix,amac}
 modules/{common,nixos,darwin,home}
-home/winona
+home/default
 pkgs/{herdr,nuvio,opencode-dcp-fix,herdr-plugins,herdr-sidebar-patch}
 secrets
 scripts

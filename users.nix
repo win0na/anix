@@ -1,0 +1,4 @@
+{
+  anix = "winona";
+  amac = "winona";
+}

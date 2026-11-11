@@ -91,10 +91,10 @@ opencode plugin list
 ```
 
 Check the generated config for absolute paths from the other host. The WSL host
-uses `/home/winona`; the Mac uses `/Users/winona`. A shared file with either
+uses `/home/default`; the Mac uses `/Users/winona`. A shared file with either
 path is a bug. Check that `mcp` has exactly `fff`, `headroom`, and `serena`, and
 that no caveman or moshi entry survives. The checked-in config parses with
-`jq empty home/winona/opencode/opencode.json`.
+`jq empty home/default/opencode/opencode.json`.
 
 ## Known limits
 

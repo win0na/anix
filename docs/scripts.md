@@ -145,9 +145,9 @@ scripts/ttt-handoff vscode <path> [line] [col]
 ```
 
 Opens a file from the ttt plugin or the Herdr sidebar. The path must resolve
-under `/home/winona/src`; `/../` escapes are rejected. `vscode` SSHes to amac
+under `/home/default/src`; `/../` escapes are rejected. `vscode` SSHes to amac
 and runs the app-bundle CLI with `--reuse-window --remote tunnel+anix
---folder-uri vscode-remote://tunnel+anix/home/winona/src --goto path:line:col`.
+--folder-uri vscode-remote://tunnel+anix/home/default/src --goto path:line:col`.
 The path travels on stdin; there is no NFS path mapping. VS Code must run in
 the GUI session.
 

@@ -11,7 +11,8 @@ root, or let the script use sudo for the mount.
 Environment:
   ANIX_NFS_HOST    NFS server hostname. Defaults to anix, the Windows
                    Tailscale node that forwards to the WSL NFS server.
-  ANIX_MOUNT_POINT Local mount point. Defaults to /Users/winona/src.
+  ANIX_MOUNT_POINT Local mount point. Defaults to $ANIX_MAC_HOME/src,
+                   the console user's home/src, or $HOME/src.
 
 Options:
   -h, --help       Show this help and exit.
@@ -32,7 +33,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-MOUNT_POINT=${ANIX_MOUNT_POINT:-/Users/winona/src}
+if [[ -n ${ANIX_MAC_HOME:-} ]]; then
+  default_mount="${ANIX_MAC_HOME}/src"
+elif [[ "$(id -u)" -eq 0 ]]; then
+  console_user=$(/usr/bin/stat -f%Su /dev/console)
+  default_mount="/Users/${console_user}/src"
+else
+  default_mount="$HOME/src"
+fi
+MOUNT_POINT=${ANIX_MOUNT_POINT:-$default_mount}
 NFS_HOST=${ANIX_NFS_HOST:-anix}
 
 if [[ "$(uname -s)" != "Darwin" ]]; then

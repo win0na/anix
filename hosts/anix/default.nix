@@ -1,4 +1,4 @@
-{ config, lib, pkgs, inputs, ... }:
+{ config, lib, pkgs, inputs, userName, macUserName, ... }:
 
 let
   secretsFile = ../../secrets/secrets.yaml;
@@ -24,11 +24,11 @@ in
 
   wsl = {
     enable = true;
-    defaultUser = "winona";
+    defaultUser = userName;
   };
 
   programs.zsh.enable = true;
-  users.users.winona.shell = pkgs.zsh;
+  users.users.${userName}.shell = pkgs.zsh;
 
   environment.systemPackages = with pkgs; [
     age
@@ -56,7 +56,7 @@ in
 
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
-    trusted-users = [ "winona" ];
+    trusted-users = [ userName ];
     builders-use-substitutes = true;
   };
 
@@ -64,7 +64,7 @@ in
   nix.buildMachines = [
     {
       hostName = "amac";
-      sshUser = "winona";
+      sshUser = macUserName;
       sshKey = "/etc/nix/mac-builder";
       systems = [ "x86_64-darwin" ];
       protocol = "ssh-ng";
@@ -83,7 +83,7 @@ in
     enable = true;
     createMountPoints = true;
     exports = ''
-      /home/winona/src amac(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
+      /home/${userName}/src amac(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
     '';
   };
 
@@ -104,10 +104,11 @@ in
     useUserPackages = true;
     backupFileExtension = "hm-backup";
     sharedModules = [ ../../modules/home ];
-    users.winona = {
+    extraSpecialArgs = { inherit userName macUserName; };
+    users.${userName} = {
       imports = [
-        ../../home/winona
-        ../../home/winona/anix.nix
+        ../../home/default
+        ../../home/default/anix.nix
       ];
     };
   };

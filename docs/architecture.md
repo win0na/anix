@@ -52,9 +52,9 @@ as the host.
 hosts/anix  ->  modules/common  ->  modules/nixos   ->  home-manager
 hosts/amac  ->  modules/common  ->  modules/darwin  ->  home-manager
 
-home/winona/default  ->  shared home configuration
-home/winona/anix     ->  /home/winona
-home/winona/amac     ->  /Users/winona
+home/default/default  ->  shared home configuration
+home/default/anix     ->  /home/default
+home/default/amac     ->  /Users/winona
 ```
 
 Both hosts enable Home Manager integration with `useGlobalPkgs = true` and
@@ -73,9 +73,9 @@ both platforms. A platform-specific module belongs in `modules/nixos` or
 | `modules/nixos` | NixOS-only options. |
 | `modules/darwin` | nix-darwin-only options. |
 | `modules/home` | Home Manager modules shared by both hosts. |
-| `home/winona` | The user's packages, shell, Herdr, OpenCode, and ttt. |
-| `home/winona/opencode` | The shared OpenCode config and first-party plugins. |
-| `home/winona/herdr` | Herdr config, palette, and the sidebar plugin activation. |
+| `home/default` | The user's packages, shell, Herdr, OpenCode, and ttt. |
+| `home/default/opencode` | The shared OpenCode config and first-party plugins. |
+| `home/default/herdr` | Herdr config, palette, and the sidebar plugin activation. |
 | `pkgs/herdr` | Pinned Herdr source with the two core patches. |
 | `pkgs/herdr-sidebar` | Pinned sidebar plugin with the single-ttt-pane patch. |
 | `pkgs/herdr-sidebar-patch` | The patch applied to the sidebar plugin. |

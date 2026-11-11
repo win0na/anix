@@ -1,8 +1,8 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, userName, ... }:
 
 let
   extensionIds = lib.filter (line: line != "" && !lib.hasPrefix "#" line) (
-    lib.splitString "\n" (builtins.readFile ../../home/winona/editors/extensions-remote.txt)
+    lib.splitString "\n" (builtins.readFile ../../home/default/editors/extensions-remote.txt)
   );
 
   extensionArgs = lib.escapeShellArgs (
@@ -25,18 +25,18 @@ in
     startLimitIntervalSec = 300;
 
     environment = {
-      HOME = "/home/winona";
+      HOME = "/home/${userName}";
       VSCODE_CLI_USE_FILE_KEYCHAIN = "1";
       NIX_LD = config.environment.sessionVariables.NIX_LD;
       NIX_LD_LIBRARY_PATH = config.environment.sessionVariables.NIX_LD_LIBRARY_PATH;
     };
 
-    unitConfig.ConditionPathExists = "/home/winona/.vscode/cli/token.json";
+    unitConfig.ConditionPathExists = "/home/${userName}/.vscode/cli/token.json";
 
     serviceConfig = {
-      User = "winona";
+      User = userName;
       Group = "users";
-      WorkingDirectory = "/home/winona";
+      WorkingDirectory = "/home/${userName}";
       ExecStart = "${lib.getExe pkgs.vscode-cli} tunnel --accept-server-license-terms --disable-telemetry --name anix ${extensionArgs}";
       Restart = "on-failure";
       RestartSec = 30;

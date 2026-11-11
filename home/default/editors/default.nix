@@ -2,7 +2,7 @@
 
 let
   inherit (pkgs.stdenv.hostPlatform) isDarwin;
-  repoEditors = "${config.home.homeDirectory}/.config/anix/home/winona/editors";
+  repoEditors = "${config.home.homeDirectory}/.config/anix/home/default/editors";
   machineSettings = "${config.home.homeDirectory}/.vscode-server/data/Machine/settings.json";
 in
 {

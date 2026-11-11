@@ -53,17 +53,27 @@
   };
 
   outputs = inputs@{ self, nixpkgs, nixpkgs-2605, nix-darwin, ... }:
+    let
+      users = import ./users.nix;
+    in
     {
       nixosConfigurations.anix = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [ ./hosts/anix ];
-        specialArgs = { inherit inputs; };
+        specialArgs = {
+          inherit inputs;
+          userName = users.anix;
+          macUserName = users.amac;
+        };
       };
 
       darwinConfigurations.amac = nix-darwin.lib.darwinSystem {
         system = "x86_64-darwin";
         modules = [ ./hosts/amac ];
-        specialArgs = { inherit inputs; };
+        specialArgs = {
+          inherit inputs;
+          userName = users.amac;
+        };
       };
 
       overlays.default = import ./overlays;

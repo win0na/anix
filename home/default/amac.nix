@@ -1,10 +1,10 @@
-{ config, lib, pkgs, ... }:
+{ userName, lib, ... }:
 
 let
   builderKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMrCBmuvJjxzV9XxfxBMdncZsx/JHUGOa3VWdnbtJHOJ anix-builder";
 in
 {
-  home.homeDirectory = "/Users/winona";
+  home.homeDirectory = "/Users/${userName}";
   home.stateVersion = "26.05";
 
   # Append the builder key without replacing keys that already exist.

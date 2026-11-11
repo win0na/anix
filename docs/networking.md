@@ -97,7 +97,7 @@ The WSL host exports `~/src` as the NFSv4.1 pseudo-root:
 services.nfs.server.enable = true;
 services.nfs.server.createMountPoints = true;
 services.nfs.server.exports = ''
-  /home/winona/src  amac(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
+  /home/default/src  amac(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
 '';
 ```
 
@@ -174,12 +174,12 @@ No firewall rule is needed. The old code-server 8080 rule and the Windows 8080
 Hyper-V rule are removed.
 
 The Mac VS Code desktop signs into the same GitHub account and opens
-`vscode-remote://tunnel+anix/home/winona/src`. The browser URL is
-`https://vscode.dev/tunnel/anix/home/winona/src`. The tunnel is private to the
+`vscode-remote://tunnel+anix/home/default/src`. The browser URL is
+`https://vscode.dev/tunnel/anix/home/default/src`. The tunnel is private to the
 account; `code tunnel` has no public sharing flag.
 
 The Mac keeps the NFS mount at `/Users/winona/src` for Finder and other tools.
-VS Code uses the tunnel and the remote `/home/winona/src` path.
+VS Code uses the tunnel and the remote `/home/default/src` path.
 
 ## Ports
 

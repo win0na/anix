@@ -3,10 +3,10 @@
 keys:
   # anix: &anix age1...
   # amac: &amac age1...
-  winona: &winona age1tpj6u0myx27ny7su05cglcsu3wccu7jyz83l49msdzf08qxnhc2qdcaruy
+  personal: &personal age1tpj6u0myx27ny7su05cglcsu3wccu7jyz83l49msdzf08qxnhc2qdcaruy
   # recovery: &recovery age1...
 
 creation_rules:
   - path_regex: ^secrets/[^/]+\.yaml$
     age:
-      - *winona
+      - *personal

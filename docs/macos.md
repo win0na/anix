@@ -95,22 +95,22 @@ has no quarantine attribute. A manually downloaded copy needs
 ## VS Code
 
 VS Code is the official Microsoft cask. Home Manager links
-`settings.json` and `keybindings.json` from `home/winona/editors` to
+`settings.json` and `keybindings.json` from `home/default/editors` to
 `~/Library/Application Support/Code/User`. nix-darwin's `homebrew.vscode`
-installs the extension list from `home/winona/editors/extensions.txt`. The
+installs the extension list from `home/default/editors/extensions.txt`. The
 `code` binary is `/usr/local/bin/code` on the Intel Homebrew prefix; the app
 bundle path is
 `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`.
 
 VS Code opens the anix tunnel, not the NFS copy. The Remote - Tunnels connection
-runs the editor server on anix against `/home/winona/src`, so file watching,
+runs the editor server on anix against `/home/default/src`, so file watching,
 LSP, terminal, and search are local to the files. The NFS mount at
 `/Users/winona/src` remains for Finder and other Mac tools. The shared settings
 still exclude `target`, `node_modules`, and `result*` from watching and search.
 
 Connect with `code --remote tunnel+anix --folder-uri
-vscode-remote://tunnel+anix/home/winona/src`, or open
-`https://vscode.dev/tunnel/anix/home/winona/src` in a browser. Both require the
+vscode-remote://tunnel+anix/home/default/src`, or open
+`https://vscode.dev/tunnel/anix/home/default/src` in a browser. Both require the
 same GitHub account as the tunnel and a GUI session for the desktop client.
 
 `scripts/ttt-handoff vscode <path> [line] [col]` opens the file on the Mac

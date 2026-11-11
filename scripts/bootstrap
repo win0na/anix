@@ -298,20 +298,20 @@ ensure_personal_key() {
 }
 
 ensure_sops_personal() {
-  if grep -q "^  winona: &winona ${age_pub}$" .sops.yaml; then
+  if grep -q "^  personal: &personal ${age_pub}$" .sops.yaml; then
     return 0
   fi
   if [[ $dry_run -eq 1 ]]; then
-    say "would update the winona recipient in .sops.yaml"
+    say "would update the personal recipient in .sops.yaml"
     return 0
   fi
-  if ! grep -q '^  winona: &winona ' .sops.yaml; then
-    die ".sops.yaml has no winona recipient line"
+  if ! grep -q '^  personal: &personal ' .sops.yaml; then
+    die ".sops.yaml has no personal recipient line"
   fi
-  if ! ask "Update the winona recipient in .sops.yaml?" y; then
+  if ! ask "Update the personal recipient in .sops.yaml?" y; then
     die "the personal key must match .sops.yaml"
   fi
-  sed_inplace "s|^  winona: &winona .*|  winona: \\&winona ${age_pub}|" .sops.yaml
+  sed_inplace "s|^  personal: &personal .*|  personal: \\&personal ${age_pub}|" .sops.yaml
 }
 
 ensure_builder_key() {
@@ -340,15 +340,15 @@ ensure_builder_key() {
   [[ -n $builder_pub ]] || die "cannot read ${builder_key}.pub"
   say "builder public key: $builder_pub"
 
-  if grep -qF "builderKey = \"${builder_pub}\"" home/winona/amac.nix; then
+  if grep -qF "builderKey = \"${builder_pub}\"" home/default/amac.nix; then
     return 0
   fi
   if [[ $dry_run -eq 1 ]]; then
-    say "would update home/winona/amac.nix with the builder public key"
+    say "would update home/default/amac.nix with the builder public key"
     return 0
   fi
-  if ask "Update home/winona/amac.nix with this builder public key?" y; then
-    sed_inplace "s|^  builderKey = \".*\";|  builderKey = \"${builder_pub}\";|" home/winona/amac.nix
+  if ask "Update home/default/amac.nix with this builder public key?" y; then
+    sed_inplace "s|^  builderKey = \".*\";|  builderKey = \"${builder_pub}\";|" home/default/amac.nix
   fi
 }
 
@@ -474,11 +474,11 @@ add_recipient() {
       sed_inplace "s|^  ${name}: &${name} .*|  ${name}: \\&${name} ${recipient}|" .sops.yaml
     fi
   else
-    awk -v line="  ${name}: &${name} ${recipient}" '{ print; if ($0 ~ /^  winona: &winona /) print line }' .sops.yaml > .sops.yaml.tmp
+    awk -v line="  ${name}: &${name} ${recipient}" '{ print; if ($0 ~ /^  personal: &personal /) print line }' .sops.yaml > .sops.yaml.tmp
     mv .sops.yaml.tmp .sops.yaml
   fi
   if ! grep -q "^      - \*${name}$" .sops.yaml; then
-    awk -v line="      - *${name}" '{ print; if ($0 == "      - *winona") print line }' .sops.yaml > .sops.yaml.tmp
+    awk -v line="      - *${name}" '{ print; if ($0 == "      - *personal") print line }' .sops.yaml > .sops.yaml.tmp
     mv .sops.yaml.tmp .sops.yaml
   fi
   sops_cmd updatekeys -y "$secrets_file"
@@ -493,15 +493,15 @@ commit_secrets() {
   if [[ ! -e $secrets_file ]]; then
     return 0
   fi
-  run git add .sops.yaml secrets/secrets.yaml home/winona/amac.nix
-  if git diff --cached --quiet -- .sops.yaml secrets/secrets.yaml home/winona/amac.nix; then
+  run git add .sops.yaml secrets/secrets.yaml home/default/amac.nix
+  if git diff --cached --quiet -- .sops.yaml secrets/secrets.yaml home/default/amac.nix; then
     return 0
   fi
   if ! ask "Commit the encrypted secrets and .sops.yaml?" y; then
     warn "secrets left uncommitted"
     return 0
   fi
-  if ! git commit -m "$message" -- .sops.yaml secrets/secrets.yaml home/winona/amac.nix; then
+  if ! git commit -m "$message" -- .sops.yaml secrets/secrets.yaml home/default/amac.nix; then
     warn "commit failed; set git user.name and user.email"
     return 0
   fi
@@ -539,7 +539,7 @@ ensure_code_tunnel() {
   if [[ -s $token ]]; then
     say "code tunnel: already logged in"
   elif [[ $assume_yes -eq 1 ]]; then
-    warn "code tunnel is not logged in; run as winona:"
+    warn "code tunnel is not logged in; run as $(id -un):"
     warn "  VSCODE_CLI_USE_FILE_KEYCHAIN=1 code tunnel user login --provider github"
   else
     run env VSCODE_CLI_USE_FILE_KEYCHAIN=1 code tunnel user login --provider github

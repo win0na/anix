@@ -162,7 +162,7 @@
     "flake.lock",
     "secrets/**",
     "pkgs/herdr/patches/**",
-    "home/winona/ttt/plugins/**",
+    "home/default/ttt/plugins/**",
     "pkgs/opencode-dcp-fix/**",
     "node_modules/**",
     ".git/**"

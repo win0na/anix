@@ -36,7 +36,7 @@ branches. Platform-specific options stay in `modules/nixos` or
 **Why.** One user configuration, one package set per host, and no separate
 `home-manager switch` step.
 
-**Consequence.** `home/winona` is imported by both hosts. A package that only
+**Consequence.** `home/default` is imported by both hosts. A package that only
 exists on one platform is gated by the host module.
 
 ## D4: Local config clone on the Mac

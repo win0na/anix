@@ -1,10 +1,10 @@
-{ config, lib, pkgs, inputs, ... }:
+{ config, lib, pkgs, inputs, userName, ... }:
 
 let
   secretsFile = ../../secrets/secrets.yaml;
   extensionLines = lib.filter
     (line: line != "" && !(lib.hasPrefix "#" line))
-    (lib.splitString "\n" (builtins.readFile ../../home/winona/editors/extensions.txt));
+    (lib.splitString "\n" (builtins.readFile ../../home/default/editors/extensions.txt));
 in
 {
   imports = [
@@ -25,13 +25,14 @@ in
   networking.hostName = "amac";
   system.stateVersion = 7;
 
-  system.primaryUser = "winona";
+  system.primaryUser = userName;
 
-  # Not in users.knownUsers, so nix-darwin does not create or delete the
-  # account. The values let Home Manager read the existing home directory.
-  users.users.winona = {
+  # macOS gives the first account uid 501. This is not in users.knownUsers,
+  # so nix-darwin does not create or delete the account; Home Manager and the
+  # HM NixOS common module read the home path from here.
+  users.users.${userName} = {
     uid = 501;
-    home = "/Users/winona";
+    home = "/Users/${userName}";
   };
 
   environment.systemPackages = with pkgs; [
@@ -60,12 +61,12 @@ in
 
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
-    trusted-users = [ "winona" ];
+    trusted-users = [ userName ];
   };
 
   nix-homebrew = {
     enable = true;
-    user = "winona";
+    user = userName;
   };
 
   homebrew = {
@@ -127,7 +128,7 @@ in
 
     loginwindow = {
       GuestEnabled = false;
-      autoLoginUser = "winona";
+      autoLoginUser = userName;
     };
 
     trackpad = {
@@ -138,7 +139,7 @@ in
   };
 
   # Apple's OpenSSH server. Key authentication only; the builder public key is
-  # installed into winona's authorized_keys.
+  # installed into the primary user's authorized_keys.
   services.openssh = {
     enable = true;
     extraConfig = ''
@@ -161,11 +162,11 @@ in
     if [ -s /run/secrets/mac-login-password ]; then
       console_uid=$(/usr/bin/stat -f%u /dev/console)
       if [ "$console_uid" = "0" ]; then
-        /usr/sbin/sysadminctl -autologin set -userName winona -password - \
+        /usr/sbin/sysadminctl -autologin set -userName ${lib.escapeShellArg userName} -password - \
           < /run/secrets/mac-login-password || true
       else
         /bin/launchctl asuser "$console_uid" /usr/sbin/sysadminctl \
-          -autologin set -userName winona -password - \
+          -autologin set -userName ${lib.escapeShellArg userName} -password - \
           < /run/secrets/mac-login-password || true
       fi
     fi
@@ -173,12 +174,16 @@ in
 
   # Retry the NFS mount every five minutes until the WSL host is reachable.
   launchd.daemons.anix-nfs = {
-    command = "/Users/winona/.config/anix/scripts/mount-src";
+    command = "/Users/${userName}/.config/anix/scripts/mount-src";
     serviceConfig = {
       RunAtLoad = true;
       StartInterval = 300;
       StandardOutPath = "/var/log/anix-nfs.log";
       StandardErrorPath = "/var/log/anix-nfs.log";
+      EnvironmentVariables = {
+        ANIX_MAC_HOME = "/Users/${userName}";
+        ANIX_NFS_HOST = "anix";
+      };
     };
   };
 
@@ -187,10 +192,14 @@ in
     useUserPackages = true;
     backupFileExtension = "hm-backup";
     sharedModules = [ ../../modules/home ];
-    users.winona = {
+    extraSpecialArgs = {
+      inherit userName;
+      macUserName = null;
+    };
+    users.${userName} = {
       imports = [
-        ../../home/winona
-        ../../home/winona/amac.nix
+        ../../home/default
+        ../../home/default/amac.nix
       ];
     };
   };

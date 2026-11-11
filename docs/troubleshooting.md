@@ -66,7 +66,7 @@ The export needs `all_squash,anonuid=1000,anongid=1000`. The Mac mounts with
 `noowners`. Check the directory mode on WSL:
 
 ```sh
-stat -c '%U %G %a' /home/winona/src
+stat -c '%U %G %a' /home/default/src
 ```
 
 Fix the export options or the directory ownership. A Mac uid of 501 is squashed
@@ -248,7 +248,7 @@ Check:
 
 ```sh
 herdr plugin list
-herdr plugin link /home/winona/src/anix/pkgs/herdr-plugins/responsive-sidebar
+herdr plugin link /home/default/src/anix/pkgs/herdr-plugins/responsive-sidebar
 ```
 
 `herdr plugin link` registers the plugin enabled by default; `--disabled` registers it off.

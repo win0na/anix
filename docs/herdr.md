@@ -99,7 +99,7 @@ The exact settings and LSP commands are in
 ## VS Code and code tunnel
 
 VS Code desktop runs on amac and connects to the anix `code tunnel`. The remote
-workspace is `/home/winona/src`; the NFS mount at `/Users/winona/src` remains
+workspace is `/home/default/src`; the NFS mount at `/Users/winona/src` remains
 for Finder and other Mac tools, not for VS Code. The tunnel gives VS Code
 remote file watching, LSP, terminal, and search on anix.
 
@@ -107,11 +107,11 @@ The handoff is one-way, from ttt or the Herdr sidebar to VS Code. The ttt plugin
 reads the current file and cursor and calls `scripts/ttt-handoff`. The patched
 sidebar has one "Open in VS Code" menu entry for the selected file. VS Code
 opens through SSH with `--reuse-window --remote tunnel+anix --folder-uri
-vscode-remote://tunnel+anix/home/winona/src --goto`. Browser access is
-`https://vscode.dev/tunnel/anix/home/winona/src`. There is no live tab or cursor
+vscode-remote://tunnel+anix/home/default/src --goto`. Browser access is
+`https://vscode.dev/tunnel/anix/home/default/src`. There is no live tab or cursor
 sync.
 
-The Catppuccin theme under `home/winona/ttt/plugins/theme-catppuccin-mocha` is a
+The Catppuccin theme under `home/default/ttt/plugins/theme-catppuccin-mocha` is a
 port of the official VS Code theme. The VS Code side uses the Catppuccin
 extension.
 

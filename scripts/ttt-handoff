@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly remote_root=/home/winona/src
-readonly remote_host=amac
+remote_root="${ANIX_SRC_ROOT:-$HOME/src}"
+remote_host="${ANIX_MAC_HOST:-amac}"
+remote_user="${ANIX_MAC_USER:-}"
+remote_home="${ANIX_MAC_HOME:-}"
 
 usage() {
   echo "usage: ttt-handoff vscode <path> [line] [col]" >&2
@@ -20,6 +22,11 @@ col=${4:-1}
 [[ $line =~ ^[0-9]+$ ]] || line=1
 [[ $col =~ ^[0-9]+$ ]] || col=1
 
+if [[ -z $remote_user || -z $remote_home ]]; then
+  echo "ttt-handoff: ANIX_MAC_USER and ANIX_MAC_HOME must be set" >&2
+  exit 2
+fi
+
 case $file in
   *$'\n'*|*$'\r'*)
     echo "ttt-handoff: invalid path" >&2
@@ -28,7 +35,7 @@ case $file in
 esac
 
 # -m collapses ".." without requiring the path to exist, so an escape such as
-# /home/winona/src/../../etc/passwd is rejected before the existence check.
+# $remote_root/../../etc/passwd is rejected before the existence check.
 resolved=$(realpath -m -- "$file")
 case $resolved in
   "$remote_root"/*) ;;
@@ -60,22 +67,25 @@ fi
 p="$resolved:$line:$col"
 
 status=0
-printf '%s\n' "$p" | ssh -o BatchMode=yes -o ConnectTimeout=5 "$remote_host" '
-  IFS= read -r p || exit 2
-  case $p in
-    /home/winona/src/*) ;;
-    *) echo "ttt-handoff: path outside /home/winona/src" >&2; exit 3 ;;
-  esac
-  cli="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
-  if [ ! -x "$cli" ]; then
-    echo "ttt-handoff: VS Code is not installed on amac at $cli" >&2
-    exit 4
-  fi
-  exec "$cli" --reuse-window --remote tunnel+anix --folder-uri "vscode-remote://tunnel+anix/home/winona/src" --goto "$p"
-' || status=$?
+ssh -o BatchMode=yes -o ConnectTimeout=5 "$remote_user@$remote_host" \
+  "REMOTE_ROOT=$(printf '%q' "$remote_root") REMOTE_HOME=$(printf '%q' "$remote_home") bash -s -- $(printf '%q' "$p")" <<'EOF' || status=$?
+set -euo pipefail
+p=$1
+case $p in
+  "$REMOTE_ROOT"/*) ;;
+  *) echo "ttt-handoff: path outside $REMOTE_ROOT" >&2; exit 3 ;;
+esac
+cli="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+if [ ! -x "$cli" ]; then
+  echo "ttt-handoff: VS Code is not installed on amac at $cli" >&2
+  exit 4
+fi
+exec "$cli" --reuse-window --remote tunnel+anix \
+  --folder-uri "vscode-remote://tunnel+anix$REMOTE_ROOT" --goto "$p"
+EOF
 
 if [[ $status -eq 255 ]]; then
-  echo "ttt-handoff: ssh to $remote_host failed; check the host and your key" >&2
+  echo "ttt-handoff: ssh to $remote_user@$remote_host failed; check the host and your key" >&2
   exit "$status"
 fi
 if [[ $status -ne 0 ]]; then
