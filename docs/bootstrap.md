@@ -93,8 +93,9 @@ offers `xcodes`.
 ## 4. Finish
 
 When both hosts pass, the script offers to export and unregister Ubuntu. The
-default is to keep it. The export is a tar archive under the Windows profile;
-it contains the age key and must be protected or deleted.
+default is to keep it. The export is age-encrypted to the personal key and is
+written under the Windows profile. If encryption fails, the script warns before
+writing a plaintext archive that contains the age key; protect or delete it.
 
 Run the checks:
 

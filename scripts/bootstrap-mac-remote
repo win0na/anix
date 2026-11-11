@@ -85,24 +85,41 @@ fi
 
 say "Waiting for SSH to $mac_user@$mac_host"
 echo "  On the Mac: connect Tailscale, then System Settings > Sharing > Remote Login."
+attempt=0
 while ! "${SSH[@]}" true 2>/dev/null; do
+  attempt=$((attempt + 1))
+  if [[ $assume_yes -eq 1 && $attempt -ge 12 ]]; then
+    die "SSH still unavailable; enable Remote Login and rerun"
+  fi
   if ! ask "SSH is not available yet. Retry?" y; then die "enable Remote Login and rerun"; fi
+  sleep 5
 done
 
 say "Checking the Mac"
 "${SSH[@]}" 'test "$(uname -m)" = x86_64' || die "the Mac is not Intel x86_64"
-if ! "${SSH[@]}" 'command -v nix >/dev/null 2>&1'; then
+nix_mac=/nix/var/nix/profiles/default/bin/nix
+if ! "${SSH[@]}" "test -x $nix_mac"; then
   if ! "${SSH[@]}" 'xcode-select -p >/dev/null 2>&1'; then
     echo "  Install the Command Line Tools on the Mac: xcode-select --install"
     ask "Continue once the installer is finished?" y || die "CLT is required"
   fi
   ask "Install Nix on the Mac now? It asks for the Mac sudo password once." y || die "Nix is required"
   "${SSH[@]}" -tt 'curl -L https://nixos.org/nix/install | sh -s -- --daemon'
-  "${SSH[@]}" 'test -x /nix/var/nix/profiles/default/bin/nix' || die "Nix was not installed"
+  "${SSH[@]}" "test -x $nix_mac" || die "Nix was not installed"
 fi
 
+if "${SSH[@]}" 'test -e "$HOME/.config/anix/.git"'; then
+  if ! ask "Replace the existing ~/.config/anix checkout on the Mac?" n; then
+    die "move or remove the Mac checkout and rerun"
+  fi
+fi
 say "Copying the repository to ~/.config/anix"
 tar -C "$repo_root" --exclude=.git -cf - . | "${SSH[@]}" 'set -e; rm -rf "$HOME/.config/anix"; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
+
+say "Checking the builder key in the Mac host config"
+if ! grep -qF "builderKey = \"$(cat "$HOME/.ssh/mac-builder.pub")\"" "$repo_root/home/default/amac.nix"; then
+  die "home/default/amac.nix does not contain the current builder public key; run the anix bootstrap first"
+fi
 
 say "Generating the Mac host key"
 "${SSH[@]}" -tt 'sudo ssh-keygen -A'
@@ -130,7 +147,7 @@ if [[ $do_switch -eq 0 ]]; then
 fi
 
 say "Writing the first switch command"
-"${SSH[@]}" 'mkdir -p "$HOME/anix-first-switch"' 
+"${SSH[@]}" 'mkdir -p "$HOME/anix-first-switch"; rm -f "$HOME/anix-first-switch/post.ok"'
 "${SSH[@]}" 'cat > "$HOME/anix-first-switch/first-switch.command"' <<'EOS'
 #!/bin/zsh
 set -euo pipefail
@@ -148,21 +165,18 @@ sudo env PATH="/nix/var/nix/profiles/default/bin:$PATH" \
   NIX_CONFIG='experimental-features = nix-command flakes' \
   nix run github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild -- \
   switch --flake "$HOME/.config/anix#amac"
-touch "$dir/post.ok"
+date > "$dir/post.ok"
 EOS
 "${SSH[@]}" 'chmod +x "$HOME/anix-first-switch/first-switch.command"'
 
-console_uid=$("${SSH[@]}" 'stat -f%u /dev/console')
-if [[ $console_uid != 0 ]]; then
-  "${SSH[@]}" "launchctl asuser $console_uid sudo -u $mac_user open -a Terminal /Users/$mac_user/anix-first-switch/first-switch.command" || true
-else
-  echo "  The Mac is at the login window. Sign in, then open:"
-  echo "  /Users/$mac_user/anix-first-switch/first-switch.command"
-fi
+echo "  If Terminal does not open, run on the Mac:"
+echo "  /Users/$mac_user/anix-first-switch/first-switch.command"
+"${SSH[@]}" "open -a Terminal /Users/$mac_user/anix-first-switch/first-switch.command" 2>/dev/null || \
+  warn "could not open Terminal over SSH; run the command above"
 
 say "Waiting for the Mac first switch"
 for _ in $(seq 1 180); do
-  if "${SSH[@]}" 'test -s "$HOME/anix-first-switch/post.ok"' 2>/dev/null; then
+  if "${SSH[@]}" 'test -e "$HOME/anix-first-switch/post.ok"' 2>/dev/null; then
     say "Mac first switch finished"
     "${SSH[@]}" 'uname -m; mount | grep "/Users/.*/src" || true; herdr plugin list 2>/dev/null || true'
     exit 0

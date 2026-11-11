@@ -28,7 +28,7 @@ param(
   [switch]$NoClone,
   [switch]$NoTask,
   [string]$DistroName = "NixOS",
-  [string]$AnixUser = "winona",
+  [string]$AnixUser = "",
   [string]$ImageUrl = "https://github.com/nix-community/NixOS-WSL/releases/download/2605.7.2/nixos.wsl",
   [string]$ImageSha256 = "e7180ad555fdcb8e1e057e2ef056de467603a5e502ff8531053738371be3f6b9",
   [string]$ImagePath = "",

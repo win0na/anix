@@ -108,10 +108,7 @@ if ! command -v wsl.exe >/dev/null 2>&1 || ! command -v powershell.exe >/dev/nul
 fi
 command -v wsl.exe >/dev/null || die "wsl.exe not found; run this inside WSL"
 command -v powershell.exe >/dev/null || die "powershell.exe not found; run this inside WSL"
-if [[ -z ${WSL_DISTRO_NAME:-} ]]; then
-  WSL_DISTRO_NAME=$(wsl.exe -l --running --quiet 2>/dev/null | tr -d '\0\r' | head -1)
-fi
-[[ -n ${WSL_DISTRO_NAME:-} ]] || die "run this inside WSL, not on the Windows host"
+[[ -n ${WSL_DISTRO_NAME:-} ]] || die "WSL_DISTRO_NAME is not set; run this from the Ubuntu WSL shell"
 [[ -s $HOME/.config/sops/age/keys.txt ]] || die "missing $HOME/.config/sops/age/keys.txt"
 [[ -s $repo_root/secrets/secrets.yaml ]] || die "missing $repo_root/secrets/secrets.yaml"
 
@@ -124,7 +121,23 @@ fi
 command -v nix >/dev/null || die "nix is not installed; install Nix first"
 sops_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#sops -c sops "$@"; }
 age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#age -c age "$@"; }
+age_keygen_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#age -c age-keygen "$@"; }
 ssh_to_age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#ssh-to-age -c ssh-to-age "$@"; }
+
+export_ubuntu() {
+  local dest=$1 unix recipient
+  recipient=$(age_keygen_cmd -y "$HOME/.config/sops/age/keys.txt")
+  unix=$(wslpath -u "$dest")
+  if wsl.exe --export "$WSL_DISTRO_NAME" - | age_cmd -r "$recipient" -o "${unix}.age"; then
+    backup="${dest}.age"
+    say "Ubuntu backup: ${dest}.age"
+    return 0
+  fi
+  warn "the age-encrypted export failed; falling back to a plaintext archive"
+  warn "the plaintext archive contains the age key; protect or delete it"
+  wsl.exe --export "$WSL_DISTRO_NAME" "$dest"
+  backup=$dest
+}
 
 if ! SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt sops_cmd decrypt "$repo_root/secrets/secrets.yaml" >/dev/null 2>&1; then
   die "cannot decrypt secrets/secrets.yaml with the personal age key"
@@ -143,14 +156,18 @@ done
 
 if [[ $anix_user != $(value_from_users anix) || $mac_user != $(value_from_users amac) ]]; then
   if ask "Write $anix_user and $mac_user to users.nix?" y; then
-    cat > "$repo_root/users.nix" <<EOF
+    if [[ $dry_run -eq 1 ]]; then
+      say "would write users.nix with anix=$anix_user amac=$mac_user"
+    else
+      cat > "$repo_root/users.nix" <<EOF
 {
   anix = "$anix_user";
   amac = "$mac_user";
 }
 EOF
-    run git -C "$repo_root" add users.nix
-    run git -C "$repo_root" commit -m "bootstrap: set the host usernames"
+      run git -C "$repo_root" add users.nix
+      run git -C "$repo_root" commit -m "bootstrap: set the host usernames"
+    fi
   else
     die "users.nix does not match the requested usernames"
   fi
@@ -166,15 +183,18 @@ if [[ $do_backup -eq 1 ]]; then
     backup="$win_home\\anix-ubuntu-backup.tar"
   fi
   if ask "Export the current Ubuntu distribution to $backup before installing?" y; then
-    say "Exporting Ubuntu"
-    run wsl.exe --export "$WSL_DISTRO_NAME" "$backup"
+    if [[ $dry_run -eq 1 ]]; then
+      say "would export Ubuntu to an age-encrypted archive"
+    else
+      export_ubuntu "$backup"
+    fi
   fi
 fi
 
 say "Installing NixOS-WSL alongside $WSL_DISTRO_NAME"
 win_helper=$(wslpath -w "$repo_root/scripts/bootstrap-windows.ps1")
 admin=$(powershell.exe -NoProfile -Command '([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)' | tr -d '\r\n')
-helper_args=("-Yes" "-NoShutdown" "-NoFirstSwitch" "-NoClone" "-DistroName" "$distro" "-AnixUser" "$anix_user" "-ImageUrl" "$image_url" "-ImageSha256" "$image_sha")
+helper_args=("-Yes" "-SkipWslUpdate" "-NoShutdown" "-NoFirstSwitch" "-NoClone" "-DistroName" "$distro" "-AnixUser" "$anix_user" "-ImageUrl" "$image_url" "-ImageSha256" "$image_sha")
 
 if [[ $dry_run -eq 1 ]]; then
   printf '  $ powershell.exe -File %q %s\n' "$win_helper" "${helper_args[*]}"
@@ -200,17 +220,24 @@ if [[ $dry_run -eq 0 ]] && ! wsl.exe --list --quiet 2>/dev/null | tr -d '\0\r' |
   die "the $distro distribution was not created"
 fi
 
-say "Staging the repository for the first switch"
-if [[ $dry_run -eq 0 ]]; then
-  tar -C "$repo_root" --exclude=.git -cf - . | wsl.exe -d "$distro" -u nixos -- bash -lc 'set -euo pipefail; rm -rf /tmp/anix; mkdir -p /tmp/anix; tar -xf - -C /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml'
-else
-  echo "  $ tar -C $repo_root --exclude=.git -cf - . | wsl.exe -d $distro -u nixos -- tar -xf - -C /tmp/anix"
+first_switch=1
+if [[ $dry_run -eq 0 ]] && wsl.exe -d "$distro" -u root -- id "$anix_user" >/dev/null 2>&1; then
+  first_switch=0
 fi
-
-say "Running the first anix switch"
-run wsl.exe -d "$distro" -u nixos -- bash -lc 'set -euo pipefail; export PATH=/nix/var/nix/profiles/default/bin:$PATH; sudo NIX_CONFIG="experimental-features = nix-command flakes" nixos-rebuild boot --flake /tmp/anix#anix'
-run wsl.exe --terminate "$distro"
-run wsl.exe -d "$distro" -u "$anix_user" -- true
+if [[ $first_switch -eq 0 ]]; then
+  say "$distro already has $anix_user; skipping the first switch"
+else
+  say "Staging the repository for the first switch"
+  if [[ $dry_run -eq 0 ]]; then
+    tar -C "$repo_root" --exclude=.git -cf - . | wsl.exe -d "$distro" -u nixos -- bash -lc 'set -euo pipefail; rm -rf /tmp/anix; mkdir -p /tmp/anix; tar -xf - -C /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml'
+  else
+    echo "  $ tar -C $repo_root --exclude=.git -cf - . | wsl.exe -d $distro -u nixos -- tar -xf - -C /tmp/anix"
+  fi
+  say "Running the first anix switch"
+  run wsl.exe -d "$distro" -u nixos -- bash -lc 'set -euo pipefail; export PATH=/nix/var/nix/profiles/default/bin:$PATH; sudo env PATH="$PATH" NIX_CONFIG="experimental-features = nix-command flakes" nixos-rebuild boot --flake /tmp/anix#anix'
+  run wsl.exe --terminate "$distro"
+  run wsl.exe -d "$distro" -u "$anix_user" -- true
+fi
 
 if [[ $do_transfer -eq 1 ]]; then
   say "Selecting directories to transfer"
@@ -247,11 +274,9 @@ if [[ $do_transfer -eq 1 ]]; then
   else
     tar -C "$HOME" \
       --exclude='*/target' --exclude='*/node_modules' --exclude='*/DerivedData' \
-      --exclude='*/.direnv' --exclude='*/result*' --exclude='*/.cache' \
-      --exclude='*/__pycache__' --exclude='*/.next' --exclude='*/dist' \
-      --exclude='*/build' --exclude='*/out' --exclude='*/.venv' \
-      --exclude='*/Pods' --exclude='*/xcuserdata' --exclude='*.o' --exclude='*.a' \
-      --exclude='*.dSYM' \
+      --exclude='*/.direnv' --exclude='*/.cache' --exclude='*/__pycache__' \
+      --exclude='*/.next' --exclude='*/.venv' --exclude='*/Pods' \
+      --exclude='*/xcuserdata' --exclude='*.dSYM' \
       -cf - .config/sops/age/keys.txt .ssh/mac-builder src/anix "${selected[@]}" |
       wsl.exe -d "$distro" -u "$anix_user" -- bash -lc 'set -euo pipefail; tar -xf - -C "$HOME"; chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"; chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt" "$HOME/src/anix/secrets/secrets.yaml" 2>/dev/null || true'
   fi
@@ -266,21 +291,38 @@ fi
 
 if [[ $do_mac -eq 1 ]]; then
   say "Preparing the Mac"
-  if [[ -x $repo_root/scripts/bootstrap-mac-remote ]]; then
-    mac_args=(--mac-host "$mac_host" --mac-user "$mac_user" --anix-user "$anix_user")
-    [[ $assume_yes -eq 1 ]] && mac_args+=(--yes)
-    [[ $dry_run -eq 1 ]] && mac_args+=(--dry-run)
-    "$repo_root/scripts/bootstrap-mac-remote" "${mac_args[@]}"
+  mac_args=(--mac-host "$mac_host" --mac-user "$mac_user" --anix-user "$anix_user")
+  [[ $assume_yes -eq 1 ]] && mac_args+=(--yes)
+  if [[ $dry_run -eq 1 ]]; then
+    say "would run scripts/bootstrap-mac-remote inside $distro"
   else
-    warn "scripts/bootstrap-mac-remote is missing; finish the Mac with docs/bootstrap.md"
+    mac_cmd='cd "$HOME/src/anix" && exec ./scripts/bootstrap-mac-remote'
+    for arg in "${mac_args[@]}"; do
+      mac_cmd+=" $(printf '%q' "$arg")"
+    done
+    wsl.exe -d "$distro" -u "$anix_user" -- bash -lc "$mac_cmd"
   fi
 fi
 
-if [[ $do_finalize -eq 1 ]]; then
+if [[ $do_finalize -eq 1 && $do_mac -eq 1 ]]; then
   say "Final check"
-  if ask "Both hosts are configured. Export and unregister $WSL_DISTRO_NAME now? This cannot be undone." n; then
-    [[ -n $backup ]] || backup=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n')\anix-ubuntu-backup.tar
-    run wsl.exe --export "$WSL_DISTRO_NAME" "$backup"
+  if [[ $WSL_DISTRO_NAME == "$distro" ]]; then
+    die "refusing to unregister the distribution this script is running in"
+  fi
+  if ask "Both hosts are configured. Prepare a final $WSL_DISTRO_NAME backup before unregister?" n; then
+    [[ -n $backup ]] || backup=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n')
+    [[ $backup == *.age || $backup == *.tar ]] || backup="$backup\\anix-ubuntu-backup.tar"
+    if [[ $dry_run -eq 1 ]]; then
+      say "would export $WSL_DISTRO_NAME to an age-encrypted archive"
+    else
+      export_ubuntu "$backup"
+    fi
+  fi
+  confirm=""
+  if [[ $assume_yes -eq 0 ]]; then
+    read -r -p "Type $WSL_DISTRO_NAME to unregister it, or press Enter to keep it: " confirm || true
+  fi
+  if [[ $confirm == "$WSL_DISTRO_NAME" ]]; then
     run wsl.exe --unregister "$WSL_DISTRO_NAME"
   else
     echo "  Keeping $WSL_DISTRO_NAME. Remove it later with: wsl.exe --unregister $WSL_DISTRO_NAME"
