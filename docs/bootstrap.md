@@ -10,10 +10,13 @@ You need:
 
 - Windows 11 with WSL 3.0.5 or later.
 - Tailscale signed in on Windows and macOS.
-- A fresh Intel MacBookPro16,1 on macOS 26.2 or later.
+- A fresh Intel MacBookPro16,1 on macOS 26.2 or later, with the first
+  Setup Assistant account (uid 501) and the requested mac username.
 - A Cachix account with a cache named `anix`.
 - The personal age key at `~/.config/sops/age/keys.txt`.
+- The Mac builder private key at `~/.ssh/mac-builder`.
 - `secrets/secrets.yaml` in the checkout.
+- The checkout at `~/src/anix`. The provision refuses a different path.
 
 The personal age key is the only irreplaceable file. Keep a copy in
 Passwords.app and an offline copy before you start. The encrypted
@@ -29,8 +32,8 @@ cd ~/src/anix
 ./scripts/provision
 ```
 
-The script checks WSL, the age key, the encrypted secrets, and the repository.
-It then:
+The script checks WSL, the age key, the builder key, the encrypted secrets, and
+the repository path. It then:
 
 1. Writes `users.nix` if you enter new usernames.
 2. Offers an Ubuntu export before changing anything.
@@ -39,7 +42,7 @@ It then:
    as `nixos`, and starts the `NixOS` distribution as the anix user.
 5. Transfers the keys, the encrypted secrets, and the directories you select.
 6. Runs `scripts/bootstrap --host anix` inside NixOS.
-7. Calls `scripts/bootstrap-mac-remote` for the Mac.
+7. Runs `scripts/bootstrap-mac-remote` from NixOS for the Mac.
 
 Useful options:
 
@@ -60,7 +63,12 @@ generated and added as a recipient.
 
 The project checklist scans the top level of `$HOME` and `$HOME/src`. Select by
 number. Build outputs and caches such as `target`, `node_modules`, and
-`DerivedData` are excluded.
+`DerivedData` are excluded. A rerun uses `tar --skip-old-files`, so the NixOS
+copy wins over an older Ubuntu copy of the same path.
+
+The Windows helper writes `%UserProfile%\.wslconfig` but does not restart WSL.
+Run `wsl --shutdown` from PowerShell after the provision if you want the new
+memory, CPU, and networking settings applied to a later start.
 
 ## 2. anix finishes
 
@@ -85,7 +93,8 @@ repository to `~/.config/anix`, generates the Mac host key, and adds the amac
 recipient to sops. It then writes
 `~/anix-first-switch/first-switch.command` and opens it in the Mac's logged-in
 Terminal. The Terminal runs the first `darwin-rebuild`; App Management and
-Homebrew prompts happen there. The script polls for `post.ok`.
+Homebrew prompts happen there. The script polls for `post.ok`. If Terminal does
+not open, the script prints the command; run it from the Mac GUI.
 
 The Mac does not need the personal age key for activation. Its host key
 decrypts the sops file after the amac recipient is added.
@@ -96,10 +105,12 @@ and 2FA; run `xcodes` on the Mac when you need it.
 
 ## 4. Finish
 
-When both hosts pass, the script offers to export and unregister Ubuntu. The
-default is to keep it. The export is age-encrypted to the personal key and is
-written under the Windows profile. If encryption fails, the script warns before
-writing a plaintext archive that contains the age key; protect or delete it.
+When both hosts pass, the script offers a final backup and then asks you to type
+the Ubuntu distribution name to unregister it. The default is to keep it, and
+`--yes` never unregisters. The export is age-encrypted to the personal key and
+is written under the Windows profile. If encryption fails, the script asks
+before writing a plaintext archive that contains the age key; protect or delete
+it.
 
 Run the checks:
 
