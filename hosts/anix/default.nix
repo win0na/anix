@@ -88,6 +88,12 @@ in
     '';
   };
 
+  # nfs-mountd creates the export path as root when it is missing. Create it
+  # first with the anix user's ownership so the project transfer can write.
+  systemd.tmpfiles.rules = [
+    "d /home/${userName}/src 0755 ${userName} users -"
+  ];
+
   # NFSv4 only. rpcbind and mountd still exist in the NixOS module but are
   # never opened in the firewall.
   services.nfs.settings.nfsd.vers3 = false;
