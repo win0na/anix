@@ -114,7 +114,7 @@ if "${SSH[@]}" 'test -e "$HOME/.config/anix/.git"'; then
   fi
 fi
 say "Copying the repository to ~/.config/anix"
-tar -C "$repo_root" --exclude=.git -cf - . | "${SSH[@]}" 'set -e; rm -rf "$HOME/.config/anix"; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
+tar -C "$repo_root" -cf - . | "${SSH[@]}" 'set -e; rm -rf "$HOME/.config/anix"; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
 
 say "Checking the builder key in the Mac host config"
 if ! grep -qF "builderKey = \"$(cat "$HOME/.ssh/mac-builder.pub")\"" "$repo_root/home/default/amac.nix"; then
@@ -179,6 +179,9 @@ for _ in $(seq 1 180); do
   if "${SSH[@]}" 'test -e "$HOME/anix-first-switch/post.ok"' 2>/dev/null; then
     say "Mac first switch finished"
     "${SSH[@]}" 'uname -m; mount | grep "/Users/.*/src" || true; herdr plugin list 2>/dev/null || true'
+    say "Installing the Herdr plugins"
+    "${SSH[@]}" 'cd "$HOME/.config/anix" && ./scripts/install-herdr-plugins.sh' ||
+      warn "Herdr plugin install failed; rerun it after the first GUI login"
     exit 0
   fi
   sleep 10

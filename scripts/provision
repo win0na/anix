@@ -19,7 +19,7 @@ Options:
   --backup PATH       Windows path for the Ubuntu export.
   --image-url URL     NixOS-WSL image. Default the pinned 2605.7.2 asset.
   --image-sha SHA     Image SHA-256.
-  --no-transfer       Do not transfer projects or keys.
+  --no-transfer       Skip the project checklist; keys and the repository still transfer.
   --no-mac            Stop after the anix bootstrap.
   --no-finalize       Do not offer to unregister Ubuntu.
   --skip-backup       Do not export Ubuntu before installation.
@@ -110,7 +110,9 @@ command -v wsl.exe >/dev/null || die "wsl.exe not found; run this inside WSL"
 command -v powershell.exe >/dev/null || die "powershell.exe not found; run this inside WSL"
 [[ -n ${WSL_DISTRO_NAME:-} ]] || die "WSL_DISTRO_NAME is not set; run this from the Ubuntu WSL shell"
 [[ -s $HOME/.config/sops/age/keys.txt ]] || die "missing $HOME/.config/sops/age/keys.txt"
+[[ -s $HOME/.ssh/mac-builder ]] || die "missing $HOME/.ssh/mac-builder"
 [[ -s $repo_root/secrets/secrets.yaml ]] || die "missing $repo_root/secrets/secrets.yaml"
+[[ $repo_root == "$HOME/src/anix" ]] || die "run this from $HOME/src/anix, not $repo_root"
 
 if ! command -v nix >/dev/null 2>&1; then
   for p in "$HOME/.nix-profile/bin" /nix/var/nix/profiles/default/bin; do
@@ -125,7 +127,7 @@ age_keygen_cmd() { nix --extra-experimental-features 'nix-command flakes' shell 
 ssh_to_age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#ssh-to-age -c ssh-to-age "$@"; }
 
 export_ubuntu() {
-  local dest=$1 unix recipient
+  local dest=${1%.age} unix recipient
   recipient=$(age_keygen_cmd -y "$HOME/.config/sops/age/keys.txt")
   unix=$(wslpath -u "$dest")
   if wsl.exe --export "$WSL_DISTRO_NAME" - | age_cmd -r "$recipient" -o "${unix}.age"; then
@@ -133,7 +135,10 @@ export_ubuntu() {
     say "Ubuntu backup: ${dest}.age"
     return 0
   fi
-  warn "the age-encrypted export failed; falling back to a plaintext archive"
+  warn "the age-encrypted export failed"
+  if ! ask "Write a plaintext archive instead? It will contain the age key." n; then
+    die "backup cancelled; nothing was unregistered"
+  fi
   warn "the plaintext archive contains the age key; protect or delete it"
   wsl.exe --export "$WSL_DISTRO_NAME" "$dest"
   backup=$dest
@@ -171,6 +176,10 @@ EOF
   else
     die "users.nix does not match the requested usernames"
   fi
+fi
+
+if [[ $do_finalize -eq 1 && $do_mac -eq 1 && $WSL_DISTRO_NAME == "$distro" ]]; then
+  die "refusing to run with finalize against $distro; this is the new host"
 fi
 
 say "Plan"
@@ -221,7 +230,7 @@ if [[ $dry_run -eq 0 ]] && ! wsl.exe --list --quiet 2>/dev/null | tr -d '\0\r' |
 fi
 
 first_switch=1
-if [[ $dry_run -eq 0 ]] && wsl.exe -d "$distro" -u root -- id "$anix_user" >/dev/null 2>&1; then
+if [[ $dry_run -eq 0 ]] && wsl.exe -d "$distro" -u root --exec id "$anix_user" >/dev/null 2>&1; then
   first_switch=0
 fi
 if [[ $first_switch -eq 0 ]]; then
@@ -229,14 +238,14 @@ if [[ $first_switch -eq 0 ]]; then
 else
   say "Staging the repository for the first switch"
   if [[ $dry_run -eq 0 ]]; then
-    tar -C "$repo_root" --exclude=.git -cf - . | wsl.exe -d "$distro" -u nixos -- bash -lc 'set -euo pipefail; rm -rf /tmp/anix; mkdir -p /tmp/anix; tar -xf - -C /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml'
+    tar -C "$repo_root" --exclude=.git -cf - . | wsl.exe -d "$distro" -u nixos --exec bash -lc 'set -euo pipefail; rm -rf /tmp/anix; mkdir -p /tmp/anix; tar -xf - -C /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml'
   else
-    echo "  $ tar -C $repo_root --exclude=.git -cf - . | wsl.exe -d $distro -u nixos -- tar -xf - -C /tmp/anix"
+    echo "  $ tar -C $repo_root --exclude=.git -cf - . | wsl.exe -d $distro -u nixos --exec tar -xf - -C /tmp/anix"
   fi
   say "Running the first anix switch"
-  run wsl.exe -d "$distro" -u nixos -- bash -lc 'set -euo pipefail; export PATH=/nix/var/nix/profiles/default/bin:$PATH; sudo env PATH="$PATH" NIX_CONFIG="experimental-features = nix-command flakes" nixos-rebuild boot --flake /tmp/anix#anix'
+  run wsl.exe -d "$distro" -u nixos --exec bash -lc 'set -euo pipefail; export PATH=/nix/var/nix/profiles/default/bin:$PATH; sudo env PATH="$PATH" NIX_CONFIG="experimental-features = nix-command flakes" nixos-rebuild boot --flake /tmp/anix#anix'
   run wsl.exe --terminate "$distro"
-  run wsl.exe -d "$distro" -u "$anix_user" -- true
+  run wsl.exe -d "$distro" -u "$anix_user" --exec true
 fi
 
 if [[ $do_transfer -eq 1 ]]; then
@@ -249,44 +258,46 @@ if [[ $do_transfer -eq 1 ]]; then
         grep -v '^src/anix$' || true
     } | sort -u
   )
-  if [[ ${#candidates[@]} -gt 0 ]]; then
+  if [[ ${#candidates[@]} -gt 0 && $assume_yes -eq 0 ]]; then
     printf '  select directories to move into the NixOS home (space separated numbers):\n'
     for i in "${!candidates[@]}"; do printf '  %3d  %s\n' "$((i+1))" "${candidates[$i]}"; done
-    if [[ $assume_yes -eq 1 ]]; then
-      selected=("${candidates[@]}")
-    else
-      read -r -p "  numbers (blank transfers none): " reply || true
-      for n in $reply; do
-        [[ $n =~ ^[0-9]+$ ]] && ((n >= 1 && n <= ${#candidates[@]})) || continue
-        selected+=("${candidates[$((n-1))]}")
-      done
-    fi
+    read -r -p "  numbers (blank transfers none): " reply || true
+    for n in $reply; do
+      [[ $n =~ ^[0-9]+$ ]] && ((n >= 1 && n <= ${#candidates[@]})) || continue
+      selected+=("${candidates[$((n-1))]}")
+    done
   fi
-  for d in "${extra_dirs[@]}"; do
-    [[ -d $HOME/$d ]] || [[ -L $HOME/$d ]] || die "directory not found under $HOME: $d"
-    selected+=("$d")
-  done
-  mapfile -t selected < <(printf '%s\n' "${selected[@]}" | awk 'NF && !seen[$0]++')
+fi
+for d in "${extra_dirs[@]}"; do
+  [[ -d $HOME/$d ]] || [[ -L $HOME/$d ]] || die "directory not found under $HOME: $d"
+  selected+=("$d")
+done
+mapfile -t selected < <(printf '%s\n' "${selected[@]}" | awk 'NF && !seen[$0]++')
 
-  say "Transferring the repository, keys, and ${#selected[@]} project paths"
-  if [[ $dry_run -eq 1 ]]; then
-    printf '  $ tar -C %s -cf - .config/sops/age/keys.txt .ssh/mac-builder src/anix %s | wsl.exe ...\n' "$HOME" "${selected[*]}"
-  else
-    tar -C "$HOME" \
-      --exclude='*/target' --exclude='*/node_modules' --exclude='*/DerivedData' \
-      --exclude='*/.direnv' --exclude='*/.cache' --exclude='*/__pycache__' \
-      --exclude='*/.next' --exclude='*/.venv' --exclude='*/Pods' \
-      --exclude='*/xcuserdata' --exclude='*.dSYM' \
-      -cf - .config/sops/age/keys.txt .ssh/mac-builder src/anix "${selected[@]}" |
-      wsl.exe -d "$distro" -u "$anix_user" -- bash -lc 'set -euo pipefail; tar -xf - -C "$HOME"; chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"; chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt" "$HOME/src/anix/secrets/secrets.yaml" 2>/dev/null || true'
-  fi
+say "Transferring the repository, keys, and ${#selected[@]} project paths"
+if [[ $dry_run -eq 1 ]]; then
+  printf '  $ tar -C %s -cf - .config/sops/age/keys.txt .ssh/mac-builder src/anix %s | wsl.exe ...\n' "$HOME" "${selected[*]}"
+else
+  tar -C "$HOME" \
+    --exclude='*/target' --exclude='*/node_modules' --exclude='*/DerivedData' \
+    --exclude='*/.direnv' --exclude='*/.cache' --exclude='*/__pycache__' \
+    --exclude='*/.next' --exclude='*/.venv' --exclude='*/Pods' \
+    --exclude='*/xcuserdata' --exclude='*.dSYM' \
+    -cf - .config/sops/age/keys.txt .ssh/mac-builder src/anix "${selected[@]}" |
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - -C "$HOME"; chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"; chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt" "$HOME/src/anix/secrets/secrets.yaml" 2>/dev/null || true'
 fi
 
 say "Running the anix bootstrap inside $distro"
+bootstrap_args=(--host anix)
+[[ $assume_yes -eq 1 ]] && bootstrap_args+=(--yes)
+bootstrap_cmd='cd "$HOME/src/anix" && exec ./scripts/bootstrap'
+for arg in "${bootstrap_args[@]}"; do
+  bootstrap_cmd+=" $(printf '%q' "$arg")"
+done
 if [[ $dry_run -eq 1 ]]; then
-  echo "  $ wsl.exe -d $distro -u $anix_user -- bash -lc 'cd ~/src/anix && ./scripts/bootstrap --host anix'"
+  echo "  $ wsl.exe -d $distro -u $anix_user --exec bash -lc '$bootstrap_cmd'"
 else
-  wsl.exe -d "$distro" -u "$anix_user" -- bash -lc 'set -euo pipefail; cd "$HOME/src/anix"; exec ./scripts/bootstrap --host anix'
+  wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc "$bootstrap_cmd"
 fi
 
 if [[ $do_mac -eq 1 ]]; then
@@ -300,7 +311,7 @@ if [[ $do_mac -eq 1 ]]; then
     for arg in "${mac_args[@]}"; do
       mac_cmd+=" $(printf '%q' "$arg")"
     done
-    wsl.exe -d "$distro" -u "$anix_user" -- bash -lc "$mac_cmd"
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc "$mac_cmd"
   fi
 fi
 

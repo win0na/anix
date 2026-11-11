@@ -47,7 +47,7 @@ Useful options:
 --anix-user NAME   --mac-user NAME   --mac-host HOST
 --dir PATH        transfer an extra directory (repeatable)
 --backup PATH     Windows path for the Ubuntu export
---no-transfer     skip projects and keys
+--no-transfer     skip project selection; keys and repo still transfer
 --no-mac          stop after anix
 --skip-backup     do not export Ubuntu
 --dry-run         print the plan only
@@ -87,8 +87,8 @@ The Mac does not need the personal age key for activation. Its host key
 decrypts the sops file after the amac recipient is added.
 
 After the first switch the script verifies the architecture, the NFS mount, and
-the Herdr plugin list. Xcode 26.6 still needs the Apple ID and 2FA; the script
-offers `xcodes`.
+the Herdr plugin list. Xcode 26.6 remains a manual GUI step with the Apple ID
+and 2FA; run `xcodes` on the Mac when you need it.
 
 ## 4. Finish
 
@@ -108,7 +108,8 @@ ssh amac uname -m
 
 ## Keys and backups
 
-- The personal age key lives at `~/.config/sops/age/keys.txt` on anix and amac.
+- The personal age key lives at `~/.config/sops/age/keys.txt` on anix. Copy it
+  to amac only when you want to edit secrets there; activation uses the host key.
 - Keep a secure note in Passwords.app and one offline copy. The `apw` stub
   reports that the Passwords.app CLI is unavailable on Linux; store the file
   manually until the separate apw port exists.

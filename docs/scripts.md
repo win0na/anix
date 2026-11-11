@@ -36,8 +36,8 @@ Ubuntu, runs the first boot as `nixos`, transfers the selected trees and keys,
 runs `scripts/bootstrap --host anix`, and calls
 `scripts/bootstrap-mac-remote`. It backs up Ubuntu first and leaves it in place
 unless you confirm removal at the end. `--yes` accepts defaults but never
-unregisters Ubuntu. `--no-transfer` skips projects and keys; the anix bootstrap
-then needs another copy. `--dry-run` prints the phases without changing either
+unregisters Ubuntu. `--no-transfer` skips the project checklist; the keys and
+repository still transfer. `--dry-run` prints the phases without changing either
 host.
 
 The project checklist scans the top level of `$HOME` and `$HOME/src`. It
