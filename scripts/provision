@@ -353,7 +353,10 @@ if [[ $dry_run -eq 1 ]]; then
   printf '  $ tar -C %s -cf - . | wsl.exe ... tar -xf - -C %s/.config/anix\n' "$repo_root" "$HOME"
 else
   tar -C "$repo_root" -cf - . |
-    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; if [ -d "$HOME/.config/anix/.git" ]; then cat >/dev/null; else mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"; fi'
+  # The target may already hold recipient commits. Update only users.nix.
+  tar -C "$repo_root" -cf - users.nix |
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'tar -xf - -C "$HOME/.config/anix"'
 fi
 
 say "Transferring keys and ${#selected[@]} project paths"
