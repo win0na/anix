@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-remote_root="${ANIX_SRC_ROOT:-$HOME/src}"
+remote_root="${ANIX_SRC_ROOT:-$HOME/${ANIX_PROJECTS_DIR:-src}}"
 remote_host="${ANIX_MAC_HOST:-amac}"
 remote_user="${ANIX_MAC_USER:-}"
 remote_home="${ANIX_MAC_HOME:-}"

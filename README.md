@@ -31,24 +31,24 @@ accept SSH after a reboot.
 ## How it works
 
 `flake.nix` defines both hosts and shares the Home Manager modules that have
-options on both platforms. The WSL host exports `~/src` over NFSv4.1, and the
-Mac mounts it at `$ANIX_MAC_HOME/src`, so projects have one copy. Secrets are
-encrypted with sops and age; each host decrypts at activation with its SSH host
-key. `scripts/rebuild` picks the host OS, or takes `anix` or `amac`.
+options on both platforms. The WSL host exports the configured project root
+over NFSv4.1, and the Mac mounts it at `$ANIX_MAC_HOME/<name>`, so projects
+have one copy. Secrets are encrypted with sops and age; each host decrypts at
+activation with its SSH host key. `scripts/rebuild` picks the host OS, or takes
+`anix` or `amac`.
 
 ## Install
 
-Fork this repository first. The installer clones your fork, creates your keys,
-and runs the host install. Replace `<you>` with your GitHub account,
-`<anix-user>` with the Linux login, and `<mac-user>` with the macOS short name
-that `whoami` prints on the Mac.
+Create your fork at https://github.com/win0na/anix/fork. The installer asks for
+the fork URL and both usernames, so the commands below need no edits. It
+installs Nix, clones the fork, creates your keys, and runs the host install.
 
 ### Ubuntu WSL
 
 Run this in your existing Ubuntu distribution:
 
 ```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/<you>/anix/main/scripts/install)
+bash <(curl -fsSL https://raw.githubusercontent.com/win0na/anix/main/scripts/install)
 ```
 
 The installer asks for your fork URL, the Linux username, and the macOS short
@@ -56,19 +56,22 @@ name. It installs Nix, clones the fork to `~/src/anix`, creates the age and
 builder keys, and starts `scripts/provision`. Approve the Windows UAC prompt,
 and enable Remote Login on the Mac when the script asks.
 
+The project root defaults to `~/src`. To keep projects in `~/code` or on an
+absolute path, set `projectsDir` in `users.nix`; `scripts/provision` asks for
+it and writes the value.
+
 ### Fresh Windows
 
 Run this in an elevated PowerShell:
 
 ```powershell
-$repo = "https://github.com/<you>/anix.git"
-$script = "$env:TEMP\anix-bootstrap.ps1"
-irm https://raw.githubusercontent.com/<you>/anix/main/scripts/bootstrap-windows.ps1 -OutFile $script
-powershell -ExecutionPolicy Bypass -File $script -RepoUrl $repo -AnixUser <anix-user> -MacUser <mac-user>
+irm https://raw.githubusercontent.com/win0na/anix/main/scripts/bootstrap-windows.ps1 -OutFile "$env:TEMP\anix-bootstrap.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:TEMP\anix-bootstrap.ps1"
 ```
 
-The helper installs WSL if it is missing, opens TCP 2049, installs the pinned
-NixOS-WSL image, runs the first switch, clones your fork, runs the anix
+The helper asks for the fork URL, the Linux username, the macOS short name, and
+the project root. It installs WSL if it is missing, opens TCP 2049, installs the
+pinned NixOS-WSL image, runs the first switch, clones your fork, runs the anix
 bootstrap, and prepares the Mac. Reboot first if it installs WSL.
 
 ### Mac

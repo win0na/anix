@@ -106,7 +106,7 @@ configuration=$4
 build_only=$5
 
 if [[ "$project" != /* ]]; then
-  project="$HOME/src/$project"
+  project="${ANIX_SRC_ROOT:-$HOME/src}/$project"
 fi
 
 if [[ ! -d "$project" ]]; then

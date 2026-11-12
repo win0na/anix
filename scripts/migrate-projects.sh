@@ -5,8 +5,8 @@ usage() {
   cat <<'EOF'
 Usage: scripts/migrate-projects.sh [--dry-run] [name...]
 
-Move project directories from HOME into HOME/src and leave a relative symlink
-at the old path. Run on Linux or WSL.
+Move project directories from HOME into the configured project root and leave
+a symlink at the old path. Run on Linux or WSL.
 
 With no names, the script prints candidate directories (immediate children of
 HOME that contain .git) and exits 1.
@@ -60,13 +60,26 @@ run() {
   fi
 }
 
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+repo_root=$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || true)
+[[ -n $repo_root ]] || {
+  echo "error: not a git checkout" >&2
+  exit 1
+}
+# shellcheck source=anix-config.sh
+# shellcheck disable=SC1091
+. "$script_dir/anix-config.sh"
+projects_dir=$(anix_projects_dir "$repo_root/users.nix")
+projects_path=$(anix_projects_path "$HOME" "$projects_dir")
+projects_name=${projects_path##*/}
+
 if [[ ${#names[@]} -eq 0 ]]; then
   echo "Candidate project directories in $HOME (contain .git):"
   found=0
   for dir in "$HOME"/*/; do
     [[ -d "$dir" ]] || continue
     name="$(basename "$dir")"
-    [[ "$name" == "src" ]] && continue
+    [[ "$name" == "$projects_name" ]] && continue
     [[ -e "$dir/.git" ]] || continue
     printf '  %s\n' "$name"
     found=1
@@ -79,9 +92,9 @@ if [[ ${#names[@]} -eq 0 ]]; then
 fi
 
 if [[ $dry_run -eq 1 ]]; then
-  printf '[dry-run] mkdir -p %q\n' "$HOME/src"
+  printf '[dry-run] mkdir -p %q\n' "$projects_path"
 else
-  mkdir -p "$HOME/src"
+  mkdir -p "$projects_path"
 fi
 
 for name in "${names[@]}"; do
@@ -96,7 +109,7 @@ for name in "${names[@]}"; do
   fi
 
   old="$HOME/$name"
-  new="$HOME/src/$name"
+  new="$projects_path/$name"
 
   if [[ -L "$old" ]]; then
     echo "skip: $old is already a symlink"
@@ -104,10 +117,10 @@ for name in "${names[@]}"; do
   fi
 
   if [[ -e "$new" && ! -e "$old" ]]; then
-    run ln -s "src/$name" "$old"
+    run ln -s "$new" "$old"
   elif [[ -e "$old" && ! -e "$new" ]]; then
     run mv "$old" "$new"
-    run ln -s "src/$name" "$old"
+    run ln -s "$new" "$old"
   elif [[ -e "$old" && -e "$new" ]]; then
     echo "warning: both $old and $new exist; skipping" >&2
   else

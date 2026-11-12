@@ -16,6 +16,10 @@ You do not need Nix, Git, or a previous checkout. The installer adds them.
 Decide two names now. The anix name is the Linux login. The amac name is the
 macOS account short name, which `whoami` prints on the Mac.
 
+The project root defaults to `src` under the anix home. If your projects
+already live in `code`, `projects`, or an absolute path, keep them there and
+use that parent as `projectsDir`. Nothing is moved.
+
 Two limits apply before the first switch. nixpkgs 26.05 is the last release
 that builds for `x86_64-darwin`, so an Intel Mac stops receiving Nix security
 updates on 2026-12-31. The installer warns when it detects one. FileVault stays
@@ -23,27 +27,27 @@ off so the Mac can auto-login and accept SSH after a reboot.
 
 ## Fork the repository
 
-Use the Fork button on GitHub. The installer clones your fork, and the
-bootstrap writes your keys and usernames there. Commit them when it finishes.
-Do not point it at the template unless you plan to re-point the remote before
-the first push.
+Create your fork at https://github.com/win0na/anix/fork. The installer clones
+your fork, and the bootstrap writes your keys and usernames there. Commit them
+when it finishes. Do not point it at the template unless you plan to re-point
+the remote before the first push.
 
 ## Path A: Ubuntu WSL
 
 Use this when the WSL distribution you use today has your projects. Run one
-command in Ubuntu:
+command in Ubuntu. It needs no edits; the installer asks for your values.
 
 ```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/<you>/anix/main/scripts/install)
+bash <(curl -fsSL https://raw.githubusercontent.com/win0na/anix/main/scripts/install)
 ```
 
 The installer asks for:
 
-1. Your fork URL. The default is the template,
-   `https://github.com/win0na/anix.git`; type your fork if you do not own the
-   template.
+1. Your fork URL. Create one at the link above, then paste it here.
 2. The Linux username for anix. The default is `$USER`.
 3. The macOS short name for amac. Run `whoami` on the Mac if you are unsure.
+4. The project root. The default is `src`; type `code` or an absolute path if
+   your projects already live there.
 
 Then it installs Nix, clones the fork to `~/src/anix`, creates the personal age
 key, the Mac builder key, `.sops.yaml`, and `secrets/secrets.yaml`, and starts
@@ -59,14 +63,13 @@ when the Mac phase starts.
 
 ## Path B: fresh Windows
 
-Use this when there is no Ubuntu WSL worth keeping. Fork the repository, then
-run this block in an elevated PowerShell:
+Use this when there is no Ubuntu WSL worth keeping. Create your fork, then run
+this block in an elevated PowerShell. It needs no edits; the helper asks for
+your fork URL, both usernames, and the project root.
 
 ```powershell
-$repo = "https://github.com/<you>/anix.git"
-$script = "$env:TEMP\anix-bootstrap.ps1"
-irm https://raw.githubusercontent.com/<you>/anix/main/scripts/bootstrap-windows.ps1 -OutFile $script
-powershell -ExecutionPolicy Bypass -File $script -RepoUrl $repo -AnixUser <anix-user> -MacUser <mac-user>
+irm https://raw.githubusercontent.com/win0na/anix/main/scripts/bootstrap-windows.ps1 -OutFile "$env:TEMP\anix-bootstrap.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:TEMP\anix-bootstrap.ps1"
 ```
 
 The helper:
@@ -75,8 +78,8 @@ The helper:
    installs WSL.
 2. Updates WSL, writes `.wslconfig`, and opens TCP 2049 for the NixOS VM.
 3. Downloads and verifies the pinned NixOS-WSL 2605.7.2 image.
-4. Installs the distribution, writes both names to `users.nix`, runs the first
-   switch, and clones your fork to `~/src/anix`.
+4. Installs the distribution, writes both names and the project root to
+   `users.nix`, runs the first switch, and clones your fork to `~/src/anix`.
 5. Registers the `anix-wsl` logon task and runs `scripts/bootstrap --host
    anix` inside the new distribution.
 6. Runs `scripts/bootstrap-mac-remote` to prepare the Mac.

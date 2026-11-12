@@ -11,9 +11,10 @@
 scripts select one from `uname -m`, so use `scripts/rebuild amac` on either.
 
 Both usernames live in `users.nix`; commands write them as `<anix-user>` and
-`<mac-user>`. `anix` follows `nixpkgs` and
-`home-manager` master; `amac` follows the 26.05 branches. sops-nix is pinned
-twice for the same reason.
+`<mac-user>`. `projectsDir` in the same file sets the project root: a relative
+name stays under the anix home, and an absolute path is used as-is. `anix`
+follows `nixpkgs` and `home-manager` master; `amac` follows the 26.05 branches.
+sops-nix is pinned twice for the same reason.
 
 ## Flake inputs
 
@@ -37,8 +38,8 @@ twice for the same reason.
 | --- | --- | --- |
 | `~/src/anix` | anix | Checkout. |
 | `~/.config/anix` | amac | Checkout used by `darwin-rebuild`. |
-| `/home/<anix>/src` | anix | NFS export, and the project root. |
-| `$ANIX_MAC_HOME/src` | amac | NFS mount point. |
+| `~/<projectsDir>` | anix | Project root, unless `projectsDir` is absolute. |
+| `$ANIX_MAC_HOME/<name>` | amac | NFS mount of the project root; `<name>` is the last path component. |
 | `/etc/nix/mac-builder` | anix | Builder private key from sops, mode `0400`. |
 | `~/.config/sops/age/keys.txt` | both | Personal age key. |
 | `~/.ssh/mac-builder` | anix | Builder key before sops installs it. |
@@ -74,14 +75,15 @@ code tunnel needs no inbound rule.
 | `scripts/install-herdr-plugins.sh` | Link the first-party sidebar plugin and list the set. |
 | `scripts/herdr-ide` | Build the sidebar, agent, and ttt layout. Bound to `prefix+i`. |
 | `scripts/ttt-handoff vscode <path> [line] [col]` | Open a file in VS Code through the tunnel. |
-| `scripts/migrate-projects.sh` | Move projects into `~/src` and leave symlinks. |
+| `scripts/migrate-projects.sh` | Move projects into the configured root and leave symlinks. |
 | `scripts/apw <command>` | Stub for the Passwords.app adapter. Storage commands exit `5`. |
 
 `scripts/install` takes `--anix-user`, `--mac-user`, `--yes`, `--dry-run`,
 `--no-pull`, and `--ensure-nix`. `scripts/provision`, `scripts/bootstrap`, and
 `scripts/bootstrap-mac-remote` accept `--dry-run`. `scripts/provision` also
-takes `--anix-user`, `--mac-user`, `--distro`, `--backup`, `--dir`, `--no-mac`,
-`--no-transfer`, `--skip-backup`, and `--yes`. Each script prints `--help`.
+takes `--anix-user`, `--mac-user`, `--distro`, `--projects-dir`, `--backup`,
+`--dir`, `--no-mac`, `--no-transfer`, `--skip-backup`, and `--yes`. Each script
+prints `--help`.
 
 `scripts/install`, `scripts/provision`, and `scripts/bootstrap` install Nix
 with the upstream installer when it is missing. `scripts/bootstrap

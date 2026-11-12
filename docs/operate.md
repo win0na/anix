@@ -41,8 +41,9 @@ Keep two things outside the repository: the personal age key in a password
 manager, and the optional recovery key offline. The encrypted
 `secrets/secrets.yaml` is committed to your fork and is the ciphertext backup.
 
-The repository holds the configuration. Projects live in `~/src` on anix. The
-Mac holds build outputs only; both can be rebuilt from the fork.
+The repository holds the configuration. Projects live in the configured root
+(`projectsDir` in `users.nix`, default `~/src`) on anix. The Mac holds build
+outputs only; both can be rebuilt from the fork.
 
 Host SSH keys are not backed up. If one is lost, regenerate it with
 `sudo ssh-keygen -A`, add the new recipient, run `sops updatekeys`, and rebuild
@@ -50,8 +51,8 @@ that host.
 
 ## NFS
 
-anix exports `/home/<anix>/src` to amac over Tailscale. The Mac mounts it at
-`$ANIX_MAC_HOME/src`. A launchd daemon named `anix-nfs` runs
+anix exports the configured project root to amac over Tailscale. The Mac
+mounts it at `$ANIX_MAC_HOME/<name>`. A launchd daemon named `anix-nfs` runs
 `~/.config/anix/scripts/mount-src` at login and retries when the server is not
 ready.
 
@@ -61,8 +62,10 @@ sudo ~/.config/anix/scripts/mount-src
 
 `ANIX_NFS_HOST` changes the server name; the default is `anix`, the Windows
 Tailscale node name. Set it if your Windows node has a different name.
-`ANIX_MOUNT_POINT` changes the mount point. The export squashes all clients to uid 1000 on anix, so file ownership
-is the same on both hosts.
+`ANIX_PROJECTS_DIR` selects the project root; only its last path component is
+used for the default mount point. `ANIX_MOUNT_POINT` overrides the mount point.
+The export squashes all clients to uid 1000 on anix, so file ownership is the
+same on both hosts.
 
 File watchers on the Mac do not see remote changes reliably. Keep build
 artifacts on local disk, and run editors on anix.
@@ -100,7 +103,7 @@ to Microsoft over TCP 443 and does not listen for inbound connections, so no
 firewall rule is needed. The token is local OAuth state in
 `~/.vscode/cli/token.json`.
 
-VS Code on amac connects to the tunnel and opens `/home/<anix>/src`. The NFS
+VS Code on amac connects to the tunnel and opens the project root. The NFS
 mount is for Finder and other local tools, not for the editor.
 
 ## Power

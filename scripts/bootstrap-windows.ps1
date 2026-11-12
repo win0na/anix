@@ -46,6 +46,7 @@ param(
   [string]$DistroName = "NixOS",
   [string]$AnixUser = "",
   [string]$MacUser = "",
+  [string]$ProjectsDir = "",
   [string]$RepoUrl = "",
   [string]$ImageUrl = "https://github.com/nix-community/NixOS-WSL/releases/download/2605.7.2/nixos.wsl",
   [string]$ImageSha256 = "e7180ad555fdcb8e1e057e2ef056de467603a5e502ff8531053738371be3f6b9",
@@ -78,14 +79,25 @@ if ([string]::IsNullOrWhiteSpace($MacUser)) {
 if ([string]::IsNullOrWhiteSpace($MacUser)) { throw "MacUser is empty" }
 if ($MacUser -notmatch '^[A-Za-z0-9._-]+$') { throw "MacUser has invalid characters: $MacUser" }
 
+if ([string]::IsNullOrWhiteSpace($ProjectsDir)) {
+  if ($Yes) {
+    $ProjectsDir = "src"
+  } else {
+    $ProjectsDir = Read-Host "Project directory [src]"
+    if ([string]::IsNullOrWhiteSpace($ProjectsDir)) { $ProjectsDir = "src" }
+  }
+}
+if ($ProjectsDir -notmatch '^[A-Za-z0-9._/-]+$' -or $ProjectsDir.Contains("..") -or $ProjectsDir -eq "/" -or $ProjectsDir -eq "." -or $ProjectsDir.EndsWith("/")) {
+  throw "ProjectsDir is invalid: $ProjectsDir"
+}
+
 if ([string]::IsNullOrWhiteSpace($RepoUrl)) { $RepoUrl = $env:ANIX_REPO_URL }
 if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
   if ($Yes) {
     $RepoUrl = "https://github.com/win0na/anix.git"
   } else {
-    $RepoUrl = Read-Host "Fork URL [https://github.com/win0na/anix.git]"
-    if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
-      $RepoUrl = "https://github.com/win0na/anix.git"
+    while ([string]::IsNullOrWhiteSpace($RepoUrl)) {
+      $RepoUrl = Read-Host "Fork URL (create one at https://github.com/win0na/anix/fork)"
     }
   }
 }
@@ -254,7 +266,7 @@ if ($NoFirstSwitch) {
 
 if ($needsFirstSwitch) {
   Write-Host "==> first switch in $Distro"
-  wsl -d $Distro -u nixos -- bash -lc "set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:`$PATH; nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone $RepoQuoted /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' > /tmp/anix/users.nix; sudo NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild switch --flake /tmp/anix#anix"
+  wsl -d $Distro -u nixos -- bash -lc "set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:`$PATH; nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone $RepoQuoted /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n  projectsDir = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' '$ProjectsDir' > /tmp/anix/users.nix; sudo NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild switch --flake /tmp/anix#anix"
   if ($LASTEXITCODE -ne 0) { throw "the first NixOS switch failed" }
 } elseif (-not $NoFirstSwitch) {
   Write-Host "==> $Distro is already configured; skipping the first switch"
@@ -263,7 +275,7 @@ if ($needsFirstSwitch) {
 if (-not $NoClone) {
   Write-Host "==> clone the repository for $AnixUser"
   wsl -d $Distro -u $AnixUser -- bash -lc "set -euo pipefail; mkdir -p ~/src; if [ ! -d ~/src/anix/.git ]; then git clone $RepoQuoted ~/src/anix; fi"
-  wsl -d $Distro -u $AnixUser -- bash -lc "printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' > ~/src/anix/users.nix"
+  wsl -d $Distro -u $AnixUser -- bash -lc "printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n  projectsDir = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' '$ProjectsDir' > ~/src/anix/users.nix"
 }
 
 if (-not $NoTask) {

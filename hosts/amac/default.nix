@@ -1,7 +1,9 @@
-{ config, lib, pkgs, inputs, userName, hostSystem, ... }:
+{ config, lib, pkgs, inputs, userName, hostSystem, projectsDir, ... }:
 
 let
   secretsFile = ../../secrets/secrets.yaml;
+  projectsName = baseNameOf (lib.removeSuffix "/" projectsDir);
+  mountPoint = "/Users/${userName}/${projectsName}";
   extensionLines = lib.filter
     (line: line != "" && !(lib.hasPrefix "#" line))
     (lib.splitString "\n" (builtins.readFile ../../home/default/editors/extensions.txt));
@@ -184,6 +186,9 @@ in
       EnvironmentVariables = {
         ANIX_MAC_HOME = "/Users/${userName}";
         ANIX_NFS_HOST = "anix";
+        ANIX_MOUNT_POINT = mountPoint;
+        ANIX_PROJECTS_DIR = projectsDir;
+        ANIX_SRC_ROOT = mountPoint;
       };
     };
   };
@@ -194,7 +199,8 @@ in
     backupFileExtension = "hm-backup";
     sharedModules = [ ../../modules/home ];
     extraSpecialArgs = {
-      inherit userName;
+      inherit userName projectsDir;
+      projectsPath = mountPoint;
       macUserName = null;
     };
     users.${userName} = {

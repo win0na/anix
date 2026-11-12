@@ -1,7 +1,10 @@
-{ config, lib, pkgs, inputs, userName, macUserName, ... }:
+{ config, lib, pkgs, inputs, userName, macUserName, projectsDir, ... }:
 
 let
   secretsFile = ../../secrets/secrets.yaml;
+  projectsPath =
+    if builtins.substring 0 1 projectsDir == "/" then projectsDir
+    else "/home/${userName}/${projectsDir}";
 in
 {
   imports = [
@@ -86,14 +89,14 @@ in
     enable = true;
     createMountPoints = true;
     exports = ''
-      /home/${userName}/src amac(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
+      ${projectsPath} amac(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
     '';
   };
 
   # nfs-mountd creates the export path as root when it is missing. Create it
   # first with the anix user's ownership so the project transfer can write.
   systemd.tmpfiles.rules = [
-    "d /home/${userName}/src 0755 ${userName} users -"
+    "d ${projectsPath} 0755 ${userName} users -"
   ];
 
   # NFSv4 only. rpcbind and mountd still exist in the NixOS module but are
@@ -113,7 +116,7 @@ in
     useUserPackages = true;
     backupFileExtension = "hm-backup";
     sharedModules = [ ../../modules/home ];
-    extraSpecialArgs = { inherit userName macUserName; };
+    extraSpecialArgs = { inherit userName macUserName projectsDir projectsPath; };
     users.${userName} = {
       imports = [
         ../../home/default

@@ -164,6 +164,10 @@ if [[ -z "$repo_root" ]]; then
   repo_root="$(cd "$script_dir/.." && pwd)"
 fi
 
+# shellcheck source=anix-config.sh
+# shellcheck disable=SC1091
+. "$script_dir/anix-config.sh"
+
 host=""
 assume_yes=0
 dry_run=0
@@ -302,11 +306,14 @@ require_amac() {
 }
 
 checkout_notes() {
+  local projects_dir
+  projects_dir=$(anix_projects_dir "$repo_root/users.nix")
   if [[ $host == anix ]]; then
     say "checkout: $repo_root"
-    say "projects: $HOME/src, exported to amac over NFS"
+    say "project root: $projects_dir; exported to amac over NFS"
   else
     say "checkout: $repo_root"
+    say "project root: $projects_dir; mounted from anix over NFS"
     say "the Mac builds from this checkout, not the NFS copy"
   fi
 }

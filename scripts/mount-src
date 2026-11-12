@@ -9,10 +9,11 @@ Mount the NFS export from the WSL host at the macOS source directory. Run as
 root, or let the script use sudo for the mount.
 
 Environment:
-  ANIX_NFS_HOST    NFS server hostname. Defaults to anix, the Windows
-                   Tailscale node that forwards to the WSL NFS server.
-  ANIX_MOUNT_POINT Local mount point. Defaults to $ANIX_MAC_HOME/src,
-                   the console user's home/src, or $HOME/src.
+  ANIX_NFS_HOST      NFS server hostname. Defaults to anix, the Windows
+                     Tailscale node that forwards to the WSL NFS server.
+  ANIX_PROJECTS_DIR  Project root from users.nix. Only the last path
+                     component is used for the default mount point.
+  ANIX_MOUNT_POINT   Local mount point. Overrides the computed path.
 
 Options:
   -h, --help       Show this help and exit.
@@ -33,13 +34,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+project_name=${ANIX_PROJECTS_DIR:-src}
+project_name=${project_name##*/}
 if [[ -n ${ANIX_MAC_HOME:-} ]]; then
-  default_mount="${ANIX_MAC_HOME}/src"
+  default_mount="${ANIX_MAC_HOME}/${project_name}"
 elif [[ "$(id -u)" -eq 0 ]]; then
   console_user=$(/usr/bin/stat -f%Su /dev/console)
-  default_mount="/Users/${console_user}/src"
+  default_mount="/Users/${console_user}/${project_name}"
 else
-  default_mount="$HOME/src"
+  default_mount="$HOME/${project_name}"
 fi
 MOUNT_POINT=${ANIX_MOUNT_POINT:-$default_mount}
 NFS_HOST=${ANIX_NFS_HOST:-anix}

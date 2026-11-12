@@ -11,9 +11,9 @@ install.
 
 From Ubuntu WSL or macOS:
 
-  bash <(curl -fsSL https://raw.githubusercontent.com/<you>/anix/main/scripts/install)
+  bash <(curl -fsSL https://raw.githubusercontent.com/win0na/anix/main/scripts/install)
 
-The fork URL defaults to https://github.com/win0na/anix.git when omitted.
+The fork URL is prompted when omitted; --yes uses the template URL.
 
 Options:
   --ensure-nix       Install Nix if it is missing, then exit. Used by the
@@ -195,9 +195,12 @@ fi
 if [[ -z $repo_url && -z $repo_root ]]; then
   if [[ $assume_yes -eq 1 ]]; then
     repo_url=$template_url
+  elif [[ -t 0 ]]; then
+    while [[ -z $repo_url ]]; do
+      read -r -p "Fork URL (create one at https://github.com/win0na/anix/fork): " repo_url || die "a fork URL is required"
+    done
   else
-    read -r -p "Fork URL [$template_url]: " repo_url || true
-    repo_url=${repo_url:-$template_url}
+    die "set ANIX_REPO_URL or pass the fork URL"
   fi
 fi
 

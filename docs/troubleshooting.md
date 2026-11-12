@@ -5,9 +5,8 @@
 `scripts/install` reruns safely. It installs Nix only when it is missing and
 pulls an existing checkout only when it is clean.
 
-- If it cloned the template, run it again from your fork, or run
-  `git remote set-url origin https://github.com/<you>/anix.git` in the
-  checkout.
+- If it cloned the template, run `gh repo fork --remote` in the checkout, or
+  point `origin` at your fork with `git remote set-url`.
 - If `sudo` or the network fails during the Nix install, fix that and run
   `scripts/install --ensure-nix`.
 - If the Windows helper installed WSL, reboot Windows and run the same block
@@ -32,14 +31,14 @@ Retry with `sudo ~/.config/anix/scripts/mount-src`.
 ## NFS permission denied
 
 ```sh
-ls -ld /home/<anix>/src
+ls -ld "$ANIX_SRC_ROOT"
 ```
 
 If the owner is `root`, an older generation created it before the tmpfiles
 rule existed. Fix it once and rebuild:
 
 ```sh
-sudo chown -R <anix>:users /home/<anix>/src
+sudo chown -R "$(id -un)":users "$ANIX_SRC_ROOT"
 ```
 
 The export squashes every client to uid 1000 on anix, so files written from the
@@ -50,7 +49,7 @@ Mac keep the same owner.
 A dead server leaves a stale mount. Force it off on the Mac:
 
 ```sh
-sudo umount -f /Users/<amac>/src
+sudo umount -f "$ANIX_SRC_ROOT"
 ```
 
 Then start anix and run `mount-src` again.

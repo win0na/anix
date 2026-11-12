@@ -55,12 +55,13 @@
   outputs = inputs@{ self, nixpkgs, nixpkgs-2605, nix-darwin, ... }:
     let
       users = import ./users.nix;
+      projectsDir = users.projectsDir or "src";
 
       darwinFor = hostSystem: nix-darwin.lib.darwinSystem {
         system = hostSystem;
         modules = [ ./hosts/amac ];
         specialArgs = {
-          inherit inputs hostSystem;
+          inherit inputs hostSystem projectsDir;
           userName = users.amac;
         };
       };
@@ -70,7 +71,7 @@
         system = "x86_64-linux";
         modules = [ ./hosts/anix ];
         specialArgs = {
-          inherit inputs;
+          inherit inputs projectsDir;
           userName = users.anix;
           macUserName = users.amac;
         };
