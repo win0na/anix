@@ -64,17 +64,17 @@
           segments = lib.splitString "/" value;
           hasDotSegment = lib.any (segment: segment == "." || segment == "..") segments;
           blocked = [
-            "Applications"
-            "Desktop"
-            "Documents"
-            "Downloads"
-            "Library"
-            "Movies"
-            "Music"
-            "Pictures"
-            "Public"
-            "System"
-            "Users"
+            "applications"
+            "desktop"
+            "documents"
+            "downloads"
+            "library"
+            "movies"
+            "music"
+            "pictures"
+            "public"
+            "system"
+            "users"
             ".config"
             ".ssh"
           ];
@@ -90,7 +90,7 @@
           throw "projectsDir must be under /home or /mnt: ${value}"
         else if value == "/home/${users.anix}" then
           throw "projectsDir must not be the anix home: ${value}"
-        else if lib.elem name blocked then
+        else if lib.elem (lib.toLower name) blocked then
           throw "projectsDir must not use a protected home directory: ${value}"
         else
           value;

@@ -43,8 +43,9 @@ anix_check_projects_dir() {
   esac
   [[ -n $home && $dir == "$home" ]] && return 1
   name=${dir##*/}
+  name=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
   case "$name" in
-    Applications|Desktop|Documents|Downloads|Library|Movies|Music|Pictures|Public|System|Users|.config|.ssh) return 1 ;;
+    applications|desktop|documents|downloads|library|movies|music|pictures|public|system|users|.config|.ssh) return 1 ;;
   esac
   return 0
 }

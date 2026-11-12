@@ -101,8 +101,8 @@ if ($projectSegments -contains "." -or $projectSegments -contains "..") {
 if ($ProjectsDir.StartsWith("/") -and -not ($ProjectsDir.StartsWith("/home/") -or $ProjectsDir.StartsWith("/mnt/"))) {
   throw "ProjectsDir must be under /home or /mnt: $ProjectsDir"
 }
-$projectName = $projectSegments[-1]
-if ($projectName -in @("Applications","Desktop","Documents","Downloads","Library","Movies","Music","Pictures","Public","System","Users",".config",".ssh")) {
+$projectName = ($projectSegments[-1]).ToLower()
+if ($projectName -in @("applications","desktop","documents","downloads","library","movies","music","pictures","public","system","users",".config",".ssh")) {
   throw "ProjectsDir must not use a protected home directory: $ProjectsDir"
 }
 if ($ProjectsDir -eq "/home/$AnixUser") {
