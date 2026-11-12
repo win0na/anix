@@ -1,131 +1,85 @@
-# Herdr
+# Editor stack
 
-Herdr is the workspace manager. ttt is the editor. The agent or terminal sits in
-the center, the file sidebar sits on the left, and one ttt pane sits at the
-bottom of each workspace. The goal is a VS Code-shaped layout without forking the
-Herdr core for every feature.
+Herdr manages panes and workspaces. ttt is the editor. A patched sidebar
+connects them. OpenCode runs the agents in the center pane.
 
-## The layout
+## Layout
 
 ```text
 +----------------------+----------------------------------+
 | Explorer             | Agent or terminal                |
 | Source Control       |                                  |
-|                      |                                  |
 +----------------------+----------------------------------+
-| ttt, one instance per workspace                         |
+| ttt, one pane per workspace                             |
 +---------------------------------------------------------+
 ```
 
-The left pane switches between Explorer and Source Control in place. The center
-pane runs the agent or a shell. The bottom pane runs ttt at 35 percent height.
-The Herdr tab bar is hidden. The `herdr-ide` script runs on `prefix+i`: it
-splits the focused pane, starts ttt with a workspace `TMPDIR`, sets the
-`hs-ttt-workspace` and `hs-ttt-tmpdir` tokens, opens the sidebar, and focuses
-the agent again.
+`prefix+i` runs `herdr-ide`: it splits the focused pane, starts ttt with a
+workspace `TMPDIR`, records `hs-ttt-workspace` and `hs-ttt-tmpdir` on the pane,
+opens the sidebar, and focuses the agent again. The Herdr tab bar is hidden.
 
-## The pieces
+## Pieces
 
 | Piece | Role |
 | --- | --- |
-| Herdr core | Pane, tab, and workspace manager. Pinned to the rootshell fork. |
-| `responsive-sidebar` | Docks the sidebar on wide tabs and opens it as an overlay on narrow tabs. |
-| `herdr-bar` | Status bar. |
-| `herdr-sidebar` | Explorer and Source Control. Patched to open files in one ttt pane. |
-| `ttt.editor` | Herdr plugin that opens ttt. |
-| ttt | The editor process. One per workspace. |
+| `pkgs/herdr` | Herdr 0.9.5 from the rootshell fork, with two patches. |
+| `pkgs/herdr-sidebar` | `alexarthurs/herdr-sidebar` at `081ed13`, with two patches. |
+| `pkgs/herdr-plugins` | First-party `responsive-sidebar` plugin. |
+| `pkgs/ttt` | ttt 1.11.0 release binary. |
+| `pkgs/fff-mcp` | fff MCP server for OpenCode. |
 
-The core carries two patches: a terminal palette setting and a hidden tab bar.
-Both are core features that a plugin cannot provide. Everything else is a
-plugin.
+The core patches hide the tab bar on its own and add a palette fallback. The
+sidebar patches replace per-file editor tabs with one ttt pane, and add **Open
+in VS Code** to the file context menu. The second one calls `ttt-handoff`, which
+opens the file on amac through the code tunnel.
 
-## Opening a file
+Home Manager links the patched sidebar build. Do not install
+`alexarthurs/herdr-sidebar` from GitHub on top of it; that replaces the patched
+copy with the stock plugin.
 
-The sidebar owns the click. On a file click, the patched sidebar:
+## Keys
 
-1. Finds the pane whose `hs-ttt-workspace` token equals the current workspace.
-2. Reads the `hs-ttt-tmpdir` token from that pane.
-3. Spawns `ttt <file>` with that `TMPDIR`, detached.
-4. Focuses the existing ttt pane.
-
-ttt uses `reuseWindow = true`, so the new process forwards the open request to
-the newest socket in `$TMPDIR/ttt-uid/` and exits. The patch does not type into
-the ttt pane. `pane.send_input` writes to the foreground TUI, which would send
-the path as editor keystrokes.
-
-The per-workspace `TMPDIR` is what keeps one ttt instance per workspace. Without
-it, `reuseWindow` can forward to the newest socket from another workspace. The
-tokens are ephemeral: a Herdr restart clears pane metadata, so run `herdr-ide`
-again after a restart.
-
-## Plugin boundary
-
-Herdr plugins can open, focus, and close panes, send input, read pane output,
-and subscribe to workspace, tab, and pane events. They cannot register
-keybindings, hide the tab bar, or set the terminal palette. Keybindings live in
-`config.toml` and point at plugin actions. The two core patches cover the
-features that have no plugin API.
-
-There is no file-open event. The sidebar patch is the integration point, not an
-event subscriber.
-
-## The sidebar patch
-
-`herdr-sidebar` already deduplicates per-file editor tabs. On a miss it creates
-a tab, and on a hit it focuses the tab. The patch adds a marker lookup before
-that path:
-
-- Find the pane with the workspace's `hs-ttt-workspace` token.
-- If it exists, spawn ttt with the file and the recorded `TMPDIR`, then focus
-  the pane.
-- If it does not, keep the stock per-file tab path.
-
-The patch targets commit `081ed133f3faa377438b51ce435fe8a87c439593`. The package
-at `pkgs/herdr-sidebar` builds it and the Home Manager activation links the
-result over the GitHub install. The sidebar patch stays local; upstream it when
-the plugin API settles.
+| Key | Action |
+| --- | --- |
+| `prefix+i` | IDE layout: sidebar, agent, ttt |
+| `prefix+e` | Open ttt in the focused pane |
+| `prefix+s` | Toggle the responsive sidebar |
+| `prefix+k` | Open the command bar |
 
 ## ttt
 
-ttt is a Go TUI editor with built-in LSP, ripgrep search, a multi-root tree,
-tabs, git staging, and an integrated terminal. It has no debug adapter, no VSIX
-extensions, and no per-root LSP instances. The config copies the current user
-settings: Catppuccin mocha, `reuseWindow`, and a collapsed sidebar.
-`focusOnOpen` and `formatOnSave` are off in that file. The shared settings have no
-`lsp.servers` list yet; add one when you want LSP in ttt.
+`home/default/ttt/settings.json` sets Catppuccin mocha, `reuseWindow`, icons
+off, 4-space indents, and `focusOnOpen` and `formatOnSave` off. It has no
+`lsp.servers` list. ttt accepts a server command plus a language list, and no
+per-server settings, so add entries when a project needs LSP.
 
-The exact settings and LSP commands are in
-[Herdr reference](herdr-reference.md).
+`reuseWindow` forwards an open request to the newest socket under
+`$TMPDIR/ttt-uid/` and exits. The per-workspace `TMPDIR` is what keeps that
+socket inside the current workspace.
 
-## VS Code and code tunnel
+## Opening a file
 
-VS Code desktop runs on amac and connects to the anix `code tunnel`. The remote
-workspace is `/home/winona/src`; the NFS mount at `/Users/winona/src` remains
-for Finder and other Mac tools, not for VS Code. The tunnel gives VS Code
-remote file watching, LSP, terminal, and search on anix.
+The explorer runs `ttt <file>` detached and then focuses the ttt pane. Because
+ttt reuses the newest socket for that workspace, the file appears in the pane
+that is already open instead of a new tab.
 
-The handoff is one-way, from ttt or the Herdr sidebar to VS Code. The ttt plugin
-reads the current file and cursor and calls `ttt-handoff` from `PATH`. The patched
-sidebar has one "Open in VS Code" menu entry for the selected file. VS Code
-opens through SSH with `--reuse-window --remote tunnel+anix --folder-uri
-vscode-remote://tunnel+anix/home/winona/src --goto`. Browser access is
-`https://vscode.dev/tunnel/anix/home/winona/src`. There is no live tab or cursor
-sync.
+## OpenCode
 
-The Catppuccin theme under `home/default/ttt/plugins/theme-catppuccin-mocha` is a
-port of the official VS Code theme. The VS Code side uses the Catppuccin
-extension.
+One configuration is shared by both hosts. Provider credentials are interactive
+OAuth logins stored in OpenCode's local state, not in sops. The MCP servers are
+`fff`, `headroom`, and `serena`.
+
+`pkgs/opencode-dcp-fix` is vendored and loaded as a local plugin. It strips
+three kinds of internal metadata from prompts and replies: system reminders,
+DCP nudges, and `@N@` / `@bN@` references. Its tests run with `node --test`.
+
+The plugin list also includes `oh-my-opencode-slim`, the DCP plugin, the
+Anthropic auth plugin, and the quota plugin. `service.json` and `auth.json` are
+local state; they stay out of the repository.
 
 ## What stays manual
 
-- The sidebar's `custom_editor_on_click` state and `editor-command.txt` must
-  select the custom editor. The state lives under
-  `~/.local/state/herdr/plugins/herdr-sidebar`; the plugin settings UI writes
-  it. The patch does not override that user choice.
-- The Herdr Darwin build is not exercised in upstream CI. The first Mac build
-  proves the Zig and Rust toolchain.
-- ttt cannot attach a debugger or load VSIX extensions. Use Xcode or a terminal
-  debugger for those cases.
-- The layout script arranges panes; it does not restore editor state.
-- The `herdr-sidebar` build is pinned to commit `081ed13`. A new plugin release
-  needs the patch rebased.
+Plugin pins live in `flake.nix`. Update a pin, rebuild, and run
+`herdr plugin list`. The two core patches and the sidebar patches stay local
+until upstream accepts them; they are part of the build, not a post-install
+step.
