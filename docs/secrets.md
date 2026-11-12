@@ -30,7 +30,8 @@ The VS Code tunnel token is not here. It is OAuth state in
 
 ## First setup
 
-`scripts/bootstrap --prepare` creates the personal key, the builder key,
+Both install paths run this step for you. To do it by hand, run
+`scripts/bootstrap --prepare`. It creates the personal key, the builder key,
 `.sops.yaml`, and `secrets/secrets.yaml`, then stages the encrypted file. The
 host bootstraps add each host key as a recipient:
 

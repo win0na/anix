@@ -5,10 +5,10 @@ usage() {
   cat <<'EOF'
 Usage: scripts/provision [options]
 
-Run from the old Ubuntu WSL distribution. Installs a fresh NixOS-WSL
-distribution alongside Ubuntu, transfers the selected trees and keys, runs the
-anix bootstrap inside NixOS, then prepares the Mac. Ubuntu is not removed until
-both hosts pass and you confirm at the end.
+Run from the old Ubuntu WSL distribution. Installs Nix if it is missing, then
+installs a fresh NixOS-WSL distribution alongside Ubuntu, transfers the
+selected trees and keys, runs the anix bootstrap inside NixOS, then prepares
+the Mac. Ubuntu is not removed until both hosts pass and you confirm at the end.
 
 Options:
   --distro NAME       New WSL distribution name. Default NixOS.
@@ -108,14 +108,30 @@ if ! command -v wsl.exe >/dev/null 2>&1 || ! command -v powershell.exe >/dev/nul
 fi
 command -v wsl.exe >/dev/null || die "wsl.exe not found; run this inside WSL"
 command -v powershell.exe >/dev/null || die "powershell.exe not found; run this inside WSL"
-[[ -n ${WSL_DISTRO_NAME:-} ]] || die "WSL_DISTRO_NAME is not set; run this from the Ubuntu WSL shell"
+if [[ -z ${WSL_DISTRO_NAME:-} ]]; then
+  WSL_DISTRO_NAME=$(wsl.exe --list --verbose 2>/dev/null | tr -d '\0\r' | awk '$1 == "*" { print $2; exit }')
+  export WSL_DISTRO_NAME
+fi
+[[ -n ${WSL_DISTRO_NAME:-} ]] || die "cannot detect the WSL distribution; run this from the Ubuntu WSL shell"
 if ! command -v nix >/dev/null 2>&1; then
   for p in "$HOME/.nix-profile/bin" /nix/var/nix/profiles/default/bin; do
     [[ -x "$p/nix" ]] && PATH="$p:$PATH"
   done
   export PATH
 fi
-command -v nix >/dev/null || die "nix is not installed; install Nix first"
+if ! command -v nix >/dev/null 2>&1; then
+  if [[ $dry_run -eq 1 ]]; then
+    warn "nix is not installed; the dry run continues without it"
+  else
+    say "installing Nix"
+    "$repo_root/scripts/install" --ensure-nix
+    for p in "$HOME/.nix-profile/bin" /nix/var/nix/profiles/default/bin; do
+      [[ -x "$p/nix" ]] && PATH="$p:$PATH"
+    done
+    export PATH
+    command -v nix >/dev/null 2>&1 || die "nix is still missing after the install"
+  fi
+fi
 missing_material() {
   if [[ ! -s $HOME/.config/sops/age/keys.txt ]]; then
     printf '%s\n' "$HOME/.config/sops/age/keys.txt"

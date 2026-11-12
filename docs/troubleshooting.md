@@ -1,5 +1,20 @@
 # Troubleshooting
 
+## Install stops before the first switch
+
+`scripts/install` reruns safely. It installs Nix only when it is missing and
+pulls an existing checkout only when it is clean.
+
+- If it cloned the template, run it again from your fork, or run
+  `git remote set-url origin https://github.com/<you>/anix.git` in the
+  checkout.
+- If `sudo` or the network fails during the Nix install, fix that and run
+  `scripts/install --ensure-nix`.
+- If the Windows helper installed WSL, reboot Windows and run the same block
+  again.
+
+The manual prompts are listed in [Install](install.md#manual-steps).
+
 ## NFS mount times out
 
 `scripts/mount-src` waits 60 seconds for Tailscale and port 2049, then exits.

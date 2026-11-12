@@ -1,169 +1,95 @@
 # Install
 
 This page takes one Windows machine and one Intel Mac to a working `anix` and
-`amac`. Pick the path that matches the machine you have. Both paths create the
-same key material and end with the same two hosts.
+`amac`. The installer does the setup. You answer prompts and approve the few
+steps that Windows and macOS reserve for a person.
 
 ## Before you start
 
 - Windows 11 with WSL 2.4.4 or later.
-- Intel MacBookPro16,1 on macOS 26.2 or later, signed in to Tailscale.
-- Tailscale on Windows, with MagicDNS enabled.
-- Nix on the machine that runs `scripts/bootstrap --prepare`. The fresh-Windows
-  path installs it inside NixOS-WSL for you.
+- Intel MacBookPro16,1 on macOS 26.2 or later.
+- Tailscale signed in on Windows and macOS, with MagicDNS enabled.
 - An Apple ID for Xcode 26.6 and iOS builds.
 
-Decide two names now. The anix name is the Linux login. The amac name must be
-the macOS account short name, which `whoami` prints on the Mac. Both live in
-`users.nix`, and the scripts write that file for you on the Ubuntu path. The
-commands below write them as `<anix-user>` and `<mac-user>`.
-
-Fork the repository. The install clones your fork, so the remote URL must point
-at your copy, not at the upstream template.
+You do not need Nix, Git, or a previous checkout. The installer adds them.
+Decide two names now. The anix name is the Linux login. The amac name is the
+macOS account short name, which `whoami` prints on the Mac.
 
 Two limits apply before the first switch. nixpkgs 26.05 is the last release
 that builds for `x86_64-darwin`, so the Mac stops receiving Nix security
 updates on 2026-12-31. FileVault stays off so the Mac can auto-login and accept
 SSH after a reboot.
 
-## Keys and secrets
+## Fork the repository
 
-Every path needs four things:
+Use the Fork button on GitHub. The installer clones your fork, and the
+bootstrap commits your keys and usernames there. Do not point it at the
+template unless you plan to re-point the remote before the first push.
 
-| Item | Path | Created by |
-| --- | --- | --- |
-| Personal age key | `~/.config/sops/age/keys.txt` | `scripts/bootstrap` |
-| Mac builder key | `~/.ssh/mac-builder` | `scripts/bootstrap` |
-| sops config | `.sops.yaml` | `scripts/bootstrap` |
-| Encrypted secrets | `secrets/secrets.yaml` | `scripts/bootstrap` |
+## Path A: Ubuntu WSL
 
-The personal key is the only file you cannot regenerate. Copy it to a password
-manager before the first switch.
-
-Prepare also writes the builder public key into `home/default/amac.nix`. That
-file is tracked, so commit the change with the others.
-
-`.sops.yaml` is local and gitignored. A fork never inherits another person's
-recipient. The encrypted file is staged for git and should be committed to your
-fork once it exists; that commit is the ciphertext backup.
-
-Prepare asks four questions:
-
-1. Generate a personal age key, if one is missing.
-2. Generate the Mac builder key, if one is missing.
-3. Cachix token, blank to skip.
-4. Mac login password, blank to skip.
-
-Then it offers to generate an offline recovery key. Accept it if you have a
-place to store the private half.
-
-On the Ubuntu path, install Nix if it is missing
-(`sh <(curl -L https://nixos.org/nix/install)`, then open a new shell) and run
-prepare before the installer:
+Use this when the WSL distribution you use today has your projects. Run one
+command in Ubuntu:
 
 ```sh
-cd ~/src/anix
-scripts/bootstrap --prepare
+bash <(curl -fsSL https://raw.githubusercontent.com/<you>/anix/main/scripts/install)
 ```
 
-The last lines name the next step. On the fresh-Windows path, skip this: the
-anix bootstrap inside NixOS creates the same files and asks the same four
-questions.
+The installer asks for:
 
-## Path A: from Ubuntu WSL
+1. Your fork URL. Press Enter to use `https://github.com/win0na/anix.git`.
+2. The Linux username for anix. The default is `$USER`.
+3. The macOS short name for amac. Run `whoami` on the Mac if you are unsure.
 
-Use this when the WSL distribution you use today already has your projects and
-a Nix install. The installer keeps Ubuntu until the new hosts pass.
+Then it installs Nix, clones the fork to `~/src/anix`, creates the personal age
+key, the Mac builder key, `.sops.yaml`, and `secrets/secrets.yaml`, and starts
+`scripts/provision`.
 
-Enable Remote Login on the Mac before this step: `provision` runs the Mac phase
-at the end and waits for SSH.
+`provision` exports Ubuntu, installs NixOS-WSL alongside it, transfers the
+repository and the projects you select, runs the anix bootstrap, and prepares
+the Mac. Ubuntu stays until both hosts pass, and it is removed only after you
+type the distribution name.
 
-```sh
-git clone https://github.com/<you>/anix.git ~/src/anix
-cd ~/src/anix
-scripts/bootstrap --prepare
-scripts/provision --anix-user <anix-user> --mac-user <mac-user>
+Approve the Windows UAC prompt when it appears. Enable Remote Login on the Mac
+when the Mac phase starts.
+
+## Path B: fresh Windows
+
+Use this when there is no Ubuntu WSL worth keeping. Fork the repository, then
+run this block in an elevated PowerShell:
+
+```powershell
+$repo = "https://github.com/<you>/anix.git"
+$script = "$env:TEMP\anix-bootstrap.ps1"
+irm https://raw.githubusercontent.com/<you>/anix/main/scripts/bootstrap-windows.ps1 -OutFile $script
+powershell -ExecutionPolicy Bypass -File $script -RepoUrl $repo -AnixUser <anix-user> -MacUser <mac-user>
 ```
 
-`provision` reads the two usernames from `users.nix`. Pass `--anix-user` and
-`--mac-user` when they differ from the defaults, and `--distro` or `--backup`
-to change those. It prompts for the Ubuntu export and the project checklist (both skipped under
-`--yes`), then:
+The helper:
 
-1. Writes `users.nix` when the names differ from the defaults.
-2. Exports Ubuntu with `wsl --export`, encrypted to your personal key.
-3. Installs the pinned NixOS-WSL image alongside Ubuntu.
-4. Stages the repository without secrets, runs the first `nixos-rebuild boot`
-   as `nixos`, and starts the new distribution as your anix user.
-5. Transfers the age key, the builder key, the encrypted secrets, and the
-   project directories you selected.
-6. Runs `scripts/bootstrap --host anix` inside NixOS.
-7. Runs `scripts/bootstrap-mac-remote` against the Mac.
+1. Installs WSL if it is missing. Reboot and run the block again if it does.
+2. Updates WSL, writes `.wslconfig`, and opens TCP 2049 for the NixOS VM.
+3. Downloads and verifies the pinned NixOS-WSL 2605.7.2 image.
+4. Installs the distribution, writes both names to `users.nix`, runs the first
+   switch, and clones your fork to `~/src/anix`.
+5. Registers the `anix-wsl` logon task and runs `scripts/bootstrap --host
+   anix` inside the new distribution.
+6. Runs `scripts/bootstrap-mac-remote` to prepare the Mac.
 
-The project checklist scans your home and `~/src`. It skips `target`,
-`node_modules`, and `DerivedData`. On a rerun, the NixOS copy wins for files
-that already exist there.
-
-Useful flags:
-
-| Flag | Effect |
-| --- | --- |
-| `--anix-user NAME` | Linux login. Default from `users.nix`. |
-| `--mac-user NAME` | macOS short name. Default from `users.nix`. |
-| `--distro NAME` | New WSL distribution name. Default `NixOS`. |
-| `--backup PATH` | Windows path for the Ubuntu export. |
-| `--dir PATH` | Transfer an extra directory. Repeatable. |
-| `--dry-run` | Print the plan; change nothing. |
-| `--no-mac` | Stop after the anix bootstrap. |
-| `--no-transfer` | Skip the project checklist; keys and the repository still transfer. |
-| `--skip-backup` | Do not export Ubuntu first. |
-| `--yes` | Accept defaults. It never unregisters Ubuntu and transfers no projects unless you pass `--dir`. |
-
-Ubuntu is removed only at the end, only after both hosts pass, and only after
-you type the exact distribution name. `--yes` never removes it.
-
-## Path B: from a fresh Windows machine
-
-Use this when there is no useful Ubuntu WSL to keep.
-
-1. In your fork, set both names in `users.nix`.
-2. Download `scripts/bootstrap-windows.ps1` from your fork.
-3. In an elevated PowerShell, run:
-
-   ```powershell
-   .\bootstrap-windows.ps1 -RepoUrl https://github.com/<you>/anix.git -AnixUser <anix-user>
-   ```
-
-   The script updates WSL, writes `.wslconfig`, opens TCP 2049, downloads and
-   verifies the NixOS-WSL image, installs it with `wsl --install --from-file`,
-   runs the first switch, clones your fork to `~/src/anix`, and registers the
-   `anix-wsl` logon task. It never unregisters a distribution.
-
-4. Start the distribution:
-
-   ```powershell
-   wsl -d NixOS
-   ```
-
-5. Finish the anix side:
-
-   ```sh
-   cd ~/src/anix
-   scripts/bootstrap --host anix
-   ```
-
-   This creates the keys and secrets on NixOS, adds the anix host key as a sops
-   recipient, switches, and prompts for the GitHub device login used by the
-   VS Code tunnel.
+The bootstrap creates the keys and secrets, adds the anix host key as a sops
+recipient, switches, and prompts for the GitHub device login used by the VS
+Code tunnel. The Mac phase asks for **Remote Login** to be enabled.
 
 If you changed the WSL memory, CPU, or networking settings in `.wslconfig`, run
 `wsl --shutdown` in PowerShell and start the distribution again.
 
 ## The Mac
 
-Do this from anix after the anix bootstrap succeeds.
+Path B runs this phase at the end. For Path A, or to retry, do this from anix
+after the anix bootstrap succeeds.
 
-1. On the Mac, enable Remote Login in System Settings > General > Sharing.
+1. On the Mac, open **System Settings > General > Sharing** and enable
+   **Remote Login**.
 2. Confirm Tailscale is signed in and `amac` resolves.
 3. From anix:
 
@@ -175,8 +101,8 @@ Do this from anix after the anix bootstrap succeeds.
    to `~/.config/anix`, generates the Mac host key, adds it as the amac sops
    recipient, and writes `~/anix-first-switch/first-switch.command`.
 
-4. Approve the Terminal and App Management prompts on the Mac when they appear.
-   The first `darwin-rebuild` runs inside Terminal, not over SSH.
+4. Approve the Terminal and App Management prompts on the Mac. The first
+   `darwin-rebuild` runs inside Terminal, not over SSH.
 
 If Terminal does not open, the script prints the command to run on the Mac. The
 first switch moves the Nix installer's `/etc/nix/nix.conf`, `/etc/bashrc`, and
@@ -189,6 +115,38 @@ sudo xcode-select -s /Applications/Xcode-26.6.app
 sudo xcodebuild -license accept
 sudo xcodebuild -runFirstLaunch
 ```
+
+## Manual steps
+
+These are the steps no script can finish for you. Everything else runs from
+the commands above.
+
+| Step | Where | Why |
+| --- | --- | --- |
+| Fork the repository | GitHub | Your keys, usernames, and secrets live in your copy. |
+| Approve UAC | Windows | Installing WSL and the NixOS image needs elevation. |
+| Sign in to Tailscale | Windows and macOS | MagicDNS and the NFS route depend on it. |
+| Enable Remote Login | macOS | `bootstrap-mac-remote` reaches the Mac over SSH. |
+| Approve Terminal and App Management | macOS | The first `darwin-rebuild` touches protected paths. |
+| Install Xcode | macOS | Xcode needs an Apple ID and 2FA. |
+
+## Flags
+
+`scripts/install` accepts:
+
+| Flag | Effect |
+| --- | --- |
+| `REPO_URL` | Fork URL as the first argument. |
+| `--anix-user NAME` | Linux login. Default `$USER`. |
+| `--mac-user NAME` | macOS short name. Default `amac`. |
+| `--yes` | Accept defaults. It still never unregisters Ubuntu. |
+| `--dry-run` | Print the plan and change nothing. |
+| `--no-pull` | Do not pull an existing checkout. |
+| `--ensure-nix` | Install Nix if missing, then exit. Used by the other scripts. |
+
+`scripts/provision` accepts the flags in
+[Reference](reference.md#commands), including `--distro`, `--backup`,
+`--no-transfer`, `--no-mac`, and `--no-finalize`.
 
 ## After both hosts pass
 

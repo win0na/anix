@@ -8,7 +8,8 @@ Updates WSL, writes .wslconfig, opens TCP 2049 for the NixOS VM, downloads
 and verifies the NixOS-WSL image, installs it, runs the first switch, and
 registers the logon task. It never unregisters or deletes a distribution.
 If the NixOS distribution already exists, the install step is skipped and the
-remaining steps run again.
+remaining steps run again. Unless NoBootstrap is set, the helper finishes by
+running the anix bootstrap inside the new distribution.
 
 .PARAMETER Yes
 Accept the prompts.
@@ -20,8 +21,17 @@ NixOS-WSL image URL. Default the 2605.7.2 nixos.wsl asset.
 Expected SHA-256 of the image. Default the published 2605.7.2 digest.
 
 .PARAMETER RepoUrl
-Git URL of the anix fork to clone. Default $env:ANIX_REPO_URL. Required when
-neither is set.
+Git URL of the anix fork to clone. Default $env:ANIX_REPO_URL, then
+https://github.com/win0na/anix.git.
+
+.PARAMETER MacUser
+macOS account short name for amac. Written to users.nix before the bootstrap.
+
+.PARAMETER NoBootstrap
+Stop after the clone. Do not run scripts/bootstrap inside the new distribution.
+
+.PARAMETER NoMac
+Do not run scripts/bootstrap-mac-remote after the anix bootstrap.
 #>
 param(
   [switch]$Yes,
@@ -30,9 +40,12 @@ param(
   [switch]$NoShutdown,
   [switch]$NoFirstSwitch,
   [switch]$NoClone,
+  [switch]$NoBootstrap,
+  [switch]$NoMac,
   [switch]$NoTask,
   [string]$DistroName = "NixOS",
   [string]$AnixUser = "",
+  [string]$MacUser = "",
   [string]$RepoUrl = "",
   [string]$ImageUrl = "https://github.com/nix-community/NixOS-WSL/releases/download/2605.7.2/nixos.wsl",
   [string]$ImageSha256 = "e7180ad555fdcb8e1e057e2ef056de467603a5e502ff8531053738371be3f6b9",
@@ -43,11 +56,37 @@ param(
 $ErrorActionPreference = "Stop"
 $Distro = $DistroName
 if ([string]::IsNullOrWhiteSpace($Distro)) { throw "DistroName is empty" }
+
+if ([string]::IsNullOrWhiteSpace($AnixUser)) {
+  if ($Yes) {
+    $AnixUser = ($env:USERNAME -replace '[^A-Za-z0-9._-]', '')
+  } else {
+    $AnixUser = Read-Host "Linux username for anix"
+  }
+}
 if ([string]::IsNullOrWhiteSpace($AnixUser)) { throw "AnixUser is empty" }
+if ($AnixUser -notmatch '^[A-Za-z0-9._-]+$') { throw "AnixUser has invalid characters: $AnixUser" }
+
+if ([string]::IsNullOrWhiteSpace($MacUser)) {
+  if ($Yes) {
+    $MacUser = "amac"
+  } else {
+    $MacUser = Read-Host "macOS short name for amac (run whoami on the Mac)"
+  }
+}
+if ([string]::IsNullOrWhiteSpace($MacUser)) { throw "MacUser is empty" }
+if ($MacUser -notmatch '^[A-Za-z0-9._-]+$') { throw "MacUser has invalid characters: $MacUser" }
 
 if ([string]::IsNullOrWhiteSpace($RepoUrl)) { $RepoUrl = $env:ANIX_REPO_URL }
 if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
-  throw "No repository URL. Pass -RepoUrl with the URL of your anix fork, or set ANIX_REPO_URL."
+  if ($Yes) {
+    $RepoUrl = "https://github.com/win0na/anix.git"
+  } else {
+    $RepoUrl = Read-Host "Fork URL [https://github.com/win0na/anix.git]"
+    if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
+      $RepoUrl = "https://github.com/win0na/anix.git"
+    }
+  }
 }
 $RepoQuoted = "'" + $RepoUrl.Replace("'", "'\''") + "'"
 
@@ -66,6 +105,21 @@ function Test-Admin {
 
 if (-not (Test-Admin)) {
   throw "Run this script as Administrator."
+}
+
+$savedPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+wsl --status *> $null
+$wslReady = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $savedPreference
+if (-not $wslReady) {
+  if (-not (Confirm "WSL is not installed. Install it now? A reboot may be required.")) {
+    throw "WSL is required."
+  }
+  wsl --install --no-distribution
+  if ($LASTEXITCODE -ne 0) { throw "wsl --install failed" }
+  Write-Host "WSL is installed. Reboot Windows, then run this script again."
+  exit 0
 }
 
 if (-not $SkipWslUpdate) {
@@ -199,7 +253,7 @@ if ($NoFirstSwitch) {
 
 if ($needsFirstSwitch) {
   Write-Host "==> first switch in $Distro"
-  wsl -d $Distro -u nixos -- bash -lc "set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:`$PATH; nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone $RepoQuoted /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; sudo NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild switch --flake /tmp/anix#anix"
+  wsl -d $Distro -u nixos -- bash -lc 'set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:$PATH; nix --extra-experimental-features "nix-command flakes" shell nixpkgs#git -c git clone "$1" /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; printf "{\n  anix = \"%s\";\n  amac = \"%s\";\n}\n" "$2" "$3" > /tmp/anix/users.nix; sudo NIX_CONFIG="experimental-features = nix-command flakes" nixos-rebuild switch --flake /tmp/anix#anix' _ $RepoUrl $AnixUser $MacUser
   if ($LASTEXITCODE -ne 0) { throw "the first NixOS switch failed" }
 } elseif (-not $NoFirstSwitch) {
   Write-Host "==> $Distro is already configured; skipping the first switch"
@@ -208,6 +262,7 @@ if ($needsFirstSwitch) {
 if (-not $NoClone) {
   Write-Host "==> clone the repository for $AnixUser"
   wsl -d $Distro -u $AnixUser -- bash -lc "set -euo pipefail; mkdir -p ~/src; if [ ! -d ~/src/anix/.git ]; then git clone $RepoQuoted ~/src/anix; fi"
+  wsl -d $Distro -u $AnixUser -- bash -lc 'printf "{\n  anix = \"%s\";\n  amac = \"%s\";\n}\n" "$1" "$2" > ~/src/anix/users.nix' _ $AnixUser $MacUser
 }
 
 if (-not $NoTask) {
@@ -218,7 +273,23 @@ if (-not $NoTask) {
   Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
 }
 
-Write-Host ""
-Write-Host "Windows is ready."
-Write-Host "Next: start the $Distro distribution, then run:"
-Write-Host "  ~/src/anix/scripts/bootstrap --host anix"
+if (-not $NoBootstrap -and -not $NoClone) {
+  Write-Host "==> running the anix bootstrap"
+  $bootstrapArgs = "--host anix"
+  if ($Yes) { $bootstrapArgs += " --yes" }
+  wsl -d $Distro -u $AnixUser -- bash -lc "cd ~/src/anix && exec ./scripts/bootstrap $bootstrapArgs"
+  if ($LASTEXITCODE -ne 0) { throw "the anix bootstrap failed" }
+
+  if (-not $NoMac) {
+    Write-Host "==> preparing the Mac"
+    $macArgs = ""
+    if ($Yes) { $macArgs = "--yes" }
+    wsl -d $Distro -u $AnixUser -- bash -lc "cd ~/src/anix && exec ./scripts/bootstrap-mac-remote $macArgs"
+    if ($LASTEXITCODE -ne 0) { throw "the Mac bootstrap failed; enable Remote Login and rerun scripts/bootstrap-mac-remote" }
+  }
+} else {
+  Write-Host ""
+  Write-Host "Windows is ready."
+  Write-Host "Next: start the $Distro distribution, then run:"
+  Write-Host "  ~/src/anix/scripts/bootstrap --host anix"
+}
