@@ -23,8 +23,9 @@ SSH after a reboot.
 ## Fork the repository
 
 Use the Fork button on GitHub. The installer clones your fork, and the
-bootstrap commits your keys and usernames there. Do not point it at the
-template unless you plan to re-point the remote before the first push.
+bootstrap writes your keys and usernames there. Commit them when it finishes.
+Do not point it at the template unless you plan to re-point the remote before
+the first push.
 
 ## Path A: Ubuntu WSL
 
@@ -37,7 +38,9 @@ bash <(curl -fsSL https://raw.githubusercontent.com/<you>/anix/main/scripts/inst
 
 The installer asks for:
 
-1. Your fork URL. Press Enter to use `https://github.com/win0na/anix.git`.
+1. Your fork URL. The default is the template,
+   `https://github.com/win0na/anix.git`; type your fork if you do not own the
+   template.
 2. The Linux username for anix. The default is `$USER`.
 3. The macOS short name for amac. Run `whoami` on the Mac if you are unsure.
 
@@ -67,7 +70,8 @@ powershell -ExecutionPolicy Bypass -File $script -RepoUrl $repo -AnixUser <anix-
 
 The helper:
 
-1. Installs WSL if it is missing. Reboot and run the block again if it does.
+1. Installs WSL if it is missing. Reboot and run the block again if it
+   installs WSL.
 2. Updates WSL, writes `.wslconfig`, and opens TCP 2049 for the NixOS VM.
 3. Downloads and verifies the pinned NixOS-WSL 2605.7.2 image.
 4. Installs the distribution, writes both names to `users.nix`, runs the first
@@ -138,7 +142,7 @@ the commands above.
 
 | Flag | Effect |
 | --- | --- |
-| `REPO_URL` | Fork URL as the first argument. |
+| `REPO_URL` | Fork URL as the first positional argument. |
 | `--anix-user NAME` | Linux login. Default `$USER`. |
 | `--mac-user NAME` | macOS short name. Default `amac`. |
 | `--yes` | Accept defaults. It still never unregisters Ubuntu. |

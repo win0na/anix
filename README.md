@@ -56,7 +56,7 @@ and enable Remote Login on the Mac when the script asks.
 
 ### Fresh Windows
 
-Fork the repository, then run this in an elevated PowerShell:
+Run this in an elevated PowerShell:
 
 ```powershell
 $repo = "https://github.com/<you>/anix.git"
@@ -71,7 +71,8 @@ bootstrap, and prepares the Mac. Reboot first if it installs WSL.
 
 ### Mac
 
-Enable Remote Login on the Mac, then run this from anix:
+Path B runs this phase for you. Otherwise, enable Remote Login on the Mac and
+run this from anix:
 
 ```sh
 ~/src/anix/scripts/bootstrap-mac-remote
@@ -81,9 +82,9 @@ Approve the Terminal and App Management prompts when they appear on the Mac.
 
 ## Keys and secrets
 
-`scripts/install` creates the personal age key at
-`~/.config/sops/age/keys.txt`, the builder key at `~/.ssh/mac-builder`, and the
-encrypted `secrets/secrets.yaml`. The personal key is the only file you cannot
+The first run creates the personal age key at `~/.config/sops/age/keys.txt`,
+the builder key at `~/.ssh/mac-builder`, and the encrypted
+`secrets/secrets.yaml`. The personal key is the only file you cannot
 regenerate. Copy it to a password manager before the first switch.
 
 `.sops.yaml` stays local and gitignored, so your fork never inherits another
