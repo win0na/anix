@@ -38,7 +38,8 @@ key. `scripts/rebuild` picks the host from the OS, or takes `anix` or `amac`.
 ## Install
 
 Both paths end with the same two hosts. Pick the one that matches the machine
-in front of you.
+in front of you. In the commands, `<you>` is your GitHub account, and
+`<anix-user>` and `<mac-user>` are the two names you chose.
 
 ### From an existing Ubuntu WSL
 
@@ -89,7 +90,7 @@ in front of you.
    elevated PowerShell.
 
    ```powershell
-   .\bootstrap-windows.ps1 -RepoUrl https://github.com/<you>/anix.git -AnixUser <name>
+   .\bootstrap-windows.ps1 -RepoUrl https://github.com/<you>/anix.git -AnixUser <anix-user>
    ```
 
    It updates WSL, opens TCP 2049, installs the pinned NixOS-WSL image, runs the

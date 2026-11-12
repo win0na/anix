@@ -76,7 +76,7 @@ anix. The Mac trusts the amac user through `nix.settings.trusted-users`.
 Root's SSH client on anix needs the Mac host key once:
 
 ```sh
-sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new <amac-user>@amac true
+sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new <mac-user>@amac true
 ```
 
 That records the key in root's `known_hosts` and confirms the builder key

@@ -52,7 +52,7 @@ If that fails, the Mac is down, Remote Login is off, or the builder key is not
 in `authorized_keys`. If SSH works but Nix cannot use the builder:
 
 ```sh
-sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new <amac-user>@amac true
+sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new <mac-user>@amac true
 sudo ls -l /etc/nix/mac-builder
 ```
 

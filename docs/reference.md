@@ -7,7 +7,8 @@
 | `anix` | `x86_64-linux` | `nixos-unstable` | `/home/<anix>` | Editor, agents, NFS server, builder client |
 | `amac` | `x86_64-darwin` | `nixpkgs` 26.05 | `/Users/<amac>` | Darwin and iOS builds, NFS client |
 
-Both usernames live in `users.nix`. `anix` follows `nixpkgs` and
+Both usernames live in `users.nix`; commands write them as `<anix-user>` and
+`<mac-user>`. `anix` follows `nixpkgs` and
 `home-manager` master; `amac` follows the 26.05 branches. sops-nix is pinned
 twice for the same reason.
 

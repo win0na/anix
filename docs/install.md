@@ -15,7 +15,8 @@ same key material and end with the same two hosts.
 
 Decide two names now. The anix name is the Linux login. The amac name must be
 the macOS account short name, which `whoami` prints on the Mac. Both live in
-`users.nix`, and the scripts write that file for you on the Ubuntu path.
+`users.nix`, and the scripts write that file for you on the Ubuntu path. The
+commands below write them as `<anix-user>` and `<mac-user>`.
 
 Fork the repository. The install clones your fork, so the remote URL must point
 at your copy, not at the upstream template.
@@ -81,13 +82,13 @@ at the end and waits for SSH.
 git clone https://github.com/<you>/anix.git ~/src/anix
 cd ~/src/anix
 scripts/bootstrap --prepare
-scripts/provision --anix-user <name> --mac-user <mac-name>
+scripts/provision --anix-user <anix-user> --mac-user <mac-user>
 ```
 
 `provision` reads the two usernames from `users.nix`. Pass `--anix-user` and
 `--mac-user` when they differ from the defaults, and `--distro` or `--backup`
-to change those. It prompts for the Ubuntu export and the project checklist,
-then:
+to change those. It prompts for the Ubuntu export and the project checklist (both skipped under
+`--yes`), then:
 
 1. Writes `users.nix` when the names differ from the defaults.
 2. Exports Ubuntu with `wsl --export`, encrypted to your personal key.
@@ -130,7 +131,7 @@ Use this when there is no useful Ubuntu WSL to keep.
 3. In an elevated PowerShell, run:
 
    ```powershell
-   .\bootstrap-windows.ps1 -RepoUrl https://github.com/<you>/anix.git -AnixUser <name>
+   .\bootstrap-windows.ps1 -RepoUrl https://github.com/<you>/anix.git -AnixUser <anix-user>
    ```
 
    The script updates WSL, writes `.wslconfig`, opens TCP 2049, downloads and
