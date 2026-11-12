@@ -161,7 +161,7 @@ if missing=$(missing_material) && [[ -n $missing ]]; then
     [[ -z $missing ]] || die "missing $missing"
   fi
 fi
-[[ $repo_root == "$HOME/src/anix" ]] || warn "running from $repo_root; the transfer still stages $HOME/src/anix"
+[[ $repo_root == "$HOME/.config/anix" ]] || warn "running from $repo_root; the repository is staged to $HOME/.config/anix"
 
 sops_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#sops -c sops "$@"; }
 age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#age -c age "$@"; }
@@ -348,23 +348,31 @@ for d in "${extra_dirs[@]}"; do
 done
 mapfile -t selected < <(printf '%s\n' "${selected[@]}" | awk 'NF && !seen[$0]++')
 
-say "Transferring the repository, keys, and ${#selected[@]} project paths"
+say "Transferring the repository"
 if [[ $dry_run -eq 1 ]]; then
-  printf '  $ tar -C %s -cf - .config/sops/age/keys.txt .ssh/mac-builder src/anix %s | wsl.exe ...\n' "$HOME" "${selected[*]}"
+  printf '  $ tar -C %s -cf - . | wsl.exe ... tar -xf - -C %s/.config/anix\n' "$repo_root" "$HOME"
+else
+  tar -C "$repo_root" -cf - . |
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
+fi
+
+say "Transferring keys and ${#selected[@]} project paths"
+if [[ $dry_run -eq 1 ]]; then
+  printf '  $ tar -C %s -cf - .config/sops/age/keys.txt .ssh/mac-builder %s | wsl.exe ...\n' "$HOME" "${selected[*]}"
 else
   tar -C "$HOME" \
     --exclude='*/target' --exclude='*/node_modules' --exclude='*/DerivedData' \
     --exclude='*/.direnv' --exclude='*/.cache' --exclude='*/__pycache__' \
     --exclude='*/.next' --exclude='*/.venv' --exclude='*/Pods' \
     --exclude='*/xcuserdata' --exclude='*.dSYM' \
-    -cf - .config/sops/age/keys.txt .ssh/mac-builder src/anix "${selected[@]}" |
-    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - --skip-old-files -C "$HOME"; chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"; chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt" "$HOME/src/anix/secrets/secrets.yaml" 2>/dev/null || true'
+    -cf - .config/sops/age/keys.txt .ssh/mac-builder "${selected[@]}" |
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - --skip-old-files -C "$HOME"; chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"; chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt" "$HOME/.config/anix/secrets/secrets.yaml" 2>/dev/null || true'
 fi
 
 say "Running the anix bootstrap inside $distro"
 bootstrap_args=(--host anix)
 [[ $assume_yes -eq 1 ]] && bootstrap_args+=(--yes)
-bootstrap_cmd='cd "$HOME/src/anix" && exec ./scripts/bootstrap'
+bootstrap_cmd='cd "$HOME/.config/anix" && exec ./scripts/bootstrap'
 for arg in "${bootstrap_args[@]}"; do
   bootstrap_cmd+=" $(printf '%q' "$arg")"
 done
@@ -381,7 +389,7 @@ if [[ $do_mac -eq 1 ]]; then
   if [[ $dry_run -eq 1 ]]; then
     say "would run scripts/bootstrap-mac-remote inside $distro"
   else
-    mac_cmd='cd "$HOME/src/anix" && exec ./scripts/bootstrap-mac-remote'
+    mac_cmd='cd "$HOME/.config/anix" && exec ./scripts/bootstrap-mac-remote'
     for arg in "${mac_args[@]}"; do
       mac_cmd+=" $(printf '%q' "$arg")"
     done

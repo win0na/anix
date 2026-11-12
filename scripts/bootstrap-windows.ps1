@@ -293,8 +293,8 @@ if ($needsFirstSwitch) {
 
 if (-not $NoClone) {
   Write-Host "==> clone the repository for $AnixUser"
-  wsl -d $Distro -u $AnixUser -- bash -lc "set -euo pipefail; mkdir -p ~/src; if [ ! -d ~/src/anix/.git ]; then git clone $RepoQuoted ~/src/anix; fi"
-  wsl -d $Distro -u $AnixUser -- bash -lc "printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n  projectsDir = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' '$ProjectsDir' > ~/src/anix/users.nix"
+  wsl -d $Distro -u $AnixUser -- bash -lc "set -euo pipefail; mkdir -p ~/.config/anix; if [ ! -d ~/.config/anix/.git ]; then git clone $RepoQuoted ~/.config/anix; fi"
+  wsl -d $Distro -u $AnixUser -- bash -lc "printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n  projectsDir = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' '$ProjectsDir' > ~/.config/anix/users.nix"
 }
 
 if (-not $NoTask) {
@@ -309,19 +309,19 @@ if (-not $NoBootstrap -and -not $NoClone) {
   Write-Host "==> running the anix bootstrap"
   $bootstrapArgs = "--host anix"
   if ($Yes) { $bootstrapArgs += " --yes" }
-  wsl -d $Distro -u $AnixUser -- bash -lc "cd ~/src/anix && exec ./scripts/bootstrap $bootstrapArgs"
+  wsl -d $Distro -u $AnixUser -- bash -lc "cd ~/.config/anix && exec ./scripts/bootstrap $bootstrapArgs"
   if ($LASTEXITCODE -ne 0) { throw "the anix bootstrap failed" }
 
   if (-not $NoMac) {
     Write-Host "==> preparing the Mac"
     $macArgs = ""
     if ($Yes) { $macArgs = "--yes" }
-    wsl -d $Distro -u $AnixUser -- bash -lc "cd ~/src/anix && exec ./scripts/bootstrap-mac-remote $macArgs"
+    wsl -d $Distro -u $AnixUser -- bash -lc "cd ~/.config/anix && exec ./scripts/bootstrap-mac-remote $macArgs"
     if ($LASTEXITCODE -ne 0) { throw "the Mac bootstrap failed; enable Remote Login and rerun scripts/bootstrap-mac-remote" }
   }
 } else {
   Write-Host ""
   Write-Host "Windows is ready."
   Write-Host "Next: start the $Distro distribution, then run:"
-  Write-Host "  ~/src/anix/scripts/bootstrap --host anix"
+  Write-Host "  ~/.config/anix/scripts/bootstrap --host anix"
 }

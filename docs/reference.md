@@ -36,8 +36,7 @@ sops-nix is pinned twice for the same reason.
 
 | Path | Host | Purpose |
 | --- | --- | --- |
-| `~/src/anix` | anix | Checkout. |
-| `~/.config/anix` | amac | Checkout used by `darwin-rebuild`. |
+| `~/.config/anix` | both | Checkout. |
 | `~/<projectsDir>` | anix | Project root, unless `projectsDir` is absolute. |
 | `$ANIX_MAC_HOME/<name>` | amac | NFS mount of the project root; `<name>` is the last path component. |
 | `/etc/nix/mac-builder` | anix | Builder private key from sops, mode `0400`. |

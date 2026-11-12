@@ -52,7 +52,7 @@ The installer asks for:
 4. The project root. The default is `src`; type `code` or an absolute path if
    your projects already live there.
 
-Then it installs Nix, clones the fork to `~/src/anix`, creates the personal age
+Then it installs Nix, clones the fork to `~/.config/anix`, creates the personal age
 key, the Mac builder key, `.sops.yaml`, and `secrets/secrets.yaml`, and starts
 `scripts/provision`.
 
@@ -82,7 +82,7 @@ The helper:
 2. Updates WSL, writes `.wslconfig`, and opens TCP 2049 for the NixOS VM.
 3. Downloads and verifies the pinned NixOS-WSL 2605.7.2 image.
 4. Installs the distribution, writes both names and the project root to
-   `users.nix`, runs the first switch, and clones your fork to `~/src/anix`.
+   `users.nix`, runs the first switch, and clones your fork to `~/.config/anix`.
 5. Registers the `anix-wsl` logon task and runs `scripts/bootstrap --host
    anix` inside the new distribution.
 6. Runs `scripts/bootstrap-mac-remote` to prepare the Mac.
@@ -105,7 +105,7 @@ after the anix bootstrap succeeds.
 3. From anix:
 
    ```sh
-   ~/src/anix/scripts/bootstrap-mac-remote
+   ~/.config/anix/scripts/bootstrap-mac-remote
    ```
 
    The script waits for SSH, installs Nix if it is missing, copies the checkout

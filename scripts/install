@@ -180,10 +180,7 @@ case "$(uname -s)" in
   *) die "unsupported operating system: $(uname -s)" ;;
 esac
 
-case "$(uname -s)" in
-  Darwin) target="$HOME/.config/anix" ;;
-  *) target="$HOME/src/anix" ;;
-esac
+target="$HOME/.config/anix"
 
 current_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
 if [[ $current_root == "$target" && -f $current_root/flake.nix && -x $current_root/scripts/install ]]; then

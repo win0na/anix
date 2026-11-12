@@ -273,11 +273,7 @@ anix_check_projects_dir "$projects_dir" "$HOME" ||
   die "invalid projectsDir in users.nix: $projects_dir"
 ensure_nix
 
-if [[ $host == anix ]]; then
-  expected="$HOME/src/anix"
-else
-  expected="$HOME/.config/anix"
-fi
+expected="$HOME/.config/anix"
 if [[ $repo_root != "$expected" ]]; then
   warn "using checkout at $repo_root; the documented path is $expected"
 fi

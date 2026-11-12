@@ -52,7 +52,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/win0na/anix/main/scripts/ins
 ```
 
 The installer asks for your fork URL, the Linux username, and the macOS short
-name. It installs Nix, clones the fork to `~/src/anix`, creates the age and
+name. It installs Nix, clones the fork to `~/.config/anix`, creates the age and
 builder keys, and starts `scripts/provision`. Approve the Windows UAC prompt,
 and enable Remote Login on the Mac when the script asks.
 
@@ -80,7 +80,7 @@ Path B runs this phase for you. Otherwise, enable Remote Login on the Mac and
 run this from anix:
 
 ```sh
-~/src/anix/scripts/bootstrap-mac-remote
+~/.config/anix/scripts/bootstrap-mac-remote
 ```
 
 Approve the Terminal and App Management prompts when they appear on the Mac.
