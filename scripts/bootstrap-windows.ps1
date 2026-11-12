@@ -220,5 +220,5 @@ if (-not $NoTask) {
 
 Write-Host ""
 Write-Host "Windows is ready."
-Write-Host "Next: open $Distro as $AnixUser, copy the age key, builder key, and secrets file, then run:"
-Write-Host "  ~/src/anix/scripts/bootstrap"
+Write-Host "Next: start the $Distro distribution, then run:"
+Write-Host "  ~/src/anix/scripts/bootstrap --host anix"

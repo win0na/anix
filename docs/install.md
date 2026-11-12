@@ -31,13 +31,16 @@ Every path needs four things:
 
 | Item | Path | Created by |
 | --- | --- | --- |
-| Personal age key | `~/.config/sops/age/keys.txt` | `scripts/bootstrap --prepare` |
-| Mac builder key | `~/.ssh/mac-builder` | `scripts/bootstrap --prepare` |
-| sops config | `.sops.yaml` | `scripts/bootstrap --prepare` |
-| Encrypted secrets | `secrets/secrets.yaml` | `scripts/bootstrap --prepare` |
+| Personal age key | `~/.config/sops/age/keys.txt` | `scripts/bootstrap` |
+| Mac builder key | `~/.ssh/mac-builder` | `scripts/bootstrap` |
+| sops config | `.sops.yaml` | `scripts/bootstrap` |
+| Encrypted secrets | `secrets/secrets.yaml` | `scripts/bootstrap` |
 
 The personal key is the only file you cannot regenerate. Copy it to a password
 manager before the first switch.
+
+Prepare also writes the builder public key into `home/default/amac.nix`. That
+file is tracked, so commit the change with the others.
 
 `.sops.yaml` is local and gitignored. A fork never inherits another person's
 recipient. The encrypted file is staged for git and should be committed to your
@@ -53,7 +56,9 @@ Prepare asks four questions:
 Then it offers to generate an offline recovery key. Accept it if you have a
 place to store the private half.
 
-On the Ubuntu path, run prepare before the installer:
+On the Ubuntu path, install Nix if it is missing
+(`sh <(curl -L https://nixos.org/nix/install)`, then open a new shell) and run
+prepare before the installer:
 
 ```sh
 cd ~/src/anix
@@ -61,7 +66,8 @@ scripts/bootstrap --prepare
 ```
 
 The last lines name the next step. On the fresh-Windows path, skip this: the
-anix bootstrap inside NixOS creates the same files.
+anix bootstrap inside NixOS creates the same files and asks the same four
+questions.
 
 ## Path A: from Ubuntu WSL
 
@@ -75,11 +81,13 @@ at the end and waits for SSH.
 git clone https://github.com/<you>/anix.git ~/src/anix
 cd ~/src/anix
 scripts/bootstrap --prepare
-scripts/provision
+scripts/provision --anix-user <name> --mac-user <mac-name>
 ```
 
-`provision` asks for the distribution name, the two usernames, which project
-directories to transfer, and where to put the Ubuntu export. It then:
+`provision` reads the two usernames from `users.nix`. Pass `--anix-user` and
+`--mac-user` when they differ from the defaults, and `--distro` or `--backup`
+to change those. It prompts for the Ubuntu export and the project checklist,
+then:
 
 1. Writes `users.nix` when the names differ from the defaults.
 2. Exports Ubuntu with `wsl --export`, encrypted to your personal key.
@@ -99,6 +107,11 @@ Useful flags:
 
 | Flag | Effect |
 | --- | --- |
+| `--anix-user NAME` | Linux login. Default from `users.nix`. |
+| `--mac-user NAME` | macOS short name. Default from `users.nix`. |
+| `--distro NAME` | New WSL distribution name. Default `NixOS`. |
+| `--backup PATH` | Windows path for the Ubuntu export. |
+| `--dir PATH` | Transfer an extra directory. Repeatable. |
 | `--dry-run` | Print the plan; change nothing. |
 | `--no-mac` | Stop after the anix bootstrap. |
 | `--no-transfer` | Skip the project checklist; keys and the repository still transfer. |

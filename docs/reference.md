@@ -72,8 +72,9 @@ code tunnel needs no inbound rule.
 | `scripts/apw <command>` | Stub for the Passwords.app adapter. Storage commands exit `5`. |
 
 `scripts/provision`, `scripts/bootstrap`, and `scripts/bootstrap-mac-remote`
-accept `--dry-run`. `scripts/provision` also takes `--no-mac`, `--no-transfer`,
-`--skip-backup`, and `--yes`. Each script prints `--help`.
+accept `--dry-run`. `scripts/provision` also takes `--anix-user`, `--mac-user`,
+`--distro`, `--backup`, `--dir`, `--no-mac`, `--no-transfer`, `--skip-backup`,
+and `--yes`. Each script prints `--help`.
 
 ## Versions
 

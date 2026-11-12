@@ -132,7 +132,9 @@ if missing=$(missing_material) && [[ -n $missing ]]; then
     say "would run scripts/bootstrap --prepare"
   else
     say "running scripts/bootstrap --prepare"
-    "$repo_root/scripts/bootstrap" --prepare || die "missing $missing"
+    prepare_args=(--prepare)
+    [[ $assume_yes -eq 1 ]] && prepare_args+=(--yes)
+    "$repo_root/scripts/bootstrap" "${prepare_args[@]}" || die "missing $missing"
     missing=$(missing_material)
     [[ -z $missing ]] || die "missing $missing"
   fi
@@ -162,7 +164,7 @@ export_ubuntu() {
   backup=$dest
 }
 
-if ! SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt sops_cmd decrypt "$repo_root/secrets/secrets.yaml" >/dev/null 2>&1; then
+if [[ $dry_run -eq 0 ]] && ! SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt sops_cmd decrypt "$repo_root/secrets/secrets.yaml" >/dev/null 2>&1; then
   die "cannot decrypt secrets/secrets.yaml with the personal age key"
 fi
 
@@ -189,7 +191,7 @@ if [[ $anix_user != $(value_from_users anix) || $mac_user != $(value_from_users 
 }
 EOF
       run git -C "$repo_root" add users.nix
-      run git -C "$repo_root" commit -m "bootstrap: set the host usernames"
+      run git -C "$repo_root" -c user.name=anix-bootstrap -c user.email=anix-bootstrap@localhost commit -m "bootstrap: set the host usernames" -- users.nix
     fi
   else
     die "users.nix does not match the requested usernames"

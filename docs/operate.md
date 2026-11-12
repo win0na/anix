@@ -32,7 +32,7 @@ scripts/check.sh
 ```
 
 It evaluates both host configurations, then runs `bash -n`, shellcheck, and
-typos over `scripts/`. Missing tools come from `nix shell nixpkgs#...`, so the
+typos over the repository. Missing tools come from `nix shell nixpkgs#...`, so the
 check works before either host is installed.
 
 ## Backups
@@ -59,8 +59,9 @@ ready.
 sudo ~/.config/anix/scripts/mount-src
 ```
 
-`ANIX_NFS_HOST` changes the server name; `ANIX_MOUNT_POINT` changes the mount
-point. The export squashes all clients to uid 1000 on anix, so file ownership
+`ANIX_NFS_HOST` changes the server name; the default is `anix`, the Windows
+Tailscale node name. Set it if your Windows node has a different name.
+`ANIX_MOUNT_POINT` changes the mount point. The export squashes all clients to uid 1000 on anix, so file ownership
 is the same on both hosts.
 
 File watchers on the Mac do not see remote changes reliably. Keep build
@@ -75,8 +76,11 @@ anix. The Mac trusts the amac user through `nix.settings.trusted-users`.
 Root's SSH client on anix needs the Mac host key once:
 
 ```sh
-sudo ssh-keyscan -t ed25519 amac >> /etc/ssh/ssh_known_hosts
+sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new <amac-user>@amac true
 ```
+
+That records the key in root's `known_hosts` and confirms the builder key
+works.
 
 Test a Darwin build from anix:
 

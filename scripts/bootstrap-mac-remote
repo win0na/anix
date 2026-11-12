@@ -136,7 +136,7 @@ if ! grep -q '^  amac:' "$repo_root/.sops.yaml"; then
 fi
 if [[ $dry_run -eq 0 ]]; then
   SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt sops_cmd updatekeys -y secrets/secrets.yaml
-  git add .sops.yaml secrets/secrets.yaml
+  git add secrets/secrets.yaml
   if ! git diff --cached --quiet; then
     if ! git -c user.name=anix-bootstrap -c user.email=anix-bootstrap@localhost \
       commit -m "bootstrap: add the amac sops recipient"; then

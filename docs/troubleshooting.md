@@ -52,11 +52,13 @@ If that fails, the Mac is down, Remote Login is off, or the builder key is not
 in `authorized_keys`. If SSH works but Nix cannot use the builder:
 
 ```sh
-sudo ssh-keyscan -t ed25519 amac >> /etc/ssh/ssh_known_hosts
-ls -l /etc/nix/mac-builder
+sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new <amac-user>@amac true
+sudo ls -l /etc/nix/mac-builder
 ```
 
-`/etc/nix/mac-builder` comes from the `mac-builder-key` secret. If it is
+The first command records the Mac host key in root's `known_hosts` and tests
+the builder key. `/etc/nix/mac-builder` comes from the `mac-builder-key`
+secret. If it is
 missing, sops did not activate; check that the amac host key is a recipient in
 `.sops.yaml`.
 

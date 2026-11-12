@@ -238,7 +238,7 @@ mac_side() {
 find_nix
 cd "$repo_root"
 
-if [[ ! -d .git ]]; then
+if [[ ! -e .git ]]; then
   die "not a git checkout: $repo_root; clone $repo_url first"
 fi
 
@@ -430,11 +430,7 @@ ensure_secrets() {
     fi
     local cachix macpass tmp
     ask_secret "Cachix token (blank to skip):" cachix || true
-    if mac_side || [[ $prepare -eq 1 ]]; then
-      ask_secret "Mac login password (blank to skip):" macpass || true
-    else
-      macpass=""
-    fi
+    ask_secret "Mac login password (blank to skip):" macpass || true
     mkdir -p "$(dirname "$secrets_file")"
     local tmpdir
     tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/anix-secrets.XXXXXX")"
@@ -488,7 +484,7 @@ ensure_secrets() {
       secrets_set_value '["cachix-token"]' "$cachix"
     fi
   fi
-  if { mac_side || [[ $prepare -eq 1 ]]; } && [[ -z "$(secrets_get '["mac-login-password"]')" ]]; then
+  if [[ -z "$(secrets_get '["mac-login-password"]')" ]]; then
     local macpass
     ask_secret "Mac login password (blank to skip):" macpass || true
     if [[ -n $macpass ]]; then
@@ -498,7 +494,7 @@ ensure_secrets() {
 }
 
 ensure_recovery_key() {
-  if grep -q '^  recovery: &recovery ' .sops.yaml; then
+  if [[ -e .sops.yaml ]] && grep -q '^  recovery: &recovery ' .sops.yaml; then
     say "recovery recipient: present"
     return 0
   fi
@@ -695,7 +691,7 @@ ensure_mac_host_key() {
 }
 
 update_checkout_mac() {
-  if [[ ! -d .git ]]; then
+  if [[ ! -e .git ]]; then
     die "not a git checkout: $repo_root"
   fi
   if [[ -n "$(git status --porcelain)" ]]; then
