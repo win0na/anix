@@ -61,6 +61,8 @@
           raw = users.projectsDir or "src";
           value = if raw == "/" then raw else lib.removeSuffix "/" raw;
           name = baseNameOf value;
+          segments = lib.splitString "/" value;
+          hasDotSegment = lib.any (segment: segment == "." || segment == "..") segments;
           blocked = [
             "Applications"
             "Desktop"
@@ -81,9 +83,13 @@
           "src"
         else if value == "/" then
           throw "projectsDir must not be /"
+        else if hasDotSegment then
+          throw "projectsDir must not contain . or .. segments: ${value}"
         else if lib.hasPrefix "/" value
           && !(lib.hasPrefix "/home/" value || lib.hasPrefix "/mnt/" value) then
           throw "projectsDir must be under /home or /mnt: ${value}"
+        else if value == "/home/${users.anix}" then
+          throw "projectsDir must not be the anix home: ${value}"
         else if lib.elem name blocked then
           throw "projectsDir must not use a protected home directory: ${value}"
         else

@@ -94,6 +94,20 @@ if ([string]::IsNullOrWhiteSpace($ProjectsDir)) {
 if ($ProjectsDir -notmatch '^[A-Za-z0-9._/-]+$' -or $ProjectsDir.Contains("..") -or $ProjectsDir -eq "/" -or $ProjectsDir -eq "." -or $ProjectsDir.EndsWith("/")) {
   throw "ProjectsDir is invalid: $ProjectsDir"
 }
+$projectSegments = $ProjectsDir -split "/"
+if ($projectSegments -contains "." -or $projectSegments -contains "..") {
+  throw "ProjectsDir must not contain . or .. segments: $ProjectsDir"
+}
+if ($ProjectsDir.StartsWith("/") -and -not ($ProjectsDir.StartsWith("/home/") -or $ProjectsDir.StartsWith("/mnt/"))) {
+  throw "ProjectsDir must be under /home or /mnt: $ProjectsDir"
+}
+$projectName = $projectSegments[-1]
+if ($projectName -in @("Applications","Desktop","Documents","Downloads","Library","Movies","Music","Pictures","Public","System","Users",".config",".ssh")) {
+  throw "ProjectsDir must not use a protected home directory: $ProjectsDir"
+}
+if ($ProjectsDir -eq "/home/$AnixUser") {
+  throw "ProjectsDir must not be the anix home: $ProjectsDir"
+}
 
 if ([string]::IsNullOrWhiteSpace($RepoUrl)) { $RepoUrl = $env:ANIX_REPO_URL }
 if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
@@ -104,7 +118,7 @@ if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
   }
 }
 $RepoQuoted = "'" + $RepoUrl.Replace("'", "'\''") + "'"
-if ($Yes -and [string]::IsNullOrWhiteSpace($RepoUrl) -and -not $NoClone) {
+if ($Yes -and [string]::IsNullOrWhiteSpace($RepoUrl) -and -not ($NoClone -and $NoFirstSwitch)) {
   throw "RepoUrl is required with -Yes; create a fork first."
 }
 

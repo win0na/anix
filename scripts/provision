@@ -208,6 +208,8 @@ if [[ -z $projects_dir_arg && $assume_yes -eq 0 && -t 0 ]]; then
   projects_dir=${projects_dir%/}
 fi
 [[ $projects_dir =~ ^[A-Za-z0-9._/-]+$ ]] || die "invalid project directory: $projects_dir"
+anix_check_projects_dir "$projects_dir" "/home/$anix_user" ||
+  die "invalid project directory: $projects_dir"
 [[ $projects_dir != *..* ]] || die "project directory must not contain .."
 [[ $projects_dir != "/" && $projects_dir != "." && $projects_dir != */ ]] ||
   die "project directory must be a directory name or an absolute path"

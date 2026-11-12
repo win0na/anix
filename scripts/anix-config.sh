@@ -27,3 +27,24 @@ anix_projects_name() {
   local path=$1
   printf '%s\n' "${path##*/}"
 }
+
+anix_check_projects_dir() {
+  local dir=$1 home=${2:-} segment name
+  local -a parts=()
+  [[ -n $dir && $dir != "/" ]] || return 1
+  IFS=/ read -r -a parts <<< "$dir"
+  for segment in "${parts[@]}"; do
+    [[ $segment == "." || $segment == ".." ]] && return 1
+  done
+  case "$dir" in
+    /*)
+      [[ $dir == /home/* || $dir == /mnt/* ]] || return 1
+      ;;
+  esac
+  [[ -n $home && $dir == "$home" ]] && return 1
+  name=${dir##*/}
+  case "$name" in
+    Applications|Desktop|Documents|Downloads|Library|Movies|Music|Pictures|Public|System|Users|.config|.ssh) return 1 ;;
+  esac
+  return 0
+}
