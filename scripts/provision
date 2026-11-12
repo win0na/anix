@@ -109,11 +109,6 @@ fi
 command -v wsl.exe >/dev/null || die "wsl.exe not found; run this inside WSL"
 command -v powershell.exe >/dev/null || die "powershell.exe not found; run this inside WSL"
 [[ -n ${WSL_DISTRO_NAME:-} ]] || die "WSL_DISTRO_NAME is not set; run this from the Ubuntu WSL shell"
-[[ -s $HOME/.config/sops/age/keys.txt ]] || die "missing $HOME/.config/sops/age/keys.txt"
-[[ -s $HOME/.ssh/mac-builder ]] || die "missing $HOME/.ssh/mac-builder"
-[[ -s $repo_root/secrets/secrets.yaml ]] || die "missing $repo_root/secrets/secrets.yaml"
-[[ $repo_root == "$HOME/src/anix" ]] || die "run this from $HOME/src/anix, not $repo_root"
-
 if ! command -v nix >/dev/null 2>&1; then
   for p in "$HOME/.nix-profile/bin" /nix/var/nix/profiles/default/bin; do
     [[ -x "$p/nix" ]] && PATH="$p:$PATH"
@@ -121,6 +116,29 @@ if ! command -v nix >/dev/null 2>&1; then
   export PATH
 fi
 command -v nix >/dev/null || die "nix is not installed; install Nix first"
+missing_material() {
+  if [[ ! -s $HOME/.config/sops/age/keys.txt ]]; then
+    printf '%s\n' "$HOME/.config/sops/age/keys.txt"
+  elif [[ ! -s $HOME/.ssh/mac-builder ]]; then
+    printf '%s\n' "$HOME/.ssh/mac-builder"
+  elif [[ ! -s $repo_root/secrets/secrets.yaml ]]; then
+    printf '%s\n' "$repo_root/secrets/secrets.yaml"
+  fi
+}
+
+if missing=$(missing_material) && [[ -n $missing ]]; then
+  say "missing $missing"
+  if [[ $dry_run -eq 1 ]]; then
+    say "would run scripts/bootstrap --prepare"
+  else
+    say "running scripts/bootstrap --prepare"
+    "$repo_root/scripts/bootstrap" --prepare || die "missing $missing"
+    missing=$(missing_material)
+    [[ -z $missing ]] || die "missing $missing"
+  fi
+fi
+[[ $repo_root == "$HOME/src/anix" ]] || warn "running from $repo_root; the transfer still stages $HOME/src/anix"
+
 sops_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#sops -c sops "$@"; }
 age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#age -c age "$@"; }
 age_keygen_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#age -c age-keygen "$@"; }

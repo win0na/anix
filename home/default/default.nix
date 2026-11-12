@@ -10,7 +10,11 @@
 
   home.username = userName;
   home.sessionPath = [ "$HOME/.local/bin" ];
-  home.sessionVariables = lib.optionalAttrs (macUserName != null) {
+  home.sessionVariables = {
+    # The sops CLI on macOS looks under ~/Library by default; both hosts use
+    # the same key path so an edit works from either one.
+    SOPS_AGE_KEY_FILE = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
+  } // lib.optionalAttrs (macUserName != null) {
     ANIX_MAC_USER = macUserName;
     ANIX_MAC_HOME = "/Users/${macUserName}";
   };

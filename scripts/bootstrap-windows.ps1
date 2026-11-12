@@ -18,6 +18,10 @@ NixOS-WSL image URL. Default the 2605.7.2 nixos.wsl asset.
 
 .PARAMETER ImageSha256
 Expected SHA-256 of the image. Default the published 2605.7.2 digest.
+
+.PARAMETER RepoUrl
+Git URL of the anix fork to clone. Default $env:ANIX_REPO_URL. Required when
+neither is set.
 #>
 param(
   [switch]$Yes,
@@ -29,6 +33,7 @@ param(
   [switch]$NoTask,
   [string]$DistroName = "NixOS",
   [string]$AnixUser = "",
+  [string]$RepoUrl = "",
   [string]$ImageUrl = "https://github.com/nix-community/NixOS-WSL/releases/download/2605.7.2/nixos.wsl",
   [string]$ImageSha256 = "e7180ad555fdcb8e1e057e2ef056de467603a5e502ff8531053738371be3f6b9",
   [string]$ImagePath = "",
@@ -39,6 +44,12 @@ $ErrorActionPreference = "Stop"
 $Distro = $DistroName
 if ([string]::IsNullOrWhiteSpace($Distro)) { throw "DistroName is empty" }
 if ([string]::IsNullOrWhiteSpace($AnixUser)) { throw "AnixUser is empty" }
+
+if ([string]::IsNullOrWhiteSpace($RepoUrl)) { $RepoUrl = $env:ANIX_REPO_URL }
+if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
+  throw "No repository URL. Pass -RepoUrl with the URL of your anix fork, or set ANIX_REPO_URL."
+}
+$RepoQuoted = "'" + $RepoUrl.Replace("'", "'\''") + "'"
 
 function Confirm([string]$Message) {
   if ($Yes) { return $true }
@@ -188,7 +199,7 @@ if ($NoFirstSwitch) {
 
 if ($needsFirstSwitch) {
   Write-Host "==> first switch in $Distro"
-  wsl -d $Distro -u nixos -- bash -lc "set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:`$PATH; nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone https://github.com/win0na/anix.git /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; sudo NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild switch --flake /tmp/anix#anix"
+  wsl -d $Distro -u nixos -- bash -lc "set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:`$PATH; nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone $RepoQuoted /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; sudo NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild switch --flake /tmp/anix#anix"
   if ($LASTEXITCODE -ne 0) { throw "the first NixOS switch failed" }
 } elseif (-not $NoFirstSwitch) {
   Write-Host "==> $Distro is already configured; skipping the first switch"
@@ -196,7 +207,7 @@ if ($needsFirstSwitch) {
 
 if (-not $NoClone) {
   Write-Host "==> clone the repository for $AnixUser"
-  wsl -d $Distro -u $AnixUser -- bash -lc "set -euo pipefail; mkdir -p ~/src; if [ ! -d ~/src/anix/.git ]; then git clone https://github.com/win0na/anix.git ~/src/anix; fi"
+  wsl -d $Distro -u $AnixUser -- bash -lc "set -euo pipefail; mkdir -p ~/src; if [ ! -d ~/src/anix/.git ]; then git clone $RepoQuoted ~/src/anix; fi"
 }
 
 if (-not $NoTask) {

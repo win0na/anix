@@ -1,4 +1,4 @@
 {
-  anix = "winona";
-  amac = "winona";
+  anix = "anix";
+  amac = "amac";
 }

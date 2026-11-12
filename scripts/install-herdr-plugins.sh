@@ -53,13 +53,13 @@ herdr plugin link "$plugin"
 
 cat <<'EOF'
 
-Installed declaratively by Home Manager (pinned commits):
-  herdr-bar      d9cdd88cb734615e96b1c37ed17fc39be904f060
-  herdr-sidebar  081ed133f3faa377438b51ce435fe8a87c439593
-  ttt.editor     b51ae983e0f60599090e0b0061093dbece9b541f
+Pinned plugin commits:
+  herdr-bar      d9cdd88cb734615e96b1c37ed17fc39be904f060  (bootstrap)
+  herdr-sidebar  081ed133f3faa377438b51ce435fe8a87c439593  (Home Manager)
+  ttt.editor     b51ae983e0f60599090e0b0061093dbece9b541f  (bootstrap)
 
-Run scripts/rebuild to apply the Home Manager set, or install these from the
-Herdr plugin registry.
+Run scripts/rebuild to apply the Home Manager build, or install the two
+registry plugins with the commits above.
 EOF
 
 echo "==> herdr plugin list"

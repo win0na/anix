@@ -12,6 +12,9 @@ Options:
   -y, --yes         Accept prompts and defaults.
   --dry-run         Print the actions without changing anything.
   --no-switch       Configure keys and secrets, but skip the switch.
+  --prepare         Prepare a new personal key, builder key, and secrets on
+                    any Linux or macOS host, without switching. Then print
+                    the next step for that platform.
   --install-nix     Install Nix on macOS when it is missing.
   --no-install      Never install Nix.
   --force-ssh       Allow the first Mac switch over SSH. Not recommended.
@@ -149,6 +152,7 @@ host=""
 assume_yes=0
 dry_run=0
 do_switch=1
+prepare=0
 install_nix=0
 no_install=0
 force_ssh=0
@@ -179,6 +183,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-switch)
       do_switch=0
+      shift
+      ;;
+    --prepare)
+      prepare=1
       shift
       ;;
     --install-nix)
@@ -220,6 +228,12 @@ case "$host" in
   anix|amac) ;;
   *) usage_error "--host must be anix or amac" ;;
 esac
+
+# In prepare mode every host uses the anix-side behavior, so a fresh user
+# can create the keys and secrets before either host is installed.
+mac_side() {
+  [[ $host == amac && $prepare -eq 0 ]]
+}
 
 find_nix
 cd "$repo_root"
@@ -274,7 +288,7 @@ ensure_personal_key() {
   personal_key="$HOME/.config/sops/age/keys.txt"
   export SOPS_AGE_KEY_FILE="$personal_key"
   if [[ ! -s $personal_key ]]; then
-    if [[ $host == amac ]]; then
+    if mac_side; then
       die "restore the personal age key from Passwords.app to $personal_key"
     fi
     if [[ -s "$repo_root/secrets/secrets.yaml" ]]; then
@@ -298,7 +312,21 @@ ensure_personal_key() {
 }
 
 ensure_sops_personal() {
-  if grep -q "^  personal: &personal ${age_pub}$" .sops.yaml; then
+  local copied=0
+  if [[ ! -e .sops.yaml ]]; then
+    if [[ ! -e .sops.yaml.example ]]; then
+      warn ".sops.yaml and .sops.yaml.example are missing; create .sops.yaml with your personal recipient"
+      return 0
+    fi
+    if [[ $dry_run -eq 1 ]]; then
+      say "would create .sops.yaml from .sops.yaml.example"
+    else
+      cp .sops.yaml.example .sops.yaml
+      say "created .sops.yaml from .sops.yaml.example"
+      copied=1
+    fi
+  fi
+  if grep -q "^  personal: &personal ${age_pub}$" .sops.yaml 2>/dev/null; then
     return 0
   fi
   if [[ $dry_run -eq 1 ]]; then
@@ -306,6 +334,10 @@ ensure_sops_personal() {
     return 0
   fi
   if ! grep -q '^  personal: &personal ' .sops.yaml; then
+    if [[ $copied -eq 1 ]]; then
+      warn ".sops.yaml.example has no personal recipient line; add one by hand"
+      return 0
+    fi
     die ".sops.yaml has no personal recipient line"
   fi
   if ! ask "Update the personal recipient in .sops.yaml?" y; then
@@ -384,9 +416,8 @@ secrets_set_file() {
 
 ensure_secrets() {
   secrets_file="$repo_root/secrets/secrets.yaml"
-  mkdir -p "$(dirname "$secrets_file")"
   if [[ ! -s $secrets_file ]]; then
-    if [[ $host == amac ]]; then
+    if mac_side; then
       die "secrets/secrets.yaml is missing; run the anix bootstrap and push, then pull"
     fi
     if [[ $dry_run -eq 1 ]]; then
@@ -399,11 +430,12 @@ ensure_secrets() {
     fi
     local cachix macpass tmp
     ask_secret "Cachix token (blank to skip):" cachix || true
-    if [[ $host == amac ]]; then
+    if mac_side || [[ $prepare -eq 1 ]]; then
       ask_secret "Mac login password (blank to skip):" macpass || true
     else
       macpass=""
     fi
+    mkdir -p "$(dirname "$secrets_file")"
     local tmpdir
     tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/anix-secrets.XXXXXX")"
     chmod 700 "$tmpdir"
@@ -421,6 +453,11 @@ ensure_secrets() {
     chmod 600 "$secrets_file"
     rm -rf "$tmpdir"
     trap - EXIT
+    if run git add secrets/secrets.yaml; then
+      say "secrets/secrets.yaml is staged; commit it to the fork as the ciphertext backup"
+    else
+      warn "could not stage secrets/secrets.yaml; commit it to the fork as the ciphertext backup"
+    fi
     return 0
   fi
 
@@ -439,7 +476,7 @@ ensure_secrets() {
     fi
   fi
   if [[ -z "$(secrets_get '["mac-builder-key"]')" ]]; then
-    if [[ $host == amac ]]; then
+    if mac_side; then
       die "mac-builder-key is missing; add it on anix and push"
     fi
     secrets_set_file '["mac-builder-key"]' "$builder_key"
@@ -451,7 +488,7 @@ ensure_secrets() {
       secrets_set_value '["cachix-token"]' "$cachix"
     fi
   fi
-  if [[ $host == amac && -z "$(secrets_get '["mac-login-password"]')" ]]; then
+  if { mac_side || [[ $prepare -eq 1 ]]; } && [[ -z "$(secrets_get '["mac-login-password"]')" ]]; then
     local macpass
     ask_secret "Mac login password (blank to skip):" macpass || true
     if [[ -n $macpass ]]; then
@@ -523,21 +560,21 @@ add_recipient() {
 commit_secrets() {
   local message=$1
   if [[ $dry_run -eq 1 ]]; then
-    say "would commit .sops.yaml, secrets, and the Mac builder key"
+    say "would commit the secrets and the Mac builder key"
     return 0
   fi
   if [[ ! -e $secrets_file ]]; then
     return 0
   fi
-  run git add .sops.yaml secrets/secrets.yaml home/default/amac.nix
-  if git diff --cached --quiet -- .sops.yaml secrets/secrets.yaml home/default/amac.nix; then
+  run git add secrets/secrets.yaml home/default/amac.nix
+  if git diff --cached --quiet -- secrets/secrets.yaml home/default/amac.nix; then
     return 0
   fi
-  if ! ask "Commit the encrypted secrets and .sops.yaml?" y; then
+  if ! ask "Commit the encrypted secrets and the Mac builder key?" y; then
     warn "secrets left uncommitted"
     return 0
   fi
-  if ! git commit -m "$message" -- .sops.yaml secrets/secrets.yaml home/default/amac.nix; then
+  if ! git commit -m "$message" -- secrets/secrets.yaml home/default/amac.nix; then
     warn "commit failed; set git user.name and user.email"
     return 0
   fi
@@ -800,9 +837,37 @@ bootstrap_mac() {
   post_mac
 }
 
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  case "$host" in
-    anix) bootstrap_anix ;;
-    amac) bootstrap_mac ;;
+prepare_next_steps() {
+  say "next steps"
+  printf '  .sops.yaml is local and gitignored; it is not part of the fork.\n'
+  printf '  secrets/secrets.yaml is staged; commit it to the fork as the ciphertext backup.\n'
+  case "$(uname -s)" in
+    Darwin)
+      printf '  clone the repository on anix, then run scripts/bootstrap-mac-remote from that checkout.\n'
+      ;;
+    *)
+      printf '  run scripts/provision, or on NixOS run scripts/bootstrap --host anix.\n'
+      ;;
   esac
+}
+
+prepare_host() {
+  say "preparing the personal key, builder key, and secrets for any host"
+  ensure_personal_key
+  ensure_builder_key
+  ensure_sops_personal
+  ensure_secrets
+  ensure_recovery_key
+  prepare_next_steps
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  if [[ $prepare -eq 1 ]]; then
+    prepare_host
+  else
+    case "$host" in
+      anix) bootstrap_anix ;;
+      amac) bootstrap_mac ;;
+    esac
+  fi
 fi

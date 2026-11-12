@@ -1,6 +1,9 @@
 .slim/deepwork/
 result
 result-*
+
+# Local sops config with your recipients; copy .sops.yaml.example.
+.sops.yaml
 .direnv/
 .DS_Store
 *.swp
