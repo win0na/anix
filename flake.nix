@@ -55,7 +55,39 @@
   outputs = inputs@{ self, nixpkgs, nixpkgs-2605, nix-darwin, ... }:
     let
       users = import ./users.nix;
-      projectsDir = users.projectsDir or "src";
+      lib = nixpkgs.lib;
+      projectsDir =
+        let
+          raw = users.projectsDir or "src";
+          value = if raw == "/" then raw else lib.removeSuffix "/" raw;
+          name = baseNameOf value;
+          blocked = [
+            "Applications"
+            "Desktop"
+            "Documents"
+            "Downloads"
+            "Library"
+            "Movies"
+            "Music"
+            "Pictures"
+            "Public"
+            "System"
+            "Users"
+            ".config"
+            ".ssh"
+          ];
+        in
+        if value == "" then
+          "src"
+        else if value == "/" then
+          throw "projectsDir must not be /"
+        else if lib.hasPrefix "/" value
+          && !(lib.hasPrefix "/home/" value || lib.hasPrefix "/mnt/" value) then
+          throw "projectsDir must be under /home or /mnt: ${value}"
+        else if lib.elem name blocked then
+          throw "projectsDir must not use a protected home directory: ${value}"
+        else
+          value;
 
       darwinFor = hostSystem: nix-darwin.lib.darwinSystem {
         system = hostSystem;

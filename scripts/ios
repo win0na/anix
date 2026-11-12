@@ -9,8 +9,8 @@ Build an iOS app on the Mac and install it on a device. From Linux the work
 runs over `ssh amac`; on macOS it runs locally.
 
 Arguments:
-  project              Absolute path on the Mac, or a directory name under
-                       HOME/src.
+  project              Absolute path on the Mac, or a relative name under
+                       ANIX_SRC_ROOT.
   scheme               Xcode scheme to build.
   device-udid          Target device identifier. Required unless --build-only.
 

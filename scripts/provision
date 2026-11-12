@@ -16,7 +16,7 @@ Options:
   --mac-user USER     amac login. Default from users.nix.
   --projects-dir DIR  Project root. Default from users.nix, then src. A
                       relative name stays under the anix home; an absolute
-                      path is used as-is.
+                      path under /home or /mnt is used as-is.
   --mac-host HOST     Mac Tailscale/MagicDNS name. Default amac.
   --dir PATH          Extra directory to transfer. Repeatable.
   --backup PATH       Windows path for the Ubuntu export.
@@ -200,9 +200,12 @@ value_from_users() {
 
 projects_dir=${projects_dir_arg:-$(value_from_users projectsDir)}
 [[ -n $projects_dir ]] || projects_dir=src
+projects_dir=${projects_dir%/}
+[[ -n $projects_dir ]] || die "project directory is empty"
 if [[ -z $projects_dir_arg && $assume_yes -eq 0 && -t 0 ]]; then
   read -r -p "Project directory [$projects_dir]: " reply || true
   projects_dir=${reply:-$projects_dir}
+  projects_dir=${projects_dir%/}
 fi
 [[ $projects_dir =~ ^[A-Za-z0-9._/-]+$ ]] || die "invalid project directory: $projects_dir"
 [[ $projects_dir != *..* ]] || die "project directory must not contain .."
@@ -315,7 +318,7 @@ if [[ $do_transfer -eq 1 ]]; then
     mapfile -t candidates < <(
       {
         find "$HOME" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -printf '%f\n' |
-          grep -vE "^(src|${projects_top}|\..*)$" || true
+          grep -vxF -e src -e "$projects_top" | grep -v '^\.' || true
         find "$projects_path" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -printf "$projects_rel/%f\n" 2>/dev/null |
           grep -v "^$projects_rel/anix$" || true
       } | sort -u

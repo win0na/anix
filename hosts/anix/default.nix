@@ -5,6 +5,16 @@ let
   projectsPath =
     if builtins.substring 0 1 projectsDir == "/" then projectsDir
     else "/home/${userName}/${projectsDir}";
+  projectsDirs =
+    if builtins.substring 0 1 projectsDir == "/" then
+      [ ]
+    else
+      let
+        parts = lib.splitString "/" projectsDir;
+      in
+      lib.genList
+        (i: "/home/${userName}/" + lib.concatStringsSep "/" (lib.take (i + 1) parts))
+        (builtins.length parts);
 in
 {
   imports = [
@@ -87,17 +97,18 @@ in
 
   services.nfs.server = {
     enable = true;
-    createMountPoints = true;
+    createMountPoints = false;
     exports = ''
       ${projectsPath} amac(rw,sync,no_subtree_check,all_squash,anonuid=1000,anongid=1000,insecure,fsid=0)
     '';
   };
 
-  # nfs-mountd creates the export path as root when it is missing. Create it
-  # first with the anix user's ownership so the project transfer can write.
-  systemd.tmpfiles.rules = [
-    "d ${projectsPath} 0755 ${userName} users -"
-  ];
+  # Create the project root and every relative parent with the anix user's
+  # ownership. An absolute root must already exist; this never chowns a system
+  # path. nfs-mountd is not allowed to create the export path as root.
+  systemd.tmpfiles.rules = map
+    (dir: "d ${dir} 0755 ${userName} users -")
+    projectsDirs;
 
   # NFSv4 only. rpcbind and mountd still exist in the NixOS module but are
   # never opened in the firewall.

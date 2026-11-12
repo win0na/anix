@@ -149,6 +149,9 @@ off; an encrypted volume cannot auto-login.
 - nixpkgs 26.05 is the last release that builds `x86_64-darwin`. An Intel Mac
   stops receiving Nix security updates on 2026-12-31.
 - Apple silicon has no such limit and is the long-term path.
+- `projectsDir` is normalized. An absolute root must be under `/home` or
+  `/mnt` and must already exist. Protected home names such as `Documents` and
+  `Library` are rejected so the Mac mount cannot cover a system folder.
 - FileVault stays off so the Mac can auto-login and accept SSH after a reboot.
   Anyone with physical access can read its keys.
 - File watchers on the Mac do not see changes made on anix over NFS reliably.

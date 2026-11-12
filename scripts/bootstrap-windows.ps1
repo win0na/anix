@@ -27,6 +27,10 @@ https://github.com/win0na/anix.git.
 .PARAMETER MacUser
 macOS account short name for amac. Written to users.nix before the bootstrap.
 
+.PARAMETER ProjectsDir
+Project root. A relative name stays under the anix home; an absolute path is
+used as-is. Written to users.nix before the first switch.
+
 .PARAMETER NoBootstrap
 Stop after the clone. Do not run scripts/bootstrap inside the new distribution.
 
@@ -93,15 +97,16 @@ if ($ProjectsDir -notmatch '^[A-Za-z0-9._/-]+$' -or $ProjectsDir.Contains("..") 
 
 if ([string]::IsNullOrWhiteSpace($RepoUrl)) { $RepoUrl = $env:ANIX_REPO_URL }
 if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
-  if ($Yes) {
-    $RepoUrl = "https://github.com/win0na/anix.git"
-  } else {
+  if (-not $Yes) {
     while ([string]::IsNullOrWhiteSpace($RepoUrl)) {
       $RepoUrl = Read-Host "Fork URL (create one at https://github.com/win0na/anix/fork)"
     }
   }
 }
 $RepoQuoted = "'" + $RepoUrl.Replace("'", "'\''") + "'"
+if ($Yes -and [string]::IsNullOrWhiteSpace($RepoUrl) -and -not $NoClone) {
+  throw "RepoUrl is required with -Yes; create a fork first."
+}
 
 function Confirm([string]$Message) {
   if ($Yes) { return $true }

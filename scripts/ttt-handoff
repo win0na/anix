@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-remote_root="${ANIX_SRC_ROOT:-$HOME/${ANIX_PROJECTS_DIR:-src}}"
+remote_root="${ANIX_SRC_ROOT:-}"
+if [[ -z $remote_root ]]; then
+  if [[ -n ${ANIX_PROJECTS_DIR:-} && ${ANIX_PROJECTS_DIR:0:1} != / ]]; then
+    remote_root="$HOME/$ANIX_PROJECTS_DIR"
+  else
+    remote_root="$HOME/src"
+  fi
+fi
 remote_host="${ANIX_MAC_HOST:-amac}"
 remote_user="${ANIX_MAC_USER:-}"
 remote_home="${ANIX_MAC_HOME:-}"

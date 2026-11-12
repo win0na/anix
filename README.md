@@ -56,9 +56,9 @@ name. It installs Nix, clones the fork to `~/src/anix`, creates the age and
 builder keys, and starts `scripts/provision`. Approve the Windows UAC prompt,
 and enable Remote Login on the Mac when the script asks.
 
-The project root defaults to `~/src`. To keep projects in `~/code` or on an
-absolute path, set `projectsDir` in `users.nix`; `scripts/provision` asks for
-it and writes the value.
+The project root defaults to `~/src`. To keep projects in `~/code` or an
+absolute path under `/home` or `/mnt`, set `projectsDir` in `users.nix`;
+`scripts/provision` asks for it and writes the value.
 
 ### Fresh Windows
 

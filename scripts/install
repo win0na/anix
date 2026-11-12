@@ -13,7 +13,8 @@ From Ubuntu WSL or macOS:
 
   bash <(curl -fsSL https://raw.githubusercontent.com/win0na/anix/main/scripts/install)
 
-The fork URL is prompted when omitted; --yes uses the template URL.
+The fork URL is prompted when omitted; --yes requires ANIX_REPO_URL or a
+positional fork URL.
 
 Options:
   --ensure-nix       Install Nix if it is missing, then exit. Used by the
@@ -137,7 +138,6 @@ assume_yes=0
 dry_run=0
 ensure_nix_only=0
 no_pull=0
-template_url="https://github.com/win0na/anix.git"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -194,7 +194,7 @@ fi
 
 if [[ -z $repo_url && -z $repo_root ]]; then
   if [[ $assume_yes -eq 1 ]]; then
-    repo_url=$template_url
+    die "set ANIX_REPO_URL or pass the fork URL with --yes"
   elif [[ -t 0 ]]; then
     while [[ -z $repo_url ]]; do
       read -r -p "Fork URL (create one at https://github.com/win0na/anix/fork): " repo_url || die "a fork URL is required"

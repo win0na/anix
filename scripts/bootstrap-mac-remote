@@ -204,7 +204,7 @@ say "Waiting for the Mac first switch"
 for _ in $(seq 1 180); do
   if "${SSH[@]}" 'test -e "$HOME/anix-first-switch/post.ok"' 2>/dev/null; then
     say "Mac first switch finished"
-    "${SSH[@]}" 'uname -m; mount | grep "/Users/.*/src" || true; herdr plugin list 2>/dev/null || true'
+    "${SSH[@]}" 'uname -m; mount | grep " on /Users/" || true; herdr plugin list 2>/dev/null || true'
     say "Installing the Herdr plugins"
     "${SSH[@]}" 'cd "$HOME/.config/anix" && ./scripts/install-herdr-plugins.sh' ||
       warn "Herdr plugin install failed; rerun it after the first GUI login"
