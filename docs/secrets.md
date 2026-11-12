@@ -9,7 +9,7 @@ key, so the personal key is only needed when you edit the file.
 | File | Tracked | Purpose |
 | --- | --- | --- |
 | `.sops.yaml.example` | yes | The recipient schema shipped with the template. |
-| `.sops.yaml` | no | Your local recipient list, copied from the example by `--prepare`. |
+| `.sops.yaml` | yes | Your recipient list. `--prepare` creates it from the example; it holds public keys only. |
 | `secrets/secrets.yaml` | yes | The encrypted values. Commit it to your fork. |
 | `~/.config/sops/age/keys.txt` | no | The personal key. Never commit it. |
 | `/etc/ssh/ssh_host_ed25519_key` | no | The host key sops-nix uses at activation. |
@@ -96,8 +96,11 @@ leaks. Change recipients when a key is lost or a host is retired.
 With the offline recovery key:
 
 ```sh
-SOPS_AGE_KEY_FILE=~/recovery-keys.txt sops -d secrets/secrets.yaml
+SOPS_AGE_KEY_FILE=~/anix-recovery-YYYYMMDD.txt sops -d secrets/secrets.yaml
 ```
+
+`--prepare` names the file `~/anix-recovery-$(date +%Y%m%d).txt` unless you
+give another path.
 
 If the personal key is lost, generate a new one, replace the `personal`
 recipient in `.sops.yaml`, run `sops updatekeys`, and rebuild. If a host key is

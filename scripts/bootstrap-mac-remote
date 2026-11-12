@@ -77,7 +77,7 @@ ssh_to_age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell 
 control="/tmp/anix-mac-${mac_user}@${mac_host}.sock"
 # The comma is part of the ssh PreferredAuthentications value.
 # shellcheck disable=SC2054
-SSH=(ssh -o BatchMode=no -o ConnectTimeout=8 -o ControlMaster=auto -o "ControlPath=$control" -o ControlPersist=900 -o PreferredAuthentications=password,keyboard-interactive,publickey -i "$HOME/.ssh/mac-builder" "$mac_user@$mac_host")
+SSH=(ssh -o BatchMode=no -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new -o ControlMaster=auto -o "ControlPath=$control" -o ControlPersist=900 -o PreferredAuthentications=password,keyboard-interactive,publickey -i "$HOME/.ssh/mac-builder" "$mac_user@$mac_host")
 
 if [[ $dry_run -eq 1 ]]; then
   say "Dry run: Mac host $mac_host, user $mac_user"
@@ -89,10 +89,14 @@ fi
 say "Waiting for SSH to $mac_user@$mac_host"
 echo "  On the Mac: connect Tailscale, then System Settings > Sharing > Remote Login."
 attempt=0
-while ! "${SSH[@]}" true 2>/dev/null; do
+while true; do
+  if ssh_error=$("${SSH[@]}" true 2>&1); then
+    break
+  fi
   attempt=$((attempt + 1))
+  [[ -n $ssh_error ]] && echo "  $ssh_error"
   if [[ $assume_yes -eq 1 && $attempt -ge 12 ]]; then
-    die "SSH still unavailable; enable Remote Login and rerun"
+    die "SSH still unavailable; enable Remote Login on the Mac and rerun"
   fi
   if ! ask "SSH is not available yet. Retry?" y; then die "enable Remote Login and rerun"; fi
   sleep 5
@@ -109,44 +113,58 @@ case "$mac_arch" in
   *) die "unsupported Mac architecture: $mac_arch" ;;
 esac
 say "Mac architecture: $mac_arch"
-nix_mac=/nix/var/nix/profiles/default/bin/nix
-if ! "${SSH[@]}" "test -x $nix_mac"; then
-  if ! "${SSH[@]}" 'xcode-select -p >/dev/null 2>&1'; then
-    echo "  Install the Command Line Tools on the Mac: xcode-select --install"
-    ask "Continue once the installer is finished?" y || die "CLT is required"
-  fi
-  ask "Install Nix on the Mac now? It asks for the Mac sudo password once." y || die "Nix is required"
-  "${SSH[@]}" -tt 'curl -L https://nixos.org/nix/install | sh -s -- --daemon'
-  "${SSH[@]}" "test -x $nix_mac" || die "Nix was not installed"
-fi
+# Accept the winona-era ordering: authorize the builder key before nix-darwin
+# disables password login, otherwise a failed switch locks SSH out.
+say "Authorizing the builder key for $mac_user"
+"${SSH[@]}" 'set -e; mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"; touch "$HOME/.ssh/authorized_keys"; chmod 600 "$HOME/.ssh/authorized_keys"; key=$(cat); grep -qxF "$key" "$HOME/.ssh/authorized_keys" || printf "%s\n" "$key" >> "$HOME/.ssh/authorized_keys"' < "$HOME/.ssh/mac-builder.pub"
 
-if "${SSH[@]}" 'test -e "$HOME/.config/anix/.git"'; then
-  if ! ask "Replace the existing ~/.config/anix checkout on the Mac?" n; then
-    die "move or remove the Mac checkout and rerun"
-  fi
+say "Checking the Command Line Tools on the Mac"
+if ! "${SSH[@]}" 'xcode-select -p >/dev/null 2>&1'; then
+  echo "  Install the Command Line Tools on the Mac: xcode-select --install"
+  ask "Continue once the installer is finished?" y || die "CLT is required"
 fi
-say "Copying the repository to ~/.config/anix"
-tar -C "$repo_root" -cf - . | "${SSH[@]}" 'set -e; rm -rf "$HOME/.config/anix"; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
 
 say "Checking the builder key in the Mac host config"
 if ! grep -qF "builderKey = \"$(cat "$HOME/.ssh/mac-builder.pub")\"" "$repo_root/home/default/amac.nix"; then
   die "home/default/amac.nix does not contain the current builder public key; run the anix bootstrap first"
 fi
 
+nix_mac=/nix/var/nix/profiles/default/bin/nix
+if ! "${SSH[@]}" "test -x $nix_mac"; then
+  ask "Install Nix on the Mac now? It asks for the Mac sudo password once." y || die "Nix is required"
+  "${SSH[@]}" -tt 'curl -L https://nixos.org/nix/install | sh -s -- --daemon'
+  "${SSH[@]}" "test -x $nix_mac" || die "Nix was not installed"
+fi
+
+if "${SSH[@]}" 'test -e "$HOME/.config/anix/.git"'; then
+  if ! ask "Replace the existing ~/.config/anix checkout on the Mac?" y; then
+    die "move or remove the Mac checkout and rerun"
+  fi
+fi
+say "Copying the repository to ~/.config/anix"
+tar -C "$repo_root" -cf - . | "${SSH[@]}" 'set -e; rm -rf "$HOME/.config/anix"; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
+
 say "Generating the Mac host key"
 "${SSH[@]}" -tt 'sudo ssh-keygen -A'
 recipient=$("${SSH[@]}" 'cat /etc/ssh/ssh_host_ed25519_key.pub' | ssh_to_age_cmd)
 [[ $recipient == age1* ]] || die "could not convert the Mac host key"
-if ! grep -q '^  amac:' "$repo_root/.sops.yaml"; then
+if grep -q '^  amac:' "$repo_root/.sops.yaml"; then
+  sed -i "s|^  amac: &amac .*|  amac: \&amac $recipient|" "$repo_root/.sops.yaml"
+elif grep -q '^  # amac: &amac age1...' "$repo_root/.sops.yaml"; then
   sed -i "s|^  # amac: &amac age1...|  amac: \&amac $recipient|" "$repo_root/.sops.yaml"
-  grep -q '^  amac:' "$repo_root/.sops.yaml" || sed -i "/^  personal:/a\\  amac: \&amac $recipient" "$repo_root/.sops.yaml"
-  if ! grep -q '^      - \*amac$' "$repo_root/.sops.yaml"; then
-    sed -i '/^      - \*personal$/a\      - *amac' "$repo_root/.sops.yaml"
-  fi
+else
+  sed -i "/^  personal:/a\\  amac: \&amac $recipient" "$repo_root/.sops.yaml"
+fi
+if ! grep -q '^      - \*amac$' "$repo_root/.sops.yaml"; then
+  sed -i '/^      - \*personal$/a\      - *amac' "$repo_root/.sops.yaml"
 fi
 if [[ $dry_run -eq 0 ]]; then
   SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt sops_cmd updatekeys -y secrets/secrets.yaml
-  git add secrets/secrets.yaml
+  # A missing recipient would only surface inside the Mac activation, after it
+  # has already disabled password login.
+  grep -qF "$recipient" secrets/secrets.yaml ||
+    die "the amac recipient is missing from secrets/secrets.yaml; check .sops.yaml"
+  git add .sops.yaml secrets/secrets.yaml
   if ! git diff --cached --quiet; then
     if ! git -c user.name=anix-bootstrap -c user.email=anix-bootstrap@localhost \
       commit -m "bootstrap: add the amac sops recipient"; then
@@ -169,7 +187,15 @@ set -euo pipefail
 export PATH=/nix/var/nix/profiles/default/bin:$PATH
 dir="$HOME/anix-first-switch"
 mkdir -p "$dir"
+rm -f "$dir/post.ok" "$dir/post.fail"
 exec > >(tee -a "$dir/first-switch.log") 2>&1
+# Keep the Mac awake while the build runs.
+if command -v caffeinate >/dev/null 2>&1; then
+  caffeinate -dimsu -w $$ &
+fi
+# The applications step can fail once until App Management is approved. Leave a
+# marker so the anix side stops waiting and can say how to retry.
+trap 'date > "$dir/post.fail"' ZERR
 for f in /etc/nix/nix.conf /etc/bashrc /etc/zshrc; do
   if [ -e "$f" ] && [ ! -e "$f.before-nix-darwin" ]; then
     sudo mv "$f" "$f.before-nix-darwin"
@@ -205,10 +231,23 @@ for _ in $(seq 1 180); do
   if "${SSH[@]}" 'test -e "$HOME/anix-first-switch/post.ok"' 2>/dev/null; then
     say "Mac first switch finished"
     "${SSH[@]}" 'uname -m; mount | grep " on /Users/" || true; herdr plugin list 2>/dev/null || true'
+    if ! sudo ssh-keygen -F "$mac_host" >/dev/null 2>&1; then
+      sudo install -d -m 700 /root/.ssh
+      "${SSH[@]}" 'cat /etc/ssh/ssh_host_ed25519_key.pub' |
+        awk -v h="$mac_host" '{print h, $1, $2}' |
+        sudo tee -a /root/.ssh/known_hosts >/dev/null
+      say "recorded the Mac host key for the root builder"
+    fi
     say "Installing the Herdr plugins"
     "${SSH[@]}" 'cd "$HOME/.config/anix" && ./scripts/install-herdr-plugins.sh' ||
       warn "Herdr plugin install failed; rerun it after the first GUI login"
     exit 0
+  fi
+  if "${SSH[@]}" 'test -e "$HOME/anix-first-switch/post.fail"' 2>/dev/null; then
+    warn "the first switch stopped; read /Users/$mac_user/anix-first-switch/first-switch.log"
+    echo "  Approve the App Management prompt, then run on the Mac:"
+    echo "  /Users/$mac_user/anix-first-switch/first-switch.command"
+    exit 1
   fi
   sleep 10
 done

@@ -48,7 +48,6 @@ in
     (hunspell.withDicts (dicts: [ dicts.en_US ]))
     iina
     jq
-    marksman
     nil
     nixfmt
     nuvio
@@ -119,11 +118,6 @@ in
       AppleShowAllExtensions = true;
     };
 
-    universalaccess = {
-      reduceMotion = true;
-      reduceTransparency = true;
-    };
-
     WindowManager = {
       StandardHideWidgets = true;
       StandardHideDesktopIcons = true;
@@ -151,7 +145,9 @@ in
     '';
   };
 
-  power.restartAfterPowerFailure = true;
+  # nix-darwin's power check rejects "restart after power failure" on Macs that
+  # do not support it, which fails the whole first switch. The activation script
+  # below sets autorestart with pmset instead.
 
   # The lid stays closed. A macOS update can reset this; activation restores it.
   # power is one of the activation script names nix-darwin actually runs.

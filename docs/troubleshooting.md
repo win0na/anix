@@ -14,6 +14,14 @@ pulls an existing checkout only when it is clean.
 
 The manual prompts are listed in [Install](install.md#manual-steps).
 
+## The Windows helper fails
+
+The elevated helper writes a transcript to
+`%TEMP%\anix\anix-bootstrap-windows.log` on Windows. When the installer reports
+that the helper failed, read that file, fix the item, and rerun the same
+command. The helper is idempotent; it skips an existing distribution and the
+first switch when the anix user already exists.
+
 ## NFS mount times out
 
 `scripts/mount-src` waits 60 seconds for Tailscale and port 2049, then exits.
@@ -67,12 +75,13 @@ the Mac is down, Remote Login is off, or the builder key is not in
 `authorized_keys`. If SSH works but Nix cannot use the builder:
 
 ```sh
-sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new <mac-user>@amac true
+sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new "$ANIX_MAC_USER@amac" true
 sudo ls -l /etc/nix/mac-builder
 ```
 
 The first command records the Mac host key in root's `known_hosts` and tests
-the builder key. `/etc/nix/mac-builder` comes from the `mac-builder-key`
+the builder key. `scripts/bootstrap-mac-remote` normally does it after the
+first switch. `/etc/nix/mac-builder` comes from the `mac-builder-key`
 secret. If it is
 missing, sops did not activate; check that the amac host key is a recipient in
 `.sops.yaml`.

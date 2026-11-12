@@ -6,14 +6,18 @@ let
     if builtins.substring 0 1 projectsDir == "/" then projectsDir
     else "/home/${userName}/${projectsDir}";
   projectsDirs =
-    if builtins.substring 0 1 projectsDir == "/" then
+    let
+      homePrefix = "/home/${userName}";
+      absolute = builtins.substring 0 1 projectsDir == "/";
+      inHome = absolute && lib.hasPrefix "${homePrefix}/" projectsDir;
+      relative = if absolute then lib.removePrefix "${homePrefix}/" projectsDir else projectsDir;
+      parts = lib.splitString "/" relative;
+    in
+    if absolute && !inHome then
       [ ]
     else
-      let
-        parts = lib.splitString "/" projectsDir;
-      in
       lib.genList
-        (i: "/home/${userName}/" + lib.concatStringsSep "/" (lib.take (i + 1) parts))
+        (i: "${homePrefix}/" + lib.concatStringsSep "/" (lib.take (i + 1) parts))
         (builtins.length parts);
 in
 {

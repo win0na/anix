@@ -59,8 +59,46 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
+# Without this, PowerShell 5.1 decodes wsl.exe output as OEM and the version
+# check below silently never matches.
+$env:WSL_UTF8 = "1"
+$logPath = Join-Path $env:TEMP "anix-bootstrap-windows.log"
+try { Start-Transcript -Path $logPath -Force | Out-Null } catch { $logPath = "" }
+# The elevated window closes on exit, so print the failure and keep the log.
+trap {
+  Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
+  Write-Host ""
+  Write-Host "ERROR: $($_.Exception.Message)"
+  if ($logPath) { Write-Host "Log: $logPath" }
+  Write-Host "Fix the error above, then rerun this script."
+  exit 1
+}
 $Distro = $DistroName
 if ([string]::IsNullOrWhiteSpace($Distro)) { throw "DistroName is empty" }
+
+function Test-Admin {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+  return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+if (-not (Test-Admin)) {
+  throw "Run this script from an elevated PowerShell (Run as administrator)."
+}
+
+if ([string]::IsNullOrWhiteSpace($RepoUrl)) { $RepoUrl = $env:ANIX_REPO_URL }
+if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
+  if (-not $Yes) {
+    while ([string]::IsNullOrWhiteSpace($RepoUrl)) {
+      $RepoUrl = Read-Host "Fork URL (create one at https://github.com/win0na/anix/fork)"
+    }
+  }
+}
+$RepoQuoted = "'" + $RepoUrl.Replace("'", "'\''") + "'"
+if ($Yes -and [string]::IsNullOrWhiteSpace($RepoUrl) -and -not ($NoClone -and $NoFirstSwitch)) {
+  throw "RepoUrl is required with -Yes; create a fork first."
+}
 
 if ([string]::IsNullOrWhiteSpace($AnixUser)) {
   if ($Yes) {
@@ -109,34 +147,11 @@ if ($ProjectsDir -eq "/home/$AnixUser") {
   throw "ProjectsDir must not be the anix home: $ProjectsDir"
 }
 
-if ([string]::IsNullOrWhiteSpace($RepoUrl)) { $RepoUrl = $env:ANIX_REPO_URL }
-if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
-  if (-not $Yes) {
-    while ([string]::IsNullOrWhiteSpace($RepoUrl)) {
-      $RepoUrl = Read-Host "Fork URL (create one at https://github.com/win0na/anix/fork)"
-    }
-  }
-}
-$RepoQuoted = "'" + $RepoUrl.Replace("'", "'\''") + "'"
-if ($Yes -and [string]::IsNullOrWhiteSpace($RepoUrl) -and -not ($NoClone -and $NoFirstSwitch)) {
-  throw "RepoUrl is required with -Yes; create a fork first."
-}
-
 function Confirm([string]$Message) {
   if ($Yes) { return $true }
   $answer = Read-Host "$Message [Y/n]"
   if ([string]::IsNullOrWhiteSpace($answer)) { return $true }
   return $answer -match '^[Yy]'
-}
-
-function Test-Admin {
-  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-  $principal = New-Object Security.Principal.WindowsPrincipal($identity)
-  return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
-
-if (-not (Test-Admin)) {
-  throw "Run this script as Administrator."
 }
 
 $savedPreference = $ErrorActionPreference
@@ -149,9 +164,18 @@ if (-not $wslReady) {
     throw "WSL is required."
   }
   wsl --install --no-distribution
-  if ($LASTEXITCODE -ne 0) { throw "wsl --install failed" }
-  Write-Host "WSL is installed. Reboot Windows, then run this script again."
-  exit 0
+  $installExit = $LASTEXITCODE
+  if ($installExit -ne 0 -and $installExit -ne 3010) { throw "wsl --install failed with exit code $installExit" }
+  Write-Host "WSL is installed."
+  $ErrorActionPreference = "Continue"
+  wsl --status *> $null
+  $wslReady = ($LASTEXITCODE -eq 0)
+  $ErrorActionPreference = $savedPreference
+  if (-not $wslReady) {
+    Write-Host "Reboot Windows, then run this script again."
+    exit 0
+  }
+  Write-Host "No reboot needed; continuing."
 }
 
 if (-not $SkipWslUpdate) {
@@ -228,11 +252,25 @@ if (-not $SkipFirewall) {
 
 $savedPreference = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
+wsl --list --quiet 2>$null | Out-Null
 $distros = @(wsl --list --quiet 2>$null) -replace "`0", ""
 $ErrorActionPreference = $savedPreference
 $distroExists = $distros -contains $Distro
+$needsFirstSwitch = $false
 if ($distroExists) {
-  if (-not (Confirm "$Distro already exists. Skip the install and continue?")) {
+  $savedPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  wsl -d $Distro -u root --exec id $AnixUser *> $null
+  $needsFirstSwitch = ($LASTEXITCODE -ne 0)
+  $ErrorActionPreference = $savedPreference
+  if ($needsFirstSwitch) {
+    if ($Yes) {
+      throw "A distribution named $Distro already exists and has no $AnixUser. Pass -DistroName with a different name, or remove that distribution first."
+    }
+    if (-not (Confirm "$Distro exists without $AnixUser. The first switch will replace its configuration. Continue?")) {
+      throw "Install cancelled."
+    }
+  } elseif (-not (Confirm "$Distro already exists. Skip the install and continue?")) {
     throw "Install cancelled."
   }
 } else {
@@ -251,7 +289,7 @@ if ($distroExists) {
     if (-not (Test-Path $image)) {
       Write-Host "==> downloading $ImageUrl"
       $part = "$image.part"
-      Invoke-WebRequest -Uri $ImageUrl -OutFile $part
+      Invoke-WebRequest -Uri $ImageUrl -OutFile $part -UseBasicParsing
       $actual = (Get-FileHash $part -Algorithm SHA256).Hash.ToLower()
       if ($actual -ne $expected) {
         Remove-Item $part -Force
@@ -260,23 +298,17 @@ if ($distroExists) {
       Move-Item $part $image -Force
     }
   }
-  if (-not (Confirm "Install $Distro from $image?")) {
+  $shutdownNote = ""
+  if (-not $NoShutdown) { $shutdownNote = " This stops any running WSL distribution." }
+  if (-not (Confirm "Install $Distro from $image?$shutdownNote")) {
     throw "Install cancelled."
   }
   if (-not $NoShutdown) { wsl --shutdown }
   $installArgs = @("--install", "--from-file", $image, "--name", $Distro, "--no-launch")
   if ($Location) { $installArgs += @("--location", $Location) }
   & wsl @installArgs
-  if ($LASTEXITCODE -ne 0) { throw "wsl --install failed" }
-}
-
-$needsFirstSwitch = -not $distroExists
-if ($distroExists) {
-  $savedPreference = $ErrorActionPreference
-  $ErrorActionPreference = "Continue"
-  wsl -d $Distro -u root -- id $AnixUser *> $null
-  $needsFirstSwitch = ($LASTEXITCODE -ne 0)
-  $ErrorActionPreference = $savedPreference
+  if ($LASTEXITCODE -ne 0) { throw "wsl --install failed with exit code $LASTEXITCODE" }
+  $needsFirstSwitch = $true
 }
 if ($NoFirstSwitch) {
   Write-Host "==> first switch skipped (NoFirstSwitch)"
@@ -285,43 +317,83 @@ if ($NoFirstSwitch) {
 
 if ($needsFirstSwitch) {
   Write-Host "==> first switch in $Distro"
-  wsl -d $Distro -u nixos -- bash -lc "set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:`$PATH; nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone $RepoQuoted /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n  projectsDir = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' '$ProjectsDir' > /tmp/anix/users.nix; sudo NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild switch --flake /tmp/anix#anix"
-  if ($LASTEXITCODE -ne 0) { throw "the first NixOS switch failed" }
+  wsl -d $Distro -u nixos --exec bash -lc "set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:`$PATH; nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone $RepoQuoted /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n  projectsDir = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' '$ProjectsDir' > /tmp/anix/users.nix; sudo env PATH=`"`$PATH`" NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild boot --flake /tmp/anix#anix"
+  if ($LASTEXITCODE -ne 0) { throw "the first NixOS switch failed; read the error above, then rerun this script." }
+  wsl --terminate $Distro
+  wsl -d $Distro -u $AnixUser --exec true
+  if ($LASTEXITCODE -ne 0) { throw "the new distribution did not start as $AnixUser; rerun this script." }
 } elseif (-not $NoFirstSwitch) {
   Write-Host "==> $Distro is already configured; skipping the first switch"
 }
 
 if (-not $NoClone) {
   Write-Host "==> clone the repository for $AnixUser"
-  wsl -d $Distro -u $AnixUser -- bash -lc "set -euo pipefail; mkdir -p ~/.config/anix; if [ ! -d ~/.config/anix/.git ]; then git clone $RepoQuoted ~/.config/anix; fi"
-  wsl -d $Distro -u $AnixUser -- bash -lc "printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n  projectsDir = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' '$ProjectsDir' > ~/.config/anix/users.nix"
+  wsl -d $Distro -u $AnixUser --exec bash -lc "set -euo pipefail; mkdir -p ~/.config; if [ ! -d ~/.config/anix/.git ]; then git clone $RepoQuoted ~/.config/anix; fi"
+  if ($LASTEXITCODE -ne 0) { throw "git clone failed for $RepoUrl; check the URL and your access, then rerun this script." }
+  $usersScript = @'
+set -euo pipefail
+f="$HOME/.config/anix/users.nix"
+need=0
+if [ ! -f "$f" ]; then
+  need=1
+elif ! grep -q 'anix = "__ANIX__"' "$f"; then
+  need=1
+elif grep -q 'amac = "amac"' "$f" && [ "__MAC__" != "amac" ]; then
+  need=1
+fi
+if [ "$need" -eq 1 ]; then
+  dir="__DIR__"
+  if [ -f "$f" ]; then
+    cur=$(sed -n 's/.*projectsDir *= *"\([^"]*\)".*/\1/p' "$f" | head -1)
+    [ -n "$cur" ] && dir=$cur
+  fi
+  printf '{\n  anix = "%s";\n  amac = "%s";\n  projectsDir = "%s";\n}\n' "__ANIX__" "__MAC__" "$dir" > "$f"
+fi
+'@
+  $usersScript = $usersScript.Replace("__ANIX__", $AnixUser).Replace("__MAC__", $MacUser).Replace("__DIR__", $ProjectsDir)
+  wsl -d $Distro -u $AnixUser --exec bash -lc $usersScript
+  if ($LASTEXITCODE -ne 0) { throw "could not write users.nix in ~/.config/anix; rerun this script." }
 }
 
 if (-not $NoTask) {
   $taskName = "anix-wsl"
   $action = New-ScheduledTaskAction -Execute "wsl.exe" -Argument "-d $Distro -u $AnixUser --exec /run/current-system/sw/bin/sleep infinity"
   $trigger = New-ScheduledTaskTrigger -AtLogOn
-  $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
-  Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
+  $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive
+  $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+  Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+  try { Start-ScheduledTask -TaskName $taskName } catch {
+    Write-Host "==> could not start $taskName; start it from Task Scheduler if NFS must come up now"
+  }
 }
 
 if (-not $NoBootstrap -and -not $NoClone) {
   Write-Host "==> running the anix bootstrap"
   $bootstrapArgs = "--host anix"
   if ($Yes) { $bootstrapArgs += " --yes" }
-  wsl -d $Distro -u $AnixUser -- bash -lc "cd ~/.config/anix && exec ./scripts/bootstrap $bootstrapArgs"
-  if ($LASTEXITCODE -ne 0) { throw "the anix bootstrap failed" }
+  wsl -d $Distro -u $AnixUser --exec bash -lc "cd ~/.config/anix && exec ./scripts/bootstrap $bootstrapArgs"
+  if ($LASTEXITCODE -ne 0) { throw "the anix bootstrap failed; rerun: wsl -d $Distro -u $AnixUser --exec bash -lc 'cd ~/.config/anix && ./scripts/bootstrap --host anix'" }
 
   if (-not $NoMac) {
+    $tailscale = Get-Service -Name "Tailscale" -ErrorAction SilentlyContinue
+    if (-not $tailscale -or $tailscale.Status -ne "Running") {
+      throw "Tailscale is not running on Windows. Sign in to Tailscale, confirm the anix node is up, then rerun this script."
+    }
     Write-Host "==> preparing the Mac"
     $macArgs = ""
     if ($Yes) { $macArgs = "--yes" }
-    wsl -d $Distro -u $AnixUser -- bash -lc "cd ~/.config/anix && exec ./scripts/bootstrap-mac-remote $macArgs"
-    if ($LASTEXITCODE -ne 0) { throw "the Mac bootstrap failed; enable Remote Login and rerun scripts/bootstrap-mac-remote" }
+    wsl -d $Distro -u $AnixUser --exec bash -lc "cd ~/.config/anix && exec ./scripts/bootstrap-mac-remote $macArgs"
+    if ($LASTEXITCODE -ne 0) { throw "the Mac bootstrap failed; enable Remote Login, then run: wsl -d $Distro -u $AnixUser --exec bash -lc 'cd ~/.config/anix && ./scripts/bootstrap-mac-remote'" }
   }
+  Write-Host ""
+  Write-Host "Done. anix is running in $Distro."
+} elseif ($NoBootstrap) {
+  Write-Host ""
+  Write-Host "Windows is ready. The distribution and checkout are in place."
+  Write-Host "Next: wsl -d $Distro -u $AnixUser --exec bash -lc 'cd ~/.config/anix && ./scripts/bootstrap --host anix'"
 } else {
   Write-Host ""
-  Write-Host "Windows is ready."
-  Write-Host "Next: start the $Distro distribution, then run:"
-  Write-Host "  ~/.config/anix/scripts/bootstrap --host anix"
+  Write-Host "Windows is ready; the caller continues the bootstrap."
 }
+
+Stop-Transcript -ErrorAction SilentlyContinue | Out-Null

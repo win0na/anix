@@ -12,6 +12,10 @@ scripts/rebuild amac     # local Mac, or over SSH from anix
 
 The wrapper picks `anix` on Linux and `amac` on Darwin when you give no target.
 It runs `nixos-rebuild switch` or `darwin-rebuild switch` from the checkout.
+`scripts/rebuild amac` from anix first copies the checkout to the Mac, so the
+Mac builds the current flake rather than the last copy. That path needs
+Remote Login with full disk access for remote users, because nix-darwin
+refuses app updates over SSH otherwise.
 
 ## Update
 
@@ -78,14 +82,14 @@ The builder key is the `mac-builder-key` secret, installed at
 `/etc/nix/mac-builder` on anix. The Mac trusts the amac user through
 `nix.settings.trusted-users`.
 
-Root's SSH client on anix needs the Mac host key once:
+`scripts/bootstrap-mac-remote` records the Mac host key in root's `known_hosts`
+after the first switch. To do it again by hand:
 
 ```sh
-sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new <mac-user>@amac true
+sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new "$ANIX_MAC_USER@amac" true
 ```
 
-That records the key in root's `known_hosts` and confirms the builder key
-works.
+That records the key and confirms the builder key works.
 
 Test a Darwin build from anix. Use the Mac's architecture:
 

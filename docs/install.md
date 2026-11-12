@@ -168,20 +168,30 @@ scripts/check.sh
 ssh amac uname -m
 ```
 
-`check.sh` evaluates both host configurations and runs `bash -n`, shellcheck,
-and typos. The SSH command prints `arm64` on Apple silicon or `x86_64` on
-Intel.
+`check.sh` evaluates both host configurations, parses the Windows helper with
+pwsh, and runs `bash -n`, shellcheck, and typos. The SSH command prints `arm64`
+on Apple silicon or `x86_64` on Intel.
+
+Restart the WSL VM once so `.wslconfig` takes effect. It sets mirrored
+networking, and WSL reads the file only when the VM starts. Without the restart
+the Mac cannot reach the NFS server.
+
+```powershell
+wsl --shutdown
+wsl -d NixOS
+```
 
 On the Mac, confirm the NFS mount and the editor stack:
 
 ```sh
-mount | grep '/Users/.*/src'
+mount | grep " on /Users/"
 herdr plugin list
 ```
 
 Then commit what the bootstrap changed in your fork: `secrets/secrets.yaml`,
-`home/default/amac.nix`, and `users.nix`. `.sops.yaml` stays local; it is
-ignored. Only the encrypted file and public values belong in git.
+`.sops.yaml`, `home/default/amac.nix`, and `users.nix`. `.sops.yaml` holds
+public recipients only, and tracking it keeps the host and recovery keys on a
+fresh clone.
 
 ## If a step stops
 

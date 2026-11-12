@@ -34,6 +34,16 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Under sudo the ANIX_* variables are dropped, so fall back to users.nix in the
+# checkout this script lives in.
+if [[ -z ${ANIX_PROJECTS_DIR:-} ]]; then
+  script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  users_file="$script_dir/../users.nix"
+  if [[ -r $users_file ]]; then
+    ANIX_PROJECTS_DIR=$(sed -n 's/^[[:space:]]*projectsDir[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$users_file" | head -1)
+  fi
+fi
+
 project_name=${ANIX_PROJECTS_DIR:-src}
 project_name=${project_name##*/}
 if [[ -n ${ANIX_MAC_HOME:-} ]]; then

@@ -9,6 +9,7 @@ Validate the repository without installing anything:
   - evaluate the anix and both amac system derivations
   - run bash -n on every file in scripts/
   - run shellcheck on every scripts/ file from PATH or nixpkgs
+  - parse scripts/bootstrap-windows.ps1 with pwsh
   - run typos over the repository when typos is on PATH
 
 Options:
@@ -73,6 +74,20 @@ while IFS= read -r -d '' file; do
       fail "shellcheck failed for ${file#"$repo_root"/}"
   fi
 done < <(find "$repo_root/scripts" -maxdepth 1 -type f ! -name '*.ps1' -print0)
+
+echo "==> pwsh parse scripts/bootstrap-windows.ps1"
+if command -v pwsh >/dev/null 2>&1; then
+  pwsh_bin=pwsh
+else
+  pwsh_bin=""
+fi
+if [[ -n $pwsh_bin ]]; then
+  "$pwsh_bin" -NoProfile -Command '$e = $null; $t = $null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "scripts/bootstrap-windows.ps1"), [ref]$t, [ref]$e) | Out-Null; if ($e) { $e | ForEach-Object { Write-Error $_ }; exit 1 }' ||
+    fail "PowerShell parse failed for scripts/bootstrap-windows.ps1"
+else
+  nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#powershell -c pwsh -NoProfile -Command '$e = $null; $t = $null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "scripts/bootstrap-windows.ps1"), [ref]$t, [ref]$e) | Out-Null; if ($e) { $e | ForEach-Object { Write-Error $_ }; exit 1 }' ||
+    fail "PowerShell parse failed for scripts/bootstrap-windows.ps1"
+fi
 
 echo "==> typos"
 if command -v typos >/dev/null 2>&1; then

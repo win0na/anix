@@ -85,9 +85,13 @@
           throw "projectsDir must not be /"
         else if hasDotSegment then
           throw "projectsDir must not contain . or .. segments: ${value}"
+        else if builtins.match "[A-Za-z0-9._/-]+" value == null then
+          throw "projectsDir must use only letters, digits, dot, underscore, dash and slash: ${value}"
         else if lib.hasPrefix "/" value
           && !(lib.hasPrefix "/home/" value || lib.hasPrefix "/mnt/" value) then
           throw "projectsDir must be under /home or /mnt: ${value}"
+        else if lib.hasPrefix "/mnt/c/" value then
+          throw "projectsDir must not be a Windows drive under /mnt/c; NFS cannot export it: ${value}"
         else if value == "/home/${users.anix}" then
           throw "projectsDir must not be the anix home: ${value}"
         else if lib.elem (lib.toLower name) blocked then

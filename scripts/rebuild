@@ -117,7 +117,14 @@ case "$target" in
           exit 1
           ;;
       esac
-      run ssh amac "set -euo pipefail; cd ~/.config/anix; git pull --ff-only; sudo darwin-rebuild switch --flake .#$flake_attr"
+      # The Mac builds from a copy of this checkout. Refresh it so `rebuild
+      # amac` compiles the current flake, not the last copied one.
+      echo "==> syncing the checkout to amac"
+      tar -C "$repo_root" -cf - . |
+        ssh amac 'set -e; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
+      # -t gives sudo a terminal; Remote Login must allow full disk access for
+      # remote users or nix-darwin refuses app updates.
+      run ssh -t amac "set -euo pipefail; cd ~/.config/anix; sudo darwin-rebuild switch --flake .#$flake_attr"
     else
       echo "error: amac is the Mac host and cannot be rebuilt from $host_os" >&2
       exit 1

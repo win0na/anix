@@ -2,8 +2,8 @@
 result
 result-*
 
-# Local sops config with your recipients; copy .sops.yaml.example.
-.sops.yaml
+# .sops.yaml holds public recipients only and is tracked, so a fresh clone
+# keeps the host and recovery keys and `sops updatekeys` cannot drop them.
 .direnv/
 .DS_Store
 *.swp

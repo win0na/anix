@@ -88,6 +88,10 @@ prints `--help`.
 with the upstream installer when it is missing. `scripts/bootstrap
 --no-install` is the exception.
 
+`scripts/provision` also takes `--mac-host`, `--image-url`, `--image-sha`, and
+`--no-finalize`. `scripts/bootstrap-mac-remote` takes `--mac-host`,
+`--mac-user`, `--anix-user`, and `--no-first-switch`.
+
 ## Versions
 
 | Piece | Version |
@@ -137,7 +141,6 @@ off; an encrypted volume cannot auto-login.
 | Dock | Autohide, 40 px, scale effect, no launch animation, no recent apps | Keep the screen for the editor; the dock is a launcher, not a status area. |
 | Finder | No desktop icons, path bar, status bar, folders first, all extensions | Files arrive over NFS; the path bar and extensions remove guesswork. |
 | Global UI | Window animations off, resize time 0.001, fast key repeat, menu bar hidden | The desktop is meant to be quiet, and older Intel GPUs have less headroom. |
-| Accessibility | Reduce motion, reduce transparency | Fewer compositor effects; the Mac is a build appliance. |
 | Window manager | Hide widgets, hide desktop icons | The desktop should not imply that project files live on the Mac. |
 | Login window | Guest off, auto-login as the amac user | The Mac must return after a reboot with nobody in front of it. |
 | Trackpad | Tap to click, drag, secondary click | The laptop works without hand-tuning settings first. |

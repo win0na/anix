@@ -169,14 +169,19 @@ age_keygen_cmd() { nix --extra-experimental-features 'nix-command flakes' shell 
 ssh_to_age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#ssh-to-age -c ssh-to-age "$@"; }
 
 export_ubuntu() {
-  local dest=${1%.age} unix recipient
+  local dest=${1%.age} unix recipient out
   recipient=$(age_keygen_cmd -y "$HOME/.config/sops/age/keys.txt")
   unix=$(wslpath -u "$dest")
-  if wsl.exe --export "$WSL_DISTRO_NAME" - | age_cmd -r "$recipient" -o "${unix}.age"; then
+  out="${unix}.age"
+  # Write to a partial file so a failed or interrupted rerun cannot destroy an
+  # earlier good backup that has the same name.
+  if wsl.exe --export "$WSL_DISTRO_NAME" - | age_cmd -r "$recipient" -o "${out}.partial" &&
+    [[ -s ${out}.partial ]] && mv -f "${out}.partial" "$out"; then
     backup="${dest}.age"
     say "Ubuntu backup: ${dest}.age"
     return 0
   fi
+  rm -f "${out}.partial"
   warn "the age-encrypted export failed"
   if ! ask "Write a plaintext archive instead? It will contain the age key." n; then
     die "backup cancelled; nothing was unregistered"
@@ -249,6 +254,7 @@ fi
 
 say "Plan"
 printf '  distro: %s\n  anix user: %s\n  mac user: %s\n  mac host: %s\n  project root: %s\n' "$distro" "$anix_user" "$mac_user" "$mac_host" "$projects_dir"
+echo "  windows: writes .wslconfig, opens TCP 2049, imports the image"
 
 if [[ $do_backup -eq 1 ]]; then
   if [[ -z $backup ]]; then
@@ -266,32 +272,49 @@ if [[ $do_backup -eq 1 ]]; then
 fi
 
 say "Installing NixOS-WSL alongside $WSL_DISTRO_NAME"
-win_helper=$(wslpath -w "$repo_root/scripts/bootstrap-windows.ps1")
+win_temp=$(powershell.exe -NoProfile -Command '$env:TEMP' | tr -d '\r\n')
+[[ -n $win_temp ]] || die "could not read the Windows temp directory"
+win_temp_unix=$(wslpath -u "$win_temp")
+win_stage="$win_temp_unix/anix"
+run mkdir -p "$win_stage"
+# An elevated process cannot reliably read a \\wsl.localhost path, so run the
+# helper and its wrapper from the Windows temp directory.
+run cp "$repo_root/scripts/bootstrap-windows.ps1" "$win_stage/bootstrap-windows.ps1"
+win_helper=$(wslpath -w "$win_stage/bootstrap-windows.ps1")
+win_log="$win_temp\\anix\\anix-bootstrap-windows.log"
+stage_cleanup() { rm -f "$win_stage/bootstrap-windows.ps1" "$win_stage/anix-elevate.ps1"; }
+trap stage_cleanup EXIT
 admin=$(powershell.exe -NoProfile -Command '([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)' | tr -d '\r\n')
 helper_args=("-Yes" "-SkipWslUpdate" "-NoShutdown" "-NoFirstSwitch" "-NoClone" "-DistroName" "$distro" "-AnixUser" "$anix_user" "-ProjectsDir" "$projects_dir" "-ImageUrl" "$image_url" "-ImageSha256" "$image_sha")
 
 if [[ $dry_run -eq 1 ]]; then
   printf '  $ powershell.exe -File %q %s\n' "$win_helper" "${helper_args[*]}"
 elif [[ $admin == "True" ]]; then
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$win_helper" "${helper_args[@]}"
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$win_helper" "${helper_args[@]}" ||
+    die "the Windows helper failed; read $win_log, then rerun scripts/provision"
 else
-  wrapper=$(mktemp /tmp/anix-elevate.XXXXXX.ps1)
+  wrapper="$win_stage/anix-elevate.ps1"
   {
     echo '$ErrorActionPreference = "Stop"'
     printf '$p = Start-Process -FilePath powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList @('
     printf "'-NoProfile','-ExecutionPolicy','Bypass','-File',%s" "$(printf "'%s'" "${win_helper//\'/\'\'}")"
     for arg in "${helper_args[@]}"; do printf ",%s" "$(printf "'%s'" "${arg//\'/\'\'}")"; done
     echo ')'
+    echo 'if ($p.ExitCode -ne 0) {'
+    echo '  Write-Host "The Windows helper failed with exit code $($p.ExitCode)."'
+    printf '%s\n' '  Write-Host "Log: $env:TEMP\anix\anix-bootstrap-windows.log"'
+    echo '  Read-Host "Press Enter to close" | Out-Null'
+    echo '}'
     echo 'exit $p.ExitCode'
   } > "$wrapper"
   echo "  Approve the Windows UAC prompt to install $distro."
   win_wrapper=$(wslpath -w "$wrapper")
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$win_wrapper"
-  rm -f "$wrapper"
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$win_wrapper" ||
+    die "the Windows helper failed; read $win_log, then rerun scripts/provision"
 fi
 
 if [[ $dry_run -eq 0 ]] && ! wsl.exe --list --quiet 2>/dev/null | tr -d '\0\r' | grep -qx "$distro"; then
-  die "the $distro distribution was not created"
+  die "the $distro distribution was not created; read $win_log, then rerun scripts/provision"
 fi
 
 first_switch=1
@@ -429,3 +452,9 @@ say "Provision complete"
 echo "  anix: $distro, user $anix_user"
 echo "  amac: $mac_host, user $mac_user"
 echo "  Run future rebuilds with: scripts/rebuild"
+echo
+echo "  Restart the WSL VM once so .wslconfig (mirrored networking) takes effect,"
+echo "  otherwise the Mac cannot reach the NFS server:"
+echo "    wsl.exe --shutdown"
+echo "  Then start $distro again, for example: wsl.exe -d $distro"
+echo "  The Mac mount retries until the server answers."

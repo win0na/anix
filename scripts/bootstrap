@@ -286,6 +286,11 @@ require_anix() {
   [[ "$(uname -s)" == Linux ]] || die "anix runs on NixOS-WSL (Linux)"
   [[ -e /etc/NIXOS ]] || die "/etc/NIXOS not found; this is not NixOS"
   command -v nixos-rebuild >/dev/null 2>&1 || die "nixos-rebuild not found"
+  local expected_user
+  expected_user=$(anix_value_from_users anix "$repo_root/users.nix")
+  if [[ -n $expected_user && "$(id -un)" != "$expected_user" ]]; then
+    die "run as $expected_user, not $(id -un); keys, secrets and the tunnel token belong to that account"
+  fi
 }
 
 require_amac() {
@@ -421,6 +426,10 @@ secrets_get() {
   sops_cmd decrypt --extract "$1" "$secrets_file" 2>/dev/null || true
 }
 
+secrets_has() {
+  sops_cmd decrypt --extract "$1" "$secrets_file" >/dev/null 2>&1
+}
+
 json_stream() {
   if command -v jq >/dev/null 2>&1; then
     jq -Rs .
@@ -510,19 +519,17 @@ ensure_secrets() {
     fi
     secrets_set_file '["mac-builder-key"]' "$builder_key"
   fi
-  if [[ -z "$(secrets_get '["cachix-token"]')" ]]; then
+  # sops.nix declares these keys, so an existing file without them fails the
+  # build. Write an empty value when the user skips the prompt.
+  if ! secrets_has '["cachix-token"]'; then
     local cachix
     ask_secret "Cachix token (blank to skip):" cachix || true
-    if [[ -n $cachix ]]; then
-      secrets_set_value '["cachix-token"]' "$cachix"
-    fi
+    secrets_set_value '["cachix-token"]' "${cachix:-}"
   fi
-  if [[ -z "$(secrets_get '["mac-login-password"]')" ]]; then
+  if ! secrets_has '["mac-login-password"]'; then
     local macpass
     ask_secret "Mac login password (blank to skip):" macpass || true
-    if [[ -n $macpass ]]; then
-      secrets_set_value '["mac-login-password"]' "$macpass"
-    fi
+    secrets_set_value '["mac-login-password"]' "${macpass:-}"
   fi
 }
 
@@ -531,12 +538,12 @@ ensure_recovery_key() {
     say "recovery recipient: present"
     return 0
   fi
-  if [[ $dry_run -eq 1 ]]; then
-    say "would generate an offline recovery key and add the recovery recipient"
-    return 0
-  fi
   if [[ $assume_yes -eq 1 ]]; then
     warn "recovery key generation skipped under --yes; add a recovery recipient manually"
+    return 0
+  fi
+  if [[ $dry_run -eq 1 ]]; then
+    say "would generate an offline recovery key and add the recovery recipient"
     return 0
   fi
   if ! ask "Generate an offline recovery age key now?" y; then
@@ -595,8 +602,12 @@ commit_secrets() {
   if [[ ! -e $secrets_file ]]; then
     return 0
   fi
-  run git add secrets/secrets.yaml home/default/amac.nix
-  if git diff --cached --quiet -- secrets/secrets.yaml home/default/amac.nix; then
+  local paths=(secrets/secrets.yaml home/default/amac.nix)
+  if [[ -e .sops.yaml ]]; then
+    paths=(.sops.yaml "${paths[@]}")
+  fi
+  run git add "${paths[@]}"
+  if git diff --cached --quiet -- "${paths[@]}"; then
     return 0
   fi
   if ! ask "Commit the encrypted secrets and the Mac builder key?" y; then
@@ -604,7 +615,7 @@ commit_secrets() {
     return 0
   fi
   if ! git -c user.name=anix-bootstrap -c user.email=anix-bootstrap@localhost \
-    commit -m "$message" -- secrets/secrets.yaml home/default/amac.nix; then
+    commit -m "$message" -- "${paths[@]}"; then
     warn "commit failed; set git user.name and user.email"
     return 0
   fi
@@ -645,9 +656,10 @@ ensure_code_tunnel() {
     warn "code tunnel is not logged in; run as $(id -un):"
     warn "  VSCODE_CLI_USE_FILE_KEYCHAIN=1 code tunnel user login --provider github"
   else
-    run env VSCODE_CLI_USE_FILE_KEYCHAIN=1 code tunnel user login --provider github
+    run env VSCODE_CLI_USE_FILE_KEYCHAIN=1 code tunnel user login --provider github ||
+      warn "code tunnel login did not finish; run the same command later as $(id -un)"
   fi
-  run sudo systemctl restart code-tunnel
+  run sudo systemctl restart code-tunnel || warn "could not restart code-tunnel; check the device login"
 }
 
 switch_mac() {
