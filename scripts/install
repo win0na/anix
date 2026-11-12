@@ -187,7 +187,7 @@ else
   repo_root=""
 fi
 
-if [[ -z $repo_url ]]; then
+if [[ -z $repo_url && -z $repo_root ]]; then
   if [[ $assume_yes -eq 1 ]]; then
     repo_url=$template_url
   else
@@ -195,7 +195,6 @@ if [[ -z $repo_url ]]; then
     repo_url=${repo_url:-$template_url}
   fi
 fi
-[[ -n $repo_url ]] || die "a repository URL is required"
 
 if [[ $(uname -s) == Linux ]]; then
   if [[ -z $anix_user ]]; then
