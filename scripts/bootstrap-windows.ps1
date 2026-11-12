@@ -59,7 +59,8 @@ if ([string]::IsNullOrWhiteSpace($Distro)) { throw "DistroName is empty" }
 
 if ([string]::IsNullOrWhiteSpace($AnixUser)) {
   if ($Yes) {
-    $AnixUser = ($env:USERNAME -replace '[^A-Za-z0-9._-]', '')
+    $AnixUser = ($env:USERNAME -replace '[^A-Za-z0-9._-]', '').ToLower()
+    if ($AnixUser -match '^[0-9]') { $AnixUser = "u$AnixUser" }
   } else {
     $AnixUser = Read-Host "Linux username for anix"
   }
@@ -253,7 +254,7 @@ if ($NoFirstSwitch) {
 
 if ($needsFirstSwitch) {
   Write-Host "==> first switch in $Distro"
-  wsl -d $Distro -u nixos -- bash -lc 'set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:$PATH; nix --extra-experimental-features "nix-command flakes" shell nixpkgs#git -c git clone "$1" /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; printf "{\n  anix = \"%s\";\n  amac = \"%s\";\n}\n" "$2" "$3" > /tmp/anix/users.nix; sudo NIX_CONFIG="experimental-features = nix-command flakes" nixos-rebuild switch --flake /tmp/anix#anix' _ $RepoUrl $AnixUser $MacUser
+  wsl -d $Distro -u nixos -- bash -lc "set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:`$PATH; nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone $RepoQuoted /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' > /tmp/anix/users.nix; sudo NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild switch --flake /tmp/anix#anix"
   if ($LASTEXITCODE -ne 0) { throw "the first NixOS switch failed" }
 } elseif (-not $NoFirstSwitch) {
   Write-Host "==> $Distro is already configured; skipping the first switch"
@@ -262,7 +263,7 @@ if ($needsFirstSwitch) {
 if (-not $NoClone) {
   Write-Host "==> clone the repository for $AnixUser"
   wsl -d $Distro -u $AnixUser -- bash -lc "set -euo pipefail; mkdir -p ~/src; if [ ! -d ~/src/anix/.git ]; then git clone $RepoQuoted ~/src/anix; fi"
-  wsl -d $Distro -u $AnixUser -- bash -lc 'printf "{\n  anix = \"%s\";\n  amac = \"%s\";\n}\n" "$1" "$2" > ~/src/anix/users.nix' _ $AnixUser $MacUser
+  wsl -d $Distro -u $AnixUser -- bash -lc "printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' > ~/src/anix/users.nix"
 }
 
 if (-not $NoTask) {

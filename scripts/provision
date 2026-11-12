@@ -108,11 +108,7 @@ if ! command -v wsl.exe >/dev/null 2>&1 || ! command -v powershell.exe >/dev/nul
 fi
 command -v wsl.exe >/dev/null || die "wsl.exe not found; run this inside WSL"
 command -v powershell.exe >/dev/null || die "powershell.exe not found; run this inside WSL"
-if [[ -z ${WSL_DISTRO_NAME:-} ]]; then
-  WSL_DISTRO_NAME=$(wsl.exe --list --verbose 2>/dev/null | tr -d '\0\r' | awk '$1 == "*" { print $2; exit }')
-  export WSL_DISTRO_NAME
-fi
-[[ -n ${WSL_DISTRO_NAME:-} ]] || die "cannot detect the WSL distribution; run this from the Ubuntu WSL shell"
+[[ -n ${WSL_DISTRO_NAME:-} ]] || die "WSL_DISTRO_NAME is not set; run this from the Ubuntu WSL shell"
 if ! command -v nix >/dev/null 2>&1; then
   for p in "$HOME/.nix-profile/bin" /nix/var/nix/profiles/default/bin; do
     [[ -x "$p/nix" ]] && PATH="$p:$PATH"

@@ -125,6 +125,8 @@ the commands above.
 | --- | --- | --- |
 | Fork the repository | GitHub | Your keys, usernames, and secrets live in your copy. |
 | Approve UAC | Windows | Installing WSL and the NixOS image needs elevation. |
+| Reboot Windows | Windows | The WSL optional component needs it after a fresh install. |
+| Approve the Command Line Tools installer | macOS | Nix needs the compiler tools. |
 | Sign in to Tailscale | Windows and macOS | MagicDNS and the NFS route depend on it. |
 | Enable Remote Login | macOS | `bootstrap-mac-remote` reaches the Mac over SSH. |
 | Approve Terminal and App Management | macOS | The first `darwin-rebuild` touches protected paths. |

@@ -279,6 +279,7 @@ case "$(uname -s)" in
       say "starting the anix bootstrap"
       exec ./scripts/bootstrap "${args[@]}"
     fi
+    [[ -n ${WSL_DISTRO_NAME:-} ]] || die "WSL_DISTRO_NAME is not set; open a new Ubuntu WSL shell and rerun"
     prepare_args=(--prepare)
     if [[ $assume_yes -eq 1 ]]; then prepare_args+=(--yes); fi
     say "creating keys and secrets"
