@@ -55,6 +55,15 @@
   outputs = inputs@{ self, nixpkgs, nixpkgs-2605, nix-darwin, ... }:
     let
       users = import ./users.nix;
+
+      darwinFor = hostSystem: nix-darwin.lib.darwinSystem {
+        system = hostSystem;
+        modules = [ ./hosts/amac ];
+        specialArgs = {
+          inherit inputs hostSystem;
+          userName = users.amac;
+        };
+      };
     in
     {
       nixosConfigurations.anix = nixpkgs.lib.nixosSystem {
@@ -67,14 +76,8 @@
         };
       };
 
-      darwinConfigurations.amac = nix-darwin.lib.darwinSystem {
-        system = "x86_64-darwin";
-        modules = [ ./hosts/amac ];
-        specialArgs = {
-          inherit inputs;
-          userName = users.amac;
-        };
-      };
+      darwinConfigurations.amac = darwinFor "aarch64-darwin";
+      darwinConfigurations.amac-intel = darwinFor "x86_64-darwin";
 
       overlays.default = import ./overlays;
 
@@ -93,6 +96,10 @@
           x86_64-linux.herdr = (pkgsFor nixpkgs "x86_64-linux").herdr;
           x86_64-linux.herdr-sidebar = (pkgsFor nixpkgs "x86_64-linux").herdr-sidebar;
           x86_64-linux.ttt = (pkgsFor nixpkgs "x86_64-linux").ttt;
+          aarch64-darwin.fff-mcp = (pkgsFor nixpkgs-2605 "aarch64-darwin").fff-mcp;
+          aarch64-darwin.herdr = (pkgsFor nixpkgs-2605 "aarch64-darwin").herdr;
+          aarch64-darwin.herdr-sidebar = (pkgsFor nixpkgs-2605 "aarch64-darwin").herdr-sidebar;
+          aarch64-darwin.ttt = (pkgsFor nixpkgs-2605 "aarch64-darwin").ttt;
           x86_64-darwin.fff-mcp = (pkgsFor nixpkgs-2605 "x86_64-darwin").fff-mcp;
           x86_64-darwin.herdr = (pkgsFor nixpkgs-2605 "x86_64-darwin").herdr;
           x86_64-darwin.herdr-sidebar = (pkgsFor nixpkgs-2605 "x86_64-darwin").herdr-sidebar;

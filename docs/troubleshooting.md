@@ -63,8 +63,9 @@ From anix:
 ssh amac uname -m
 ```
 
-If that fails, the Mac is down, Remote Login is off, or the builder key is not
-in `authorized_keys`. If SSH works but Nix cannot use the builder:
+It prints `arm64` on Apple silicon or `x86_64` on Intel. If the command fails,
+the Mac is down, Remote Login is off, or the builder key is not in
+`authorized_keys`. If SSH works but Nix cannot use the builder:
 
 ```sh
 sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new <mac-user>@amac true
@@ -175,8 +176,9 @@ Automatic signing needs an Apple ID and a team in Xcode.
 
 ## Nuvio is blocked
 
-Nuvio is an unsigned Intel alpha. A Nix-installed copy has no quarantine
-attribute. A manually downloaded copy needs:
+Nuvio is an unsigned alpha. The package selects the arm64 or x86_64 DMG. A
+Nix-installed copy has no quarantine attribute. A manually downloaded copy
+needs:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/Nuvio.app

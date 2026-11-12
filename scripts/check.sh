@@ -6,7 +6,7 @@ usage() {
 Usage: scripts/check.sh
 
 Validate the repository without installing anything:
-  - evaluate the anix and amac system derivations
+  - evaluate the anix and both amac system derivations
   - run bash -n on every file in scripts/
   - run shellcheck on every scripts/ file from PATH or nixpkgs
   - run typos over the repository when typos is on PATH
@@ -53,9 +53,11 @@ echo "==> nix eval .#nixosConfigurations.anix"
 nix "${nix_flags[@]}" eval --raw ".#nixosConfigurations.anix.config.system.build.toplevel.drvPath" >/dev/null ||
   fail "anix configuration eval failed"
 
-echo "==> nix eval .#darwinConfigurations.amac"
-nix "${nix_flags[@]}" eval --raw ".#darwinConfigurations.amac.config.system.build.toplevel.drvPath" >/dev/null ||
-  fail "amac configuration eval failed"
+for config in amac amac-intel; do
+  echo "==> nix eval .#darwinConfigurations.$config"
+  nix "${nix_flags[@]}" eval --raw ".#darwinConfigurations.$config.config.system.build.toplevel.drvPath" >/dev/null ||
+    fail "$config configuration eval failed"
+done
 
 echo "==> bash -n scripts/*"
 while IFS= read -r -d '' file; do

@@ -9,8 +9,9 @@ Rebuild and activate one host configuration.
 
 Targets:
   anix   NixOS-WSL host. Runs nixos-rebuild switch locally. Requires Linux.
-  amac   Intel Mac host. Runs darwin-rebuild switch on macOS, or over
-         ssh amac when run from Linux.
+  amac   Mac host. Runs darwin-rebuild switch on macOS, or over ssh amac
+         when run from Linux. Selects the Apple silicon or Intel output
+         from the Mac's architecture.
 
 With no target, rebuild detects the OS: Darwin selects amac, Linux selects anix.
 
@@ -80,7 +81,18 @@ case "$target" in
         echo "error: darwin-rebuild not found on PATH (is nix-darwin installed?)" >&2
         exit 1
       fi
-      run sudo darwin-rebuild switch --flake "$repo_root#amac"
+      case "$(uname -m)" in
+        arm64) flake_attr=amac ;;
+        x86_64)
+          flake_attr=amac-intel
+          echo "warning: this Mac is Intel; nixpkgs 26.05 is the last release that supports x86_64-darwin" >&2
+          ;;
+        *)
+          echo "error: unsupported Mac architecture: $(uname -m)" >&2
+          exit 1
+          ;;
+      esac
+      run sudo darwin-rebuild switch --flake "$repo_root#$flake_attr"
     elif [[ "$host_os" == "Linux" ]]; then
       if ! command -v ssh >/dev/null 2>&1; then
         echo "error: ssh not found on PATH" >&2
@@ -90,9 +102,24 @@ case "$target" in
         echo "error: cannot reach amac over SSH (check ssh amac and Tailscale)" >&2
         exit 1
       fi
-      run ssh amac 'set -euo pipefail; cd ~/.config/anix; git pull --ff-only; sudo darwin-rebuild switch --flake .#amac'
+      remote_arch=$(ssh -o BatchMode=yes -o ConnectTimeout=5 amac 'uname -m') || {
+        echo "error: could not read the Mac architecture over SSH" >&2
+        exit 1
+      }
+      case "$remote_arch" in
+        arm64) flake_attr=amac ;;
+        x86_64)
+          flake_attr=amac-intel
+          echo "warning: amac is Intel; nixpkgs 26.05 is the last release that supports x86_64-darwin" >&2
+          ;;
+        *)
+          echo "error: unsupported Mac architecture: $remote_arch" >&2
+          exit 1
+          ;;
+      esac
+      run ssh amac "set -euo pipefail; cd ~/.config/anix; git pull --ff-only; sudo darwin-rebuild switch --flake .#$flake_attr"
     else
-      echo "error: amac is the Intel Mac host and cannot be rebuilt from $host_os" >&2
+      echo "error: amac is the Mac host and cannot be rebuilt from $host_os" >&2
       exit 1
     fi
     ;;

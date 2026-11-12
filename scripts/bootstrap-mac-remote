@@ -5,9 +5,10 @@ usage() {
   cat <<'EOF'
 Usage: scripts/bootstrap-mac-remote [options]
 
-Run on anix after the anix bootstrap. Prepares a fresh Intel Mac over SSH,
-adds its host key as a sops recipient, and starts the first darwin-rebuild in
-the Mac's logged-in Terminal. The macOS TCC prompts are approved on the Mac.
+Run on anix after the anix bootstrap. Prepares a fresh Mac over SSH, adds its
+host key as a sops recipient, and starts the first darwin-rebuild in the Mac's
+logged-in Terminal. Apple silicon and Intel are both detected. The macOS TCC
+prompts are approved on the Mac.
 
 Options:
   --mac-host HOST   Tailscale/MagicDNS name. Default amac.
@@ -98,7 +99,16 @@ while ! "${SSH[@]}" true 2>/dev/null; do
 done
 
 say "Checking the Mac"
-"${SSH[@]}" 'test "$(uname -m)" = x86_64' || die "the Mac is not Intel x86_64"
+mac_arch=$("${SSH[@]}" 'uname -m') || die "could not read the Mac architecture"
+case "$mac_arch" in
+  arm64) ;;
+  x86_64)
+    warn "this Mac is Intel (x86_64). nixpkgs 26.05 is the last release that"
+    warn "supports x86_64-darwin, so Nix security updates stop after 2026."
+    ;;
+  *) die "unsupported Mac architecture: $mac_arch" ;;
+esac
+say "Mac architecture: $mac_arch"
 nix_mac=/nix/var/nix/profiles/default/bin/nix
 if ! "${SSH[@]}" "test -x $nix_mac"; then
   if ! "${SSH[@]}" 'xcode-select -p >/dev/null 2>&1'; then
@@ -165,11 +175,22 @@ for f in /etc/nix/nix.conf /etc/bashrc /etc/zshrc; do
     sudo mv "$f" "$f.before-nix-darwin"
   fi
 done
+case "$(uname -m)" in
+  arm64) flake_attr=amac ;;
+  x86_64)
+    flake_attr=amac-intel
+    echo "warning: this Mac is Intel; nixpkgs 26.05 is the last release that supports x86_64-darwin" >&2
+    ;;
+  *)
+    echo "error: unsupported Mac architecture: $(uname -m)" >&2
+    exit 1
+    ;;
+esac
 sudo mkdir -p /etc/nix
 sudo env PATH="/nix/var/nix/profiles/default/bin:$PATH" \
   NIX_CONFIG='experimental-features = nix-command flakes' \
   nix run github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild -- \
-  switch --flake "$HOME/.config/anix#amac"
+  switch --flake "$HOME/.config/anix#$flake_attr"
 date > "$dir/post.ok"
 EOS
 "${SSH[@]}" 'chmod +x "$HOME/anix-first-switch/first-switch.command"'

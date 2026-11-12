@@ -1,6 +1,6 @@
 # anix
 
-anix is one Nix flake for a NixOS-WSL development host and an Intel Mac build
+anix is one Nix flake for a NixOS-WSL development host and a Mac build
 machine.
 
 `anix` is the WSL host where you edit and run agents. `amac` builds Darwin and
@@ -12,19 +12,21 @@ configuration, one project tree over NFS, and one encrypted secrets file.
 | Host | Platform | Role | Channel | Rebuild |
 | --- | --- | --- | --- | --- |
 | `anix` | NixOS-WSL, x86_64-linux | Editor, agents, NFS server | `nixos-unstable` | `scripts/rebuild` |
-| `amac` | macOS 26, Intel, x86_64-darwin | Darwin and iOS builds | `nixpkgs` 26.05 | `scripts/rebuild amac` |
+| `amac` | macOS 26, Apple silicon or Intel | Darwin and iOS builds | `nixpkgs` 26.05 | `scripts/rebuild amac` |
 
 ## Requirements
 
 - Windows 11 with WSL 2.4.4 or later.
-- Intel MacBookPro16,1 on macOS 26.2 or later. Apple silicon is not supported.
+- Apple silicon or Intel Mac on macOS 26.2 or later. The installer detects the
+  architecture.
 - Tailscale signed in on Windows and macOS, with MagicDNS enabled.
 - An Apple ID for Xcode 26.6 and iOS builds.
 
 The installer adds Nix and the other tools. Two limits matter before you start.
-nixpkgs 26.05 is the last release that builds `x86_64-darwin`, so the Mac stops
-receiving Nix security updates on 2026-12-31. FileVault stays off so the Mac can
-auto-login and accept SSH after a reboot.
+nixpkgs 26.05 is the last release that builds `x86_64-darwin`, so an Intel Mac
+stops receiving Nix security updates on 2026-12-31. The installer prints a
+warning when it detects one. FileVault stays off so the Mac can auto-login and
+accept SSH after a reboot.
 
 ## How it works
 

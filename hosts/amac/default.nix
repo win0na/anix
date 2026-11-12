@@ -1,4 +1,4 @@
-{ config, lib, pkgs, inputs, userName, ... }:
+{ config, lib, pkgs, inputs, userName, hostSystem, ... }:
 
 let
   secretsFile = ../../secrets/secrets.yaml;
@@ -14,7 +14,7 @@ in
     inputs.nix-homebrew.darwinModules.nix-homebrew
   ] ++ lib.optional (builtins.pathExists secretsFile) ./sops.nix;
 
-  nixpkgs.hostPlatform = "x86_64-darwin";
+  nixpkgs.hostPlatform = hostSystem;
   nixpkgs.config.allowUnfree = true;
   nixpkgs.overlays = [
     inputs.rust-overlay.overlays.default

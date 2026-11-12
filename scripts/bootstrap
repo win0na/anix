@@ -283,7 +283,14 @@ require_amac() {
     return 0
   fi
   [[ "$(uname -s)" == Darwin ]] || die "amac runs on macOS"
-  [[ "$(uname -m)" == x86_64 ]] || die "this configuration targets the Intel Mac"
+  case "$(uname -m)" in
+    arm64) ;;
+    x86_64)
+      warn "this Mac is Intel (x86_64). nixpkgs 26.05 is the last release that"
+      warn "supports x86_64-darwin, so Nix security updates stop after 2026."
+      ;;
+    *) die "unsupported Mac architecture: $(uname -m)" ;;
+  esac
   case "$(sw_vers -productVersion)" in
     26.*) ;;
     *) warn "expected macOS 26.x, found $(sw_vers -productVersion)" ;;
@@ -642,8 +649,17 @@ switch_mac() {
     say "would run the first or normal darwin-rebuild switch"
     return 0
   fi
+  local flake_attr
+  case "$(uname -m)" in
+    arm64) flake_attr=amac ;;
+    x86_64)
+      flake_attr=amac-intel
+      warn "this Mac is Intel; nixpkgs 26.05 is the last release that supports x86_64-darwin"
+      ;;
+    *) die "unsupported Mac architecture: $(uname -m)" ;;
+  esac
   if command -v darwin-rebuild >/dev/null 2>&1; then
-    run sudo darwin-rebuild switch --flake "$repo_root#amac"
+    run sudo darwin-rebuild switch --flake "$repo_root#$flake_attr"
     return 0
   fi
   local file
@@ -656,7 +672,7 @@ switch_mac() {
   nix_bin="$(command -v nix)"
   run sudo "$nix_bin" --extra-experimental-features 'nix-command flakes' run \
     github:LnL7/nix-darwin/nix-darwin-26.05#darwin-rebuild -- \
-    switch --flake "$repo_root#amac"
+    switch --flake "$repo_root#$flake_attr"
 }
 
 ensure_clt() {
@@ -758,7 +774,13 @@ post_mac() {
     run sudo "$repo_root/scripts/mount-src" || warn "NFS mount failed; the LaunchDaemon retries"
   fi
   if ask "Build the Darwin Herdr package as a check?" y; then
-    run nixc build --no-link ".#packages.x86_64-darwin.herdr" || warn "Darwin package check failed"
+    local mac_system
+    case "$(uname -m)" in
+      arm64) mac_system=aarch64-darwin ;;
+      x86_64) mac_system=x86_64-darwin ;;
+      *) die "unsupported Mac architecture: $(uname -m)" ;;
+    esac
+    run nixc build --no-link ".#packages.$mac_system.herdr" || warn "Darwin package check failed"
   fi
   install_herdr
   if command -v xcodes >/dev/null 2>&1; then

@@ -69,9 +69,11 @@ artifacts on local disk, and run editors on anix.
 
 ## Remote builds
 
-anix sends `x86_64-darwin` builds to amac over SSH with `ssh-ng`. The builder
-key is the `mac-builder-key` secret, installed at `/etc/nix/mac-builder` on
-anix. The Mac trusts the amac user through `nix.settings.trusted-users`.
+anix sends Darwin builds to amac over SSH with `ssh-ng`. The builder advertises
+both `aarch64-darwin` and `x86_64-darwin`; the Mac serves its own architecture.
+The builder key is the `mac-builder-key` secret, installed at
+`/etc/nix/mac-builder` on anix. The Mac trusts the amac user through
+`nix.settings.trusted-users`.
 
 Root's SSH client on anix needs the Mac host key once:
 
@@ -82,9 +84,12 @@ sudo ssh -i /etc/nix/mac-builder -o StrictHostKeyChecking=accept-new <mac-user>@
 That records the key in root's `known_hosts` and confirms the builder key
 works.
 
-Test a Darwin build from anix:
+Test a Darwin build from anix. Use the Mac's architecture:
 
 ```sh
+# Apple silicon
+nix build --no-link .#packages.aarch64-darwin.herdr
+# Intel
 nix build --no-link .#packages.x86_64-darwin.herdr
 ```
 

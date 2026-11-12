@@ -1,13 +1,14 @@
 # Install
 
-This page takes one Windows machine and one Intel Mac to a working `anix` and
-`amac`. The installer does the setup. You answer prompts and approve the few
-steps that Windows and macOS reserve for a person.
+This page takes one Windows machine and one Mac to a working `anix` and `amac`.
+Apple silicon and Intel Macs are supported. The installer does the setup. You
+answer prompts and approve the few steps that Windows and macOS reserve for a
+person.
 
 ## Before you start
 
 - Windows 11 with WSL 2.4.4 or later.
-- Intel MacBookPro16,1 on macOS 26.2 or later.
+- Apple silicon or Intel Mac on macOS 26.2 or later.
 - Tailscale signed in on Windows and macOS, with MagicDNS enabled.
 - An Apple ID for Xcode 26.6 and iOS builds.
 
@@ -16,9 +17,9 @@ Decide two names now. The anix name is the Linux login. The amac name is the
 macOS account short name, which `whoami` prints on the Mac.
 
 Two limits apply before the first switch. nixpkgs 26.05 is the last release
-that builds for `x86_64-darwin`, so the Mac stops receiving Nix security
-updates on 2026-12-31. FileVault stays off so the Mac can auto-login and accept
-SSH after a reboot.
+that builds for `x86_64-darwin`, so an Intel Mac stops receiving Nix security
+updates on 2026-12-31. The installer warns when it detects one. FileVault stays
+off so the Mac can auto-login and accept SSH after a reboot.
 
 ## Fork the repository
 
@@ -161,8 +162,9 @@ scripts/check.sh
 ssh amac uname -m
 ```
 
-`check.sh` evaluates both configurations and runs `bash -n`, shellcheck, and
-typos. The SSH command prints `x86_64`.
+`check.sh` evaluates both host configurations and runs `bash -n`, shellcheck,
+and typos. The SSH command prints `arm64` on Apple silicon or `x86_64` on
+Intel.
 
 On the Mac, confirm the NFS mount and the editor stack:
 

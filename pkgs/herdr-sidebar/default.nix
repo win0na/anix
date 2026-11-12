@@ -44,6 +44,6 @@ rustPlatform.buildRustPackage {
     description = "VS Code-style sidebar for Herdr, with a single ttt editor pane";
     homepage = "https://github.com/alexarthurs/herdr-sidebar";
     license = licenses.mit;
-    platforms = [ "x86_64-linux" "x86_64-darwin" ];
+    platforms = [ "x86_64-linux" "x86_64-darwin" "aarch64-darwin" ];
   };
 }

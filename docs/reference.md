@@ -5,7 +5,10 @@
 | Host | System | Channel | Home | Role |
 | --- | --- | --- | --- | --- |
 | `anix` | `x86_64-linux` | `nixos-unstable` | `/home/<anix>` | Editor, agents, NFS server, builder client |
-| `amac` | `x86_64-darwin` | `nixpkgs` 26.05 | `/Users/<amac>` | Darwin and iOS builds, NFS client |
+| `amac` | `aarch64-darwin` or `x86_64-darwin` | `nixpkgs` 26.05 | `/Users/<amac>` | Darwin and iOS builds, NFS client |
+
+`amac` is the Apple silicon output and `amac-intel` is the Intel output. The
+scripts select one from `uname -m`, so use `scripts/rebuild amac` on either.
 
 Both usernames live in `users.nix`; commands write them as `<anix-user>` and
 `<mac-user>`. `anix` follows `nixpkgs` and
@@ -132,8 +135,8 @@ off; an encrypted volume cannot auto-login.
 | --- | --- | --- |
 | Dock | Autohide, 40 px, scale effect, no launch animation, no recent apps | Keep the screen for the editor; the dock is a launcher, not a status area. |
 | Finder | No desktop icons, path bar, status bar, folders first, all extensions | Files arrive over NFS; the path bar and extensions remove guesswork. |
-| Global UI | Window animations off, resize time 0.001, fast key repeat, menu bar hidden | The Intel GPU has less headroom, and the desktop is meant to be quiet. |
-| Accessibility | Reduce motion, reduce transparency | Fewer compositor effects on the 2019 hardware. |
+| Global UI | Window animations off, resize time 0.001, fast key repeat, menu bar hidden | The desktop is meant to be quiet, and older Intel GPUs have less headroom. |
+| Accessibility | Reduce motion, reduce transparency | Fewer compositor effects; the Mac is a build appliance. |
 | Window manager | Hide widgets, hide desktop icons | The desktop should not imply that project files live on the Mac. |
 | Login window | Guest off, auto-login as the amac user | The Mac must return after a reboot with nobody in front of it. |
 | Trackpad | Tap to click, drag, secondary click | The laptop works without hand-tuning settings first. |
@@ -141,9 +144,9 @@ off; an encrypted volume cannot auto-login.
 
 ## Limits
 
-- nixpkgs 26.05 is the last release that builds `x86_64-darwin`. The Mac stops
-  receiving Nix security updates on 2026-12-31.
-- Apple silicon is not supported: the flake defines `x86_64-darwin` only.
+- nixpkgs 26.05 is the last release that builds `x86_64-darwin`. An Intel Mac
+  stops receiving Nix security updates on 2026-12-31.
+- Apple silicon has no such limit and is the long-term path.
 - FileVault stays off so the Mac can auto-login and accept SSH after a reboot.
   Anyone with physical access can read its keys.
 - File watchers on the Mac do not see changes made on anix over NFS reliably.

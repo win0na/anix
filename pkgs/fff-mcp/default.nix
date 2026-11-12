@@ -4,7 +4,12 @@ let
   version = "0.11.0";
   base = "https://github.com/dmtrKovalenko/fff/releases/download/v${version}";
   src =
-    if stdenv.hostPlatform.isDarwin then
+    if stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isAarch64 then
+      fetchurl {
+        url = "${base}/fff-mcp-aarch64-apple-darwin";
+        hash = "sha256-zGBtlBjPp3ZDdtzXsyoz5kWabLmkcYvjZrAk3Kbp/q0=";
+      }
+    else if stdenv.hostPlatform.isDarwin then
       fetchurl {
         url = "${base}/fff-mcp-x86_64-apple-darwin";
         hash = "sha256-Mzd6j5ZELryLBtO9KGPPZqUg+XozcA4PuFoJ3XmI6GI=";
@@ -32,6 +37,6 @@ stdenv.mkDerivation {
     homepage = "https://github.com/dmtrKovalenko/fff";
     license = licenses.mit;
     mainProgram = "fff-mcp";
-    platforms = [ "x86_64-linux" "x86_64-darwin" ];
+    platforms = [ "x86_64-linux" "x86_64-darwin" "aarch64-darwin" ];
   };
 }

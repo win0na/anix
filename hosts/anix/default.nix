@@ -67,7 +67,9 @@ in
       hostName = "amac";
       sshUser = macUserName;
       sshKey = "/etc/nix/mac-builder";
-      systems = [ "x86_64-darwin" ];
+      # The Mac serves its own architecture. An Intel Mac cannot build
+      # aarch64, and an Apple silicon Mac builds x86_64 only under Rosetta.
+      systems = [ "aarch64-darwin" "x86_64-darwin" ];
       protocol = "ssh-ng";
       maxJobs = 6;
       supportedFeatures = [ "big-parallel" ];
