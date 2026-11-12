@@ -166,7 +166,12 @@ if [[ $ensure_nix_only -eq 1 ]]; then
 fi
 
 case "$(uname -s)" in
-  Darwin) ;;
+  Darwin)
+    if [[ "$(uname -m)" == x86_64 ]]; then
+      warn "this Mac is Intel (x86_64). nixpkgs 26.05 is the last release that"
+      warn "supports x86_64-darwin, so Nix security updates stop after 2026."
+    fi
+    ;;
   Linux)
     if [[ ! -e /etc/NIXOS ]] && ! grep -qi microsoft /proc/version; then
       die "run this on Ubuntu WSL, NixOS, or macOS"
@@ -266,14 +271,6 @@ fi
 
 case "$(uname -s)" in
   Darwin)
-    case "$(uname -m)" in
-      arm64) ;;
-      x86_64)
-        warn "this Mac is Intel (x86_64). nixpkgs 26.05 is the last release that"
-        warn "supports x86_64-darwin, so Nix security updates stop after 2026."
-        ;;
-      *) die "unsupported Mac architecture: $(uname -m)" ;;
-    esac
     args=(--host amac)
     if [[ $assume_yes -eq 1 ]]; then args+=(--yes); fi
     say "starting the Mac bootstrap"

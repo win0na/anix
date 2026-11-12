@@ -249,6 +249,13 @@ mac_side() {
   [[ $host == amac && $prepare -eq 0 ]]
 }
 
+warn_if_intel_mac() {
+  [[ "$(uname -s)" == Darwin ]] || return 0
+  [[ "$(uname -m)" == x86_64 ]] || return 0
+  warn "this Mac is Intel (x86_64). nixpkgs 26.05 is the last release that"
+  warn "supports x86_64-darwin, so Nix security updates stop after 2026."
+}
+
 find_nix
 cd "$repo_root"
 
@@ -256,6 +263,7 @@ if [[ ! -e .git ]]; then
   die "not a git checkout: $repo_root; clone $repo_url first"
 fi
 
+warn_if_intel_mac
 ensure_nix
 
 if [[ $host == anix ]]; then
@@ -284,11 +292,7 @@ require_amac() {
   fi
   [[ "$(uname -s)" == Darwin ]] || die "amac runs on macOS"
   case "$(uname -m)" in
-    arm64) ;;
-    x86_64)
-      warn "this Mac is Intel (x86_64). nixpkgs 26.05 is the last release that"
-      warn "supports x86_64-darwin, so Nix security updates stop after 2026."
-      ;;
+    arm64|x86_64) ;;
     *) die "unsupported Mac architecture: $(uname -m)" ;;
   esac
   case "$(sw_vers -productVersion)" in
