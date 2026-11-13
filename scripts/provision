@@ -96,7 +96,8 @@ ask() {
   local prompt=$1 default=${2:-n} reply
   if [[ $assume_yes -eq 1 ]]; then [[ $default == y ]]; return; fi
   if [[ $default == y ]]; then prompt="$prompt [Y/n]"; else prompt="$prompt [y/N]"; fi
-  read -r -p "$prompt " reply || true
+  # EOF means "no": an unattended run must not accept a prompt silently.
+  read -r -p "$prompt " reply || return 1
   reply=${reply:-$default}
   [[ $reply == [Yy]* ]]
 }
@@ -252,7 +253,7 @@ EOF
         die "could not commit users.nix; rerun scripts/provision"
     fi
   else
-    die "users.nix does not match the requested values"
+    die "users.nix does not match the requested values; rerun with --yes or edit users.nix"
   fi
 fi
 
