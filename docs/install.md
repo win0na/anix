@@ -109,6 +109,13 @@ Code tunnel. The Mac phase asks for **Remote Login** to be enabled.
 If you changed the WSL memory, CPU, or networking settings in `.wslconfig`, run
 `wsl --shutdown` in PowerShell and start the distribution again.
 
+`.wslconfig` also lists `loadKernelModules=nfsd,nft_ct,nft_fib,nft_reject`.
+The 6.6 WSL kernel builds those as modules and WSL loads them only when the VM
+starts, so the NFS export needs one WSL restart after the first install. If the
+Mac phase stops with "nfs-server is not running", run `wsl --shutdown` in
+PowerShell, start the distribution again, then rerun
+`scripts/bootstrap-mac-remote`.
+
 ## The Mac
 
 Path B runs this phase at the end. For Path A, or to retry, do this from anix

@@ -426,6 +426,27 @@ else
 fi
 
 if [[ $do_mac -eq 1 ]]; then
+  mac_retry=(--mac-host "$mac_host" --mac-user "$mac_user" --anix-user "$anix_user")
+  [[ $assume_yes -eq 1 ]] && mac_retry+=(--yes)
+  if [[ $dry_run -eq 1 ]]; then
+    say "would check that nfs-server is running, then run scripts/bootstrap-mac-remote inside $distro"
+  elif ! wsl.exe -d "$distro" -u root --exec bash -c 'test -e /proc/fs/nfsd && systemctl is-active --quiet nfs-server' >/dev/null 2>&1; then
+    # The 6.6 WSL kernel builds nfsd as a module, and WSL loads modules only
+    # when the VM starts. The Mac mount cannot work before that restart.
+    say "The Mac phase needs the NFS export, which is not running yet"
+    say "The WSL kernel loads nfsd when the VM starts; .wslconfig already asks for it"
+    say "From Windows PowerShell:"
+    printf '  wsl --shutdown\n  wsl -d %s\n' "$distro"
+    say "Then inside $distro:"
+    printf '  cd ~/.config/anix && scripts/bootstrap-mac-remote'
+    printf ' %q' "${mac_retry[@]}"
+    printf '\n'
+    say "Ubuntu stays installed; nothing was unregistered"
+    do_mac=0
+  fi
+fi
+
+if [[ $do_mac -eq 1 ]]; then
   say "Preparing the Mac"
   mac_args=(--mac-host "$mac_host" --mac-user "$mac_user" --anix-user "$anix_user")
   [[ $assume_yes -eq 1 ]] && mac_args+=(--yes)

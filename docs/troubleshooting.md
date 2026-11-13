@@ -22,6 +22,38 @@ that the helper failed, read that file, fix the item, and rerun the same
 command. The helper is idempotent; it skips an existing distribution and the
 first switch when the anix user already exists.
 
+## NFS export does not start
+
+The 6.6 WSL kernel builds `nfsd` and the `nft_ct`/`nft_fib` helpers as modules,
+and NixOS-WSL does not load modules by itself. `.wslconfig` asks WSL to load
+them, but only when the WSL VM starts.
+
+Check on anix:
+
+```sh
+systemctl status nfs-server
+grep -w nfsd /proc/filesystems
+```
+
+If `nfsd` is missing, restart WSL from Windows PowerShell and start the
+distribution again:
+
+```powershell
+wsl --shutdown
+wsl -d NixOS
+```
+
+Then confirm the module is there and rebuild:
+
+```sh
+grep -w nfsd /proc/filesystems
+scripts/rebuild anix
+```
+
+A rebuild that reports failed units but exits 4 still applied the
+configuration; the bootstrap treats that as a warning and prints the failed
+unit names.
+
 ## NFS mount times out
 
 `scripts/mount-src` waits 60 seconds for Tailscale and port 2049, then exits.
@@ -33,6 +65,7 @@ Check, in order:
 3. The anix firewall allows 2049 from `100.64.0.0/10`.
 4. The export names `amac`, not a stale client.
 5. `wsl -d NixOS` is running.
+6. `nfs-server` is active, and `grep -w nfsd /proc/filesystems` lists it.
 
 Retry with `sudo ~/.config/anix/scripts/mount-src`.
 

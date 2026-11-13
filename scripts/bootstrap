@@ -269,7 +269,11 @@ fi
 
 warn_if_intel_mac
 projects_dir=$(anix_projects_dir "$repo_root/users.nix")
-anix_check_projects_dir "$projects_dir" "$HOME" ||
+anix_user_name=$(anix_value_from_users anix "$repo_root/users.nix")
+[[ -n $anix_user_name ]] || anix_user_name=$USER
+# The flake resolves a relative root under the anix user's home, which differs
+# from $HOME on the Mac.
+anix_check_projects_dir "$projects_dir" "/home/$anix_user_name" ||
   die "invalid projectsDir in users.nix: $projects_dir"
 ensure_nix
 
@@ -291,6 +295,20 @@ require_anix() {
   if [[ -n $expected_user && "$(id -un)" != "$expected_user" ]]; then
     die "run as $expected_user, not $(id -un); keys, secrets and the tunnel token belong to that account"
   fi
+  local projects_dir absolute
+  projects_dir=$(anix_projects_dir "$repo_root/users.nix")
+  case "$projects_dir" in
+    /*)
+      absolute=$projects_dir
+      if [[ $absolute != "/home/$expected_user"/* && ! -d $absolute ]]; then
+        die "projectsDir is $absolute but that directory does not exist; create it, or use a relative root, then rerun"
+      fi
+      ;;
+  esac
+  if ! grep -qw nfsd /proc/filesystems 2>/dev/null; then
+    warn "this kernel does not list nfsd, so the NFS export will not start."
+    warn "the Mac mount needs it; check: sudo modprobe nfsd; grep nfsd /proc/filesystems"
+  fi
 }
 
 require_amac() {
@@ -307,6 +325,21 @@ require_amac() {
     26.*) ;;
     *) warn "expected macOS 26.x, found $(sw_vers -productVersion)" ;;
   esac
+  # Authorize the builder key before the switch: nix-darwin disables password
+  # SSH, and a failed activation must not lock this Mac out.
+  local pub=$HOME/.ssh/mac-builder.pub
+  if [[ -s $pub ]]; then
+    mkdir -p "$HOME/.ssh"
+    chmod 700 "$HOME/.ssh"
+    touch "$HOME/.ssh/authorized_keys"
+    chmod 600 "$HOME/.ssh/authorized_keys"
+    if ! grep -qxF "$(cat "$pub")" "$HOME/.ssh/authorized_keys"; then
+      cat "$pub" >> "$HOME/.ssh/authorized_keys"
+      say "builder key authorized for SSH"
+    fi
+  else
+    warn "missing $pub; the Mac switch disables password SSH, so make sure you can log in locally"
+  fi
 }
 
 checkout_notes() {
@@ -648,7 +681,26 @@ switch_anix() {
     say "would run sudo nixos-rebuild switch --flake $repo_root#anix"
     return 0
   fi
-  run sudo nixos-rebuild switch --flake "$repo_root#anix"
+  local status=0 failed
+  # Exit 4 means the configuration applied but units failed. On a stock WSL
+  # kernel that is how a missing nfsd module shows up, and it must not stop the
+  # rest of the bootstrap.
+  run sudo nixos-rebuild switch --flake "$repo_root#anix" || status=$?
+  if [[ $status -eq 0 ]]; then
+    return 0
+  fi
+  if [[ $status -ne 4 ]]; then
+    die "the anix switch failed (status $status); rerun scripts/bootstrap --host anix"
+  fi
+  failed=$(systemctl --failed --no-legend --no-pager 2>/dev/null | awk '{print $1}' | paste -sd' ' - || true)
+  if [[ $failed == *sops* ]]; then
+    die "the switch applied, but the secrets unit failed ($failed); rerun scripts/bootstrap --host anix"
+  fi
+  warn "the switch applied, but these units failed: ${failed:-unknown}"
+  warn "if nfs-server is in that list, the WSL kernel has not loaded nfsd."
+  warn "from Windows PowerShell run: wsl --shutdown; then wsl -d NixOS"
+  warn "then from the checkout: scripts/rebuild anix"
+  return 0
 }
 
 ensure_code_tunnel() {
@@ -691,7 +743,7 @@ switch_mac() {
     return 0
   fi
   local file
-  for file in /etc/nix/nix.conf /etc/bashrc /etc/zshrc; do
+  for file in /etc/nix/nix.conf /etc/nix/nix.custom.conf /etc/bashrc /etc/zshrc; do
     if [[ -e $file && ! -e ${file}.before-nix-darwin ]]; then
       run sudo mv "$file" "${file}.before-nix-darwin"
     fi
@@ -775,7 +827,7 @@ install_herdr() {
   fi
   run herdr plugin install jeffarese/herdr-bar --ref d9cdd88cb734615e96b1c37ed17fc39be904f060 --yes || warn "herdr-bar install failed"
   run herdr plugin install eugenioenko/ttt/herdr-plugin --ref b51ae983e0f60599090e0b0061093dbece9b541f --yes || warn "ttt.editor install failed"
-  run "$repo_root/scripts/install-herdr-plugins.sh"
+  run "$repo_root/scripts/install-herdr-plugins.sh" || warn "herdr plugin linking failed; rerun it after the switch"
   set_sidebar_state
 }
 

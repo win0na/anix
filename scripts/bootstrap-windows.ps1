@@ -250,6 +250,10 @@ swap=8GB
 networkingMode=mirrored
 dnsTunneling=true
 autoProxy=true
+# NixOS-WSL does not load kernel modules itself, and the 6.6 WSL kernel builds
+# nfsd and the nftables helpers as modules. Without these the NFS export and
+# the nftables firewall fail on the first switch.
+loadKernelModules=nfsd,nft_ct,nft_fib,nft_reject
 
 [general]
 instanceIdleTimeout=-1
