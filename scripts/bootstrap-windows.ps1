@@ -449,7 +449,7 @@ if (-not $NoBootstrap -and -not $NoClone) {
     $macArgs = ""
     if ($Yes) { $macArgs = "--yes" }
     wsl -d $Distro -u $AnixUser --exec bash -lc "cd ~/.config/anix && exec ./scripts/bootstrap-mac-remote $macArgs"
-    if ($LASTEXITCODE -ne 0) { throw "the Mac bootstrap failed; enable Remote Login, then run: wsl -d $Distro -u $AnixUser --exec bash -lc 'cd ~/.config/anix && ./scripts/bootstrap-mac-remote'" }
+    if ($LASTEXITCODE -ne 0) { throw "the Mac bootstrap failed; read the message above (Remote Login, or 'wsl --shutdown' then rerun), then run: wsl -d $Distro -u $AnixUser --exec bash -lc 'cd ~/.config/anix && ./scripts/bootstrap-mac-remote'" }
   }
   Write-Host ""
   Write-Host "Done. anix is running in $Distro."

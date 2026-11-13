@@ -190,7 +190,7 @@ export_ubuntu() {
   rm -f "${out}.partial"
   warn "the age-encrypted export failed"
   if ! ask "Write a plaintext archive instead? It will contain the age key." n; then
-    die "backup cancelled; nothing was unregistered"
+    die "backup cancelled; nothing was unregistered. Rerun with --skip-backup, or pass --backup <windows path>."
   fi
   warn "the plaintext archive contains the age key; protect or delete it"
   wsl.exe --export "$WSL_DISTRO_NAME" "$dest" ||
@@ -199,7 +199,7 @@ export_ubuntu() {
 }
 
 if [[ $dry_run -eq 0 ]] && ! SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt sops_cmd decrypt "$repo_root/secrets/secrets.yaml" >/dev/null 2>&1; then
-  die "cannot decrypt secrets/secrets.yaml with the personal age key"
+  die "cannot decrypt secrets/secrets.yaml with the personal age key; if nix failed to start, run nix --version, fix that first, then rerun scripts/provision"
 fi
 
 value_from_users() {
@@ -291,6 +291,8 @@ run mkdir -p "$win_stage"
 run cp "$repo_root/scripts/bootstrap-windows.ps1" "$win_stage/bootstrap-windows.ps1"
 win_helper=$(wslpath -w "$win_stage/bootstrap-windows.ps1")
 win_log="$win_temp\\anix\\anix-bootstrap-windows.log"
+# Test the unix path: a Windows path is never a file in bash.
+win_log_unix="$win_temp_unix/anix/anix-bootstrap-windows.log"
 stage_cleanup() { rm -f "$win_stage/bootstrap-windows.ps1" "$win_stage/anix-elevate.ps1"; }
 trap stage_cleanup EXIT
 admin=$(powershell.exe -NoProfile -Command '([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)' | tr -d '\r\n') ||
@@ -320,7 +322,7 @@ else
   echo "  Approve the Windows UAC prompt to install $distro."
   win_wrapper=$(wslpath -w "$wrapper")
   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$win_wrapper" || {
-    if [[ ! -s $win_log ]]; then
+    if [[ ! -s $win_log_unix ]]; then
       die "the Windows helper did not start; approve the UAC prompt, then rerun scripts/provision"
     fi
     die "the Windows helper failed; read $win_log, then rerun scripts/provision"
@@ -328,7 +330,7 @@ else
 fi
 
 if [[ $dry_run -eq 0 ]] && ! wsl.exe --list --quiet 2>/dev/null | tr -d '\0\r' | grep -qx "$distro"; then
-  if [[ ! -s $win_log ]]; then
+  if [[ ! -s $win_log_unix ]]; then
     die "the Windows helper did not start; approve the UAC prompt, then rerun scripts/provision"
   fi
   die "the $distro distribution was not created; read $win_log, then rerun scripts/provision"
@@ -440,18 +442,28 @@ if [[ $do_mac -eq 1 ]]; then
   if [[ $dry_run -eq 1 ]]; then
     say "would check that nfs-server is running, then run scripts/bootstrap-mac-remote inside $distro"
   elif ! wsl.exe -d "$distro" -u root --exec bash -lc 'grep -qw nfsd /proc/filesystems && systemctl is-active --quiet nfs-server' >/dev/null 2>&1; then
-    # The 6.6 WSL kernel builds nfsd as a module, and WSL loads modules only
-    # when the VM starts. The Mac mount cannot work before that restart.
-    say "The Mac phase needs the NFS export, which is not running yet"
-    say "The WSL kernel loads nfsd when the VM starts; .wslconfig already asks for it"
-    say "From Windows PowerShell:"
-    printf '  wsl --shutdown\n  wsl -d %s\n' "$distro"
-    say "Then inside $distro:"
-    printf '  cd ~/.config/anix && scripts/bootstrap-mac-remote'
-    printf ' %q' "${mac_retry[@]}"
-    printf '\n'
-    say "Ubuntu stays installed; nothing was unregistered"
-    do_mac=0
+    if wsl.exe -d "$distro" -u root --exec bash -lc 'grep -qw nfsd /proc/filesystems' >/dev/null 2>&1; then
+      say "nfsd is loaded but nfs-server is not running"
+      say "Start it inside $distro, then rerun the Mac phase:"
+      printf '  sudo systemctl start nfs-server\n  cd ~/.config/anix && scripts/bootstrap-mac-remote'
+      printf ' %q' "${mac_retry[@]}"
+      printf '\n'
+      say "Ubuntu stays installed; nothing was unregistered"
+      do_mac=0
+    else
+      # The 6.6 WSL kernel builds nfsd as a module, and WSL loads modules only
+      # when the VM starts. The Mac mount cannot work before that restart.
+      say "The Mac phase needs the NFS export, which is not running yet"
+      say "The WSL kernel loads nfsd when the VM starts; .wslconfig already asks for it"
+      say "From Windows PowerShell:"
+      printf '  wsl --shutdown\n  wsl -d %s\n' "$distro"
+      say "Then inside $distro:"
+      printf '  cd ~/.config/anix && scripts/bootstrap-mac-remote'
+      printf ' %q' "${mac_retry[@]}"
+      printf '\n'
+      say "Ubuntu stays installed; nothing was unregistered"
+      do_mac=0
+    fi
   fi
 fi
 

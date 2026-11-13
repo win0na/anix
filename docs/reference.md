@@ -91,7 +91,7 @@ with the upstream installer when it is missing. `scripts/bootstrap
 
 `scripts/provision` also takes `--mac-host`, `--image-url`, `--image-sha`, and
 `--no-finalize`. `scripts/bootstrap-mac-remote` takes `--mac-host`,
-`--mac-user`, `--anix-user`, and `--no-first-switch`.
+`--mac-user`, `--anix-user`, `--no-first-switch`, `--yes`, and `--dry-run`.
 
 ## Versions
 

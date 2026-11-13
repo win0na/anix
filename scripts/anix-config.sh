@@ -5,7 +5,9 @@
 
 anix_value_from_users() {
   local key=$1 file=${2:-${repo_root:-}/users.nix}
-  [[ -n $file && -s $file ]] || return 1
+  # Return an empty value rather than failing: callers run under `set -e` and
+  # check the result themselves.
+  [[ -n $file && -s $file ]] || return 0
   # Strip comments and flatten first: a commented-out assignment or a
   # hand-written one-line users.nix must not change the answer.
   sed 's/#.*//' "$file" |
