@@ -66,7 +66,8 @@ It then installs Nix, clones the fork to `~/.config/anix`, and runs
    the push prompt defaults to no.
 
 Because of those prompts, the first run needs a terminal. `--yes` accepts the
-defaults, skips the recovery key, and leaves the commits to you.
+defaults, skips the recovery key, commits without asking, and leaves the push
+to you.
 
 `provision` then asks for the project root (default `src`; type `code` or an
 absolute path under the anix home or `/mnt` if your projects already live there),
