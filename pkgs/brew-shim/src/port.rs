@@ -151,11 +151,10 @@ pub fn parse_info(text: &str) -> Option<(String, String)> {
         return None;
     }
     let version = match fields.as_slice() {
-        [_, version, revision, ..] if *revision != "0" => normalize_version(&format!(
-            "{}_{}",
-            version, revision
-        )),
-        [_, version, ..] => normalize_version(version),
+        // `--version --revision` splits the fields already; a revision is not
+        // part of a Homebrew version, and the upstream version may itself end
+        // in `_<digits>`.
+        [_, version, ..] => version.trim_start_matches('@').to_string(),
         _ => return None,
     };
     Some((name, version))
@@ -261,6 +260,10 @@ The following ports are currently installed:
         assert_eq!(
             parse_info("python312 3.12.7 2"),
             Some(("python312".into(), "3.12.7".into()))
+        );
+        assert_eq!(
+            parse_info("foo 1.2.3_1 0"),
+            Some(("foo".into(), "1.2.3_1".into()))
         );
     }
 

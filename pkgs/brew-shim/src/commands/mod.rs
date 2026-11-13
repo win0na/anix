@@ -21,11 +21,12 @@ pub fn run(args: &[String]) -> Result<(), CliError> {
 
     // Homebrew-owned commands may receive --json; only the port-backed ones
     // cannot synthesise it.
-    let delegated = cask
-        || matches!(
+    let delegated = (cask
+        && matches!(
             command,
-            "tap" | "untap" | "pin" | "unpin" | "bundle"
-        );
+            "list" | "info" | "install" | "uninstall" | "remove" | "rm"
+        ))
+        || matches!(command, "tap" | "untap" | "pin" | "unpin" | "bundle");
     if !delegated {
         if let Some(flag) = args
             .iter()

@@ -276,7 +276,7 @@ fn missing_archive_falls_back_to_brew_with_clean_environment() {
     fixture.write("search_exact.txt", "foo @1.0\n");
     fixture.write(
         "install_failure.txt",
-        "Error: Failed to archivefetch foo: version @1.0_0: HTTP response code said error\n",
+        "Error: Failed to archivefetch foo: version @1.0_0: The requested URL returned error: 404\n",
     );
 
     let output = fixture.run_env(
@@ -299,6 +299,40 @@ fn missing_archive_falls_back_to_brew_with_clean_environment() {
         brew_env.is_empty(),
         "Homebrew inherited shim variables: {}",
         brew_env
+    );
+}
+
+#[test]
+fn archivefetch_server_error_is_reported_without_brew_fallback() {
+    let fixture = Fixture::new();
+    fixture.write("search_exact.txt", "foo @1.0\n");
+    fixture.write(
+        "install_failure.txt",
+        "Error: Failed to archivefetch foo: version @1.0_0: The requested URL returned error: 500\n",
+    );
+
+    let output = fixture.run(&["install", "foo"]);
+    assert_eq!(code(&output), 1, "stderr: {}", stderr(&output));
+    assert!(
+        !fixture.log_exists("brew.log"),
+        "a server error must not fall back to Homebrew"
+    );
+}
+
+#[test]
+fn archivefetch_connection_reset_does_not_fall_back() {
+    let fixture = Fixture::new();
+    fixture.write("search_exact.txt", "foo @1.0\n");
+    fixture.write(
+        "install_failure.txt",
+        "Error: Failed to archivefetch foo: version @1.0_0: Connection reset by peer\n",
+    );
+
+    let output = fixture.run(&["install", "foo"]);
+    assert_eq!(code(&output), 1, "stderr: {}", stderr(&output));
+    assert!(
+        !fixture.log_exists("brew.log"),
+        "a connection error must not fall back to Homebrew"
     );
 }
 

@@ -4,20 +4,16 @@ use crate::exec::{self, CliError};
 use crate::formula;
 use crate::port;
 
-const NO_ARCHIVE: &[&str] = &[
-    "not found, required when binary-only is set",
-    "failed to archivefetch",
-];
-
 /// `port -b` exits 1 for every failure. Only a missing binary archive may fall
-/// back to Homebrew, so the error text decides; a network error must surface.
+/// back to Homebrew: the archivefetch failure must also read as not-found, and
+/// a network error must surface instead.
 fn missing_archive(stdout: &str, stderr: &str) -> bool {
-    ["failed to archivefetch", "not found, required when binary-only is set"]
-        .iter()
-        .any(|marker| {
-            stdout.to_ascii_lowercase().contains(marker)
-                || stderr.to_ascii_lowercase().contains(marker)
-        })
+    let text = format!("{}\n{}", stdout, stderr).to_ascii_lowercase();
+    let archive = text.contains("failed to archivefetch")
+        || text.contains("not found, required when binary-only is set");
+    archive
+        && (text.contains("404") || text.contains("not found"))
+        && !network_error(stdout, stderr)
 }
 
 fn network_error(stdout: &str, stderr: &str) -> bool {

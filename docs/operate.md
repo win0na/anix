@@ -58,7 +58,7 @@ everything else is answered from MacPorts.
 Mutations need a password: the shim runs `sudo -n` and prints the exact
 `sudo port ...` command instead of prompting. The first switch installs
 MacPorts 2.12.7 from the signed package, and every switch runs `port sync` with
-a 120 second timeout. A failed sync or package install is a warning; the
+a 300 second timeout. A failed sync or package install is a warning; the
 switch still completes.
 
 ## Backups
