@@ -554,8 +554,8 @@ ensure_recovery_key() {
   read -r -p "Recovery key path [$HOME/anix-recovery-$(date +%Y%m%d).txt]: " path || true
   path=${path:-$HOME/anix-recovery-$(date +%Y%m%d).txt}
   [[ ! -e $path ]] || die "refusing to overwrite $path"
-  umask 077
-  age_keygen -o "$path"
+  # The subshell keeps umask 077 from leaking into the later nixos-rebuild.
+  ( umask 077; age_keygen -o "$path" )
   chmod 600 "$path"
   pub=$(age_keygen -y "$path")
   add_recipient recovery "$pub"
@@ -564,7 +564,7 @@ ensure_recovery_key() {
   if [[ $path == "$HOME"/* ]] && ask "Delete $path now after copying it offline?" n; then
     rm -f "$path"
   fi
-  commit_secrets "secrets: add the recovery recipient"
+  commit_secrets "bootstrap: add the recovery recipient"
 }
 
 add_recipient() {
@@ -596,7 +596,7 @@ add_recipient() {
 commit_secrets() {
   local message=$1
   if [[ $dry_run -eq 1 ]]; then
-    say "would commit the secrets and the Mac builder key"
+    say "would commit users.nix, the secrets, and the Mac builder key"
     return 0
   fi
   if [[ ! -e $secrets_file ]]; then
@@ -606,12 +606,18 @@ commit_secrets() {
   if [[ -e .sops.yaml ]]; then
     paths=(.sops.yaml "${paths[@]}")
   fi
+  # The Windows helper writes users.nix itself, so this is the only place that
+  # records the usernames in git on that path.
+  if [[ -e users.nix ]] &&
+    { ! git diff --quiet -- users.nix || ! git ls-files --error-unmatch users.nix >/dev/null 2>&1; }; then
+    paths+=(users.nix)
+  fi
   run git add "${paths[@]}"
   if git diff --cached --quiet -- "${paths[@]}"; then
     return 0
   fi
-  if ! ask "Commit the encrypted secrets and the Mac builder key?" y; then
-    warn "secrets left uncommitted"
+  if ! ask "Commit users.nix, the encrypted secrets, and the Mac builder key?" y; then
+    warn "users.nix and the secrets are left uncommitted"
     return 0
   fi
   if ! git -c user.name=anix-bootstrap -c user.email=anix-bootstrap@localhost \
@@ -620,7 +626,7 @@ commit_secrets() {
     return 0
   fi
   if ask "Push to the current branch?" n; then
-    run git push
+    run git push || warn "push failed; push later from a host with credentials"
   fi
 }
 
@@ -836,7 +842,7 @@ bootstrap_anix() {
   recipient="$(host_recipient)" || die "cannot derive the anix age recipient from the host key"
   if [[ -s $secrets_file ]]; then
     add_recipient anix "$recipient"
-    commit_secrets "secrets: add the anix recipient and builder key"
+    commit_secrets "bootstrap: record the anix recipient and builder key"
   fi
 
   switch_anix
@@ -873,15 +879,15 @@ bootstrap_mac() {
   recipient="$(host_recipient)" || die "the Mac host key was not generated"
   say "amac recipient: $recipient"
   add_recipient amac "$recipient"
-  commit_secrets "secrets: add the amac recipient"
+  commit_secrets "bootstrap: record the host names, recipients, and builder key"
   switch_mac
   post_mac
 }
 
 prepare_next_steps() {
   say "next steps"
-  printf '  .sops.yaml is tracked; commit it with secrets/secrets.yaml. It holds public recipients only.\n'
-  printf '  secrets/secrets.yaml is staged; commit it to the fork as the ciphertext backup.\n'
+  printf '  .sops.yaml holds public recipients only; commit it with the other files.\n'
+  printf '  secrets/secrets.yaml and users.nix are committed by the host bootstrap; push them from the checkout.\n'
   case "$(uname -s)" in
     Darwin)
       printf '  clone the repository on anix, then run scripts/bootstrap-mac-remote from that checkout.\n'

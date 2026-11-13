@@ -181,6 +181,8 @@ case "$(uname -s)" in
 esac
 
 target="$HOME/.config/anix"
+target_exists=0
+[[ -d $target/.git ]] && target_exists=1
 
 current_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
 if [[ $current_root == "$target" && -f $current_root/flake.nix && -x $current_root/scripts/install ]]; then
@@ -189,7 +191,7 @@ else
   repo_root=""
 fi
 
-if [[ -z $repo_url && -z $repo_root ]]; then
+if [[ -z $repo_url && -z $repo_root && $target_exists -eq 0 ]]; then
   if [[ $assume_yes -eq 1 ]]; then
     die "set ANIX_REPO_URL or pass the fork URL with --yes"
   elif [[ -t 0 ]]; then
@@ -227,6 +229,8 @@ fi
 if [[ $dry_run -eq 1 ]]; then
   if [[ -n $repo_root ]]; then
     say "would use the checkout at $repo_root"
+  elif [[ $target_exists -eq 1 ]]; then
+    say "would use the checkout at $target"
   else
     say "would clone $repo_url to $target"
   fi
@@ -247,6 +251,12 @@ ensure_nix
 if [[ -z $repo_root ]]; then
   if [[ -d "$target/.git" ]]; then
     repo_root=$target
+    if [[ -n $repo_url ]]; then
+      origin=$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)
+      if [[ -n $origin && $origin != "$repo_url" ]]; then
+        warn "keeping the checkout at $repo_root with origin $origin; ignored $repo_url"
+      fi
+    fi
     if [[ $no_pull -eq 0 ]]; then
       if [[ -n "$(git -C "$repo_root" status --porcelain)" ]]; then
         warn "local changes in $repo_root; not pulling"

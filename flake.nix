@@ -58,11 +58,13 @@
       lib = nixpkgs.lib;
       projectsDir =
         let
+          anixHome = "/home/${users.anix}";
           raw = users.projectsDir or "src";
           value = if raw == "/" then raw else lib.removeSuffix "/" raw;
-          name = baseNameOf value;
-          segments = lib.splitString "/" value;
-          hasDotSegment = lib.any (segment: segment == "." || segment == "..") segments;
+          segments = lib.filter (segment: segment != "") (lib.splitString "/" value);
+          # A hidden segment could export a key directory; a protected name
+          # could put the Mac mount over a system folder.
+          hiddenSegment = lib.any (segment: lib.hasPrefix "." segment) segments;
           blocked = [
             "applications"
             "desktop"
@@ -75,29 +77,29 @@
             "public"
             "system"
             "users"
-            ".config"
-            ".ssh"
           ];
+          blockedSegment = lib.any (segment: lib.elem (lib.toLower segment) blocked) segments;
+          underHome = lib.hasPrefix "${anixHome}/" value;
+          underMnt = lib.hasPrefix "/mnt/" value
+            && builtins.match "/mnt/[A-Za-z](/.*)?" value == null
+            && builtins.match "/mnt/(wsl|wslg)(/.*)?" value == null;
         in
         if value == "" then
           "src"
         else if value == "/" then
           throw "projectsDir must not be /"
-        else if hasDotSegment then
-          throw "projectsDir must not contain . or .. segments: ${value}"
         else if lib.hasInfix "//" value then
           throw "projectsDir must not contain empty segments: ${value}"
         else if builtins.match "[A-Za-z0-9._/-]+" value == null then
           throw "projectsDir must use only letters, digits, dot, underscore, dash and slash: ${value}"
-        else if lib.hasPrefix "/" value
-          && !(lib.hasPrefix "/home/" value || lib.hasPrefix "/mnt/" value) then
-          throw "projectsDir must be under /home or /mnt: ${value}"
-        else if builtins.match "/mnt/[A-Za-z](/.*)?" value != null then
-          throw "projectsDir must not be a Windows drive mount; NFS cannot export it: ${value}"
-        else if value == "/home/${users.anix}" then
+        else if hiddenSegment then
+          throw "projectsDir must not contain a hidden segment: ${value}"
+        else if value == anixHome then
           throw "projectsDir must not be the anix home: ${value}"
-        else if lib.elem (lib.toLower name) blocked then
-          throw "projectsDir must not use a protected home directory: ${value}"
+        else if blockedSegment then
+          throw "projectsDir must not use a protected directory name: ${value}"
+        else if lib.hasPrefix "/" value && !(underHome || underMnt) then
+          throw "projectsDir must be under ${anixHome} or /mnt/<name>: ${value}"
         else
           value;
 

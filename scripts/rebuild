@@ -118,9 +118,10 @@ case "$target" in
           ;;
       esac
       # The Mac builds from a copy of this checkout. Refresh it so `rebuild
-      # amac` compiles the current flake, not the last copied one.
+      # amac` compiles the current flake, not the last copied one. Exclude .git:
+      # the Mac copy must not receive refs from this checkout.
       echo "==> syncing the checkout to amac"
-      tar -C "$repo_root" -cf - . |
+      tar -C "$repo_root" --exclude=.git -cf - . |
         ssh amac 'set -e; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
       # -t gives sudo a terminal; Remote Login must allow full disk access for
       # remote users or nix-darwin refuses app updates.

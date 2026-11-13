@@ -174,7 +174,9 @@ in
 
   # Retry the NFS mount every five minutes until the WSL host is reachable.
   launchd.daemons.anix-nfs = {
-    command = "/Users/${userName}/.config/anix/scripts/mount-src";
+    # A root daemon must not run a script the login user can edit; ship the
+    # script from the store instead of ~/.config/anix.
+    command = "${pkgs.bash}/bin/bash ${../../scripts}/mount-src";
     serviceConfig = {
       RunAtLoad = true;
       StartInterval = 300;

@@ -29,7 +29,7 @@ anix_projects_name() {
 }
 
 anix_check_projects_dir() {
-  local dir=$1 home=${2:-} segment name
+  local dir=$1 home=${2:-} segment lower
   local -a parts=()
   [[ -n $dir && $dir != "/" ]] || return 1
   # The flake strips one trailing slash; do the same so both agree on `src/`.
@@ -39,19 +39,28 @@ anix_check_projects_dir() {
   [[ $dir == *//* ]] && return 1
   IFS=/ read -r -a parts <<< "$dir"
   for segment in "${parts[@]}"; do
-    [[ $segment == "." || $segment == ".." ]] && return 1
+    # The leading slash of an absolute path yields one empty segment.
+    [[ -n $segment ]] || continue
+    # A hidden directory can hold keys or a tunnel token.
+    [[ $segment == .* ]] && return 1
+    lower=$(printf '%s' "$segment" | tr '[:upper:]' '[:lower:]')
+    case "$lower" in
+      applications|desktop|documents|downloads|library|movies|music|pictures|public|system|users) return 1 ;;
+    esac
   done
   case "$dir" in
     /*)
-      [[ $dir == /home/* || $dir == /mnt/* ]] || return 1
-      [[ $dir == /mnt/[A-Za-z] || $dir == /mnt/[A-Za-z]/* ]] && return 1
+      # Only the anix home and a non-WSL /mnt path may be exported.
+      if [[ -n $home && $dir == "$home"/* ]]; then
+        :
+      else
+        [[ $dir == /mnt/* ]] || return 1
+        [[ $dir == /mnt/[A-Za-z] || $dir == /mnt/[A-Za-z]/* ]] && return 1
+        [[ $dir == /mnt/wsl || $dir == /mnt/wsl/* ]] && return 1
+        [[ $dir == /mnt/wslg || $dir == /mnt/wslg/* ]] && return 1
+      fi
       ;;
   esac
   [[ -n $home && $dir == "$home" ]] && return 1
-  name=${dir##*/}
-  name=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
-  case "$name" in
-    applications|desktop|documents|downloads|library|movies|music|pictures|public|system|users|.config|.ssh) return 1 ;;
-  esac
   return 0
 }

@@ -37,6 +37,7 @@ warn() { printf 'warning: %s\n' "$*" >&2; }
 say() { printf '\n==> %s\n' "$*"; }
 usage_error() { printf 'error: %s\n' "$*" >&2; usage >&2; exit 2; }
 
+original_args=("$@")
 assume_yes=0
 dry_run=0
 distro=NixOS
@@ -310,11 +311,18 @@ else
   } > "$wrapper"
   echo "  Approve the Windows UAC prompt to install $distro."
   win_wrapper=$(wslpath -w "$wrapper")
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$win_wrapper" ||
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$win_wrapper" || {
+    if [[ ! -s $win_log ]]; then
+      die "the Windows helper did not start; approve the UAC prompt, then rerun scripts/provision"
+    fi
     die "the Windows helper failed; read $win_log, then rerun scripts/provision"
+  }
 fi
 
 if [[ $dry_run -eq 0 ]] && ! wsl.exe --list --quiet 2>/dev/null | tr -d '\0\r' | grep -qx "$distro"; then
+  if [[ ! -s $win_log ]]; then
+    die "the Windows helper did not start; approve the UAC prompt, then rerun scripts/provision"
+  fi
   die "the $distro distribution was not created; read $win_log, then rerun scripts/provision"
 fi
 
@@ -379,11 +387,15 @@ say "Transferring the repository"
 if [[ $dry_run -eq 1 ]]; then
   printf '  $ tar -C %s -cf - . | wsl.exe ... tar -xf - -C %s/.config/anix\n' "$repo_root" "$HOME"
 else
+  # Stage and swap. An interrupted earlier transfer can leave a partial .git,
+  # and treating that as a finished checkout skips every later step.
   tar -C "$repo_root" -cf - . |
-    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; if [ -d "$HOME/.config/anix/.git" ]; then cat >/dev/null; else mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"; fi'
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; stage="$HOME/.config/anix.stage.$$"; trap "rm -rf \"$stage\"" EXIT; rm -rf "$stage"; mkdir -p "$stage" "$HOME/.config"; tar -xf - -C "$stage"; if [ -s "$HOME/.config/anix/.git/HEAD" ]; then rm -rf "$stage"; else rm -rf "$HOME/.config/anix"; mv "$stage" "$HOME/.config/anix"; fi' ||
+    die "copying the repository to $distro failed; rerun: scripts/provision ${original_args[*]:-}"
   # The target may already hold recipient commits. Update only users.nix.
   tar -C "$repo_root" -cf - users.nix |
-    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'tar -xf - -C "$HOME/.config/anix"'
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - -C "$HOME/.config/anix"' ||
+    die "writing users.nix in $distro failed; rerun: scripts/provision ${original_args[*]:-}"
 fi
 
 say "Transferring keys and ${#selected[@]} project paths"
@@ -409,7 +421,8 @@ done
 if [[ $dry_run -eq 1 ]]; then
   echo "  $ wsl.exe -d $distro -u $anix_user --exec bash -lc '$bootstrap_cmd'"
 else
-  wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc "$bootstrap_cmd"
+  wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc "$bootstrap_cmd" ||
+    die "the anix bootstrap in $distro failed; fix the reported step, then rerun: scripts/provision ${original_args[*]:-}"
 fi
 
 if [[ $do_mac -eq 1 ]]; then
@@ -423,7 +436,8 @@ if [[ $do_mac -eq 1 ]]; then
     for arg in "${mac_args[@]}"; do
       mac_cmd+=" $(printf '%q' "$arg")"
     done
-    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc "$mac_cmd"
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc "$mac_cmd" ||
+      die "the Mac phase failed; rerun it inside $distro with: scripts/bootstrap-mac-remote ${mac_args[*]}"
   fi
 fi
 
@@ -432,13 +446,25 @@ if [[ $do_finalize -eq 1 && $do_mac -eq 1 ]]; then
   if [[ $WSL_DISTRO_NAME == "$distro" ]]; then
     die "refusing to unregister the distribution this script is running in"
   fi
-  if ask "Both hosts are configured. Prepare a final $WSL_DISTRO_NAME backup before unregister?" n; then
-    [[ -n $backup ]] || backup=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n')
-    [[ $backup == *.age || $backup == *.tar ]] || backup="$backup\\anix-ubuntu-backup.tar"
-    if [[ $dry_run -eq 1 ]]; then
-      say "would export $WSL_DISTRO_NAME to an age-encrypted archive"
-    else
+  if [[ $dry_run -eq 0 ]] && ! grep -q '^  recovery: &recovery ' "$repo_root/.sops.yaml" 2>/dev/null; then
+    die "no recovery recipient in .sops.yaml; run scripts/bootstrap --prepare in ~/.config/anix, then rerun this script. Nothing was unregistered."
+  fi
+  [[ -n $backup ]] || backup=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n')
+  [[ $backup == *.age || $backup == *.tar ]] || backup="$backup\\anix-ubuntu-backup.tar"
+  if [[ $dry_run -eq 1 ]]; then
+    say "would export $WSL_DISTRO_NAME to an age-encrypted archive"
+  else
+    backup_unix=$(wslpath -u "$backup")
+    if [[ -s $backup_unix ]]; then
+      say "Existing backup: $backup"
+    elif ask "Export $WSL_DISTRO_NAME before removing it? The archive is the only copy." y; then
       export_ubuntu "$backup"
+      backup_unix=$(wslpath -u "$backup")
+    fi
+    # Unregistering without a backup loses the recovery key and every file
+    # that was not selected for transfer.
+    if [[ ! -s $backup_unix ]]; then
+      die "refusing to unregister $WSL_DISTRO_NAME without a backup; rerun with --backup <windows path>, or remove it yourself with: wsl.exe --unregister $WSL_DISTRO_NAME"
     fi
   fi
   confirm=""

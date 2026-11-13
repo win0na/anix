@@ -104,8 +104,10 @@ function Invoke-WslScript {
   )
   $bytes = [Text.Encoding]::UTF8.GetBytes($Script.Replace("`r", ""))
   $encoded = [Convert]::ToBase64String($bytes)
-  wsl.exe -d $Distribution -u $User --exec bash -lc "echo $encoded | base64 -d | bash"
-  return $LASTEXITCODE
+  # Out-Host keeps the command's stdout out of the function's return value,
+  # which would otherwise be an array holding both the output and the code.
+  wsl.exe -d $Distribution -u $User --exec bash -lc "echo $encoded | base64 -d | bash" | Out-Host
+  return [int]$LASTEXITCODE
 }
 
 if (-not (Test-Admin)) {
@@ -154,25 +156,35 @@ if ([string]::IsNullOrWhiteSpace($ProjectsDir)) {
     if ([string]::IsNullOrWhiteSpace($ProjectsDir)) { $ProjectsDir = "src" }
   }
 }
-if ($ProjectsDir -notmatch '^[A-Za-z0-9._/-]+$' -or $ProjectsDir.Contains("..") -or $ProjectsDir -eq "/" -or $ProjectsDir -eq "." -or $ProjectsDir.EndsWith("/")) {
+# Match the flake: strip one trailing slash, then validate every segment.
+if ($ProjectsDir.EndsWith("/") -and $ProjectsDir.Length -gt 1) {
+  $ProjectsDir = $ProjectsDir.Substring(0, $ProjectsDir.Length - 1)
+}
+if ($ProjectsDir -notmatch '^[A-Za-z0-9._/-]+$' -or $ProjectsDir -eq "/" -or $ProjectsDir -eq ".") {
   throw "ProjectsDir is invalid: $ProjectsDir"
-}
-$projectSegments = $ProjectsDir -split "/"
-if ($projectSegments -contains "." -or $projectSegments -contains "..") {
-  throw "ProjectsDir must not contain . or .. segments: $ProjectsDir"
-}
-if ($ProjectsDir.StartsWith("/") -and -not ($ProjectsDir.StartsWith("/home/") -or $ProjectsDir.StartsWith("/mnt/"))) {
-  throw "ProjectsDir must be under /home or /mnt: $ProjectsDir"
-}
-if ($ProjectsDir -match '^/mnt/[A-Za-z](/|$)') {
-  throw "ProjectsDir must not be a Windows drive mount; NFS cannot export it: $ProjectsDir"
 }
 if ($ProjectsDir.Contains("//")) {
   throw "ProjectsDir must not contain empty segments: $ProjectsDir"
 }
-$projectName = ($projectSegments[-1]).ToLower()
-if ($projectName -in @("applications","desktop","documents","downloads","library","movies","music","pictures","public","system","users",".config",".ssh")) {
-  throw "ProjectsDir must not use a protected home directory: $ProjectsDir"
+$projectSegments = $ProjectsDir -split "/"
+$protected = @("applications","desktop","documents","downloads","library","movies","music","pictures","public","system","users")
+foreach ($segment in $projectSegments) {
+  if ([string]::IsNullOrEmpty($segment)) { throw "ProjectsDir must not contain empty segments: $ProjectsDir" }
+  if ($segment.StartsWith(".")) {
+    throw "ProjectsDir must not contain a hidden segment: $ProjectsDir"
+  }
+  if ($protected -contains $segment.ToLower()) {
+    throw "ProjectsDir must not use a protected directory name: $ProjectsDir"
+  }
+}
+if ($ProjectsDir.StartsWith("/")) {
+  $inHome = $ProjectsDir.StartsWith("/home/$AnixUser/")
+  $inMnt = $ProjectsDir.StartsWith("/mnt/") -and
+    $ProjectsDir -notmatch '^/mnt/[A-Za-z](/|$)' -and
+    $ProjectsDir -notmatch '^/mnt/(wsl|wslg)(/|$)'
+  if (-not ($inHome -or $inMnt)) {
+    throw "ProjectsDir must be under /home/$AnixUser or /mnt/<name>: $ProjectsDir"
+  }
 }
 if ($ProjectsDir -eq "/home/$AnixUser") {
   throw "ProjectsDir must not be the anix home: $ProjectsDir"
@@ -203,7 +215,9 @@ if (-not $wslReady) {
   $wslReady = ($LASTEXITCODE -eq 0)
   $ErrorActionPreference = $savedPreference
   if (-not $wslReady) {
-    Write-Host "Reboot Windows, then run this script again."
+    Write-Host "==> reboot Windows, then run this script again:"
+    Write-Host "    powershell -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+    Stop-Log
     exit 0
   }
   Write-Host "No reboot needed; continuing."
@@ -223,7 +237,7 @@ $ErrorActionPreference = $savedPreference
 if ($wslVersion) {
   $current = [version]$wslVersion
   if ($current -lt [version]"2.4.4") {
-    Write-Warning "WSL $wslVersion is older than 2.4.4; --from-file may fail."
+    throw "WSL $wslVersion is older than 2.4.4 and cannot import the image. Run: wsl --update. Then rerun this script."
   }
 }
 
@@ -270,7 +284,8 @@ if (-not $SkipFirewall) {
         -Action Allow `
         -VMCreatorId "{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}" `
         -Protocol TCP `
-        -LocalPorts 2049
+        -LocalPorts 2049 `
+        -RemoteAddresses "100.64.0.0/10"
     }
   }
 
@@ -300,11 +315,12 @@ if ($distroExists) {
     Write-Host "==> first switch skipped (NoFirstSwitch)"
     $needsFirstSwitch = $false
   } elseif ($needsFirstSwitch) {
-    if ($Yes) {
-      throw "A distribution named $Distro exists and has no $AnixUser. Pass -DistroName with a different name, or rerun with -NoFirstSwitch if its first switch failed."
-    }
-    if (-not (Confirm "$Distro exists without $AnixUser. The first switch will replace its configuration. Continue?")) {
-      throw "Install cancelled."
+    if (-not $Yes) {
+      if (-not (Confirm "$Distro exists without $AnixUser. The first switch will replace its configuration. Continue?")) {
+        throw "Install cancelled."
+      }
+    } else {
+      Write-Warning "$Distro exists without $AnixUser; running the first switch to create it."
     }
   } elseif (-not (Confirm "$Distro already exists. Skip the install and continue?")) {
     throw "Install cancelled."

@@ -57,7 +57,7 @@ builder keys, and starts `scripts/provision`. Approve the Windows UAC prompt,
 and enable Remote Login on the Mac when the script asks.
 
 The project root defaults to `~/src`. To keep projects in `~/code` or an
-absolute path under `/home` or `/mnt`, set `projectsDir` in `users.nix`;
+absolute path under the anix home or `/mnt`, set `projectsDir` in `users.nix`;
 `scripts/provision` asks for it and writes the value.
 
 ### Fresh Windows
@@ -90,13 +90,15 @@ Approve the Terminal and App Management prompts when they appear on the Mac.
 The first run creates the personal age key at `~/.config/sops/age/keys.txt`,
 the builder key at `~/.ssh/mac-builder`, and the encrypted
 `secrets/secrets.yaml`. The personal key is the only file you cannot
-regenerate. Copy it to a password manager before the first switch.
+regenerate. `scripts/bootstrap --prepare` prints its path and offers to create
+an offline recovery key; copy the personal key to a password manager before the
+first switch.
 
-Commit `.sops.yaml` (public recipients only), `secrets/secrets.yaml`, and the
-values the bootstrap writes to `home/default/amac.nix` and `users.nix`. Tracking
-`.sops.yaml` keeps the anix, Mac, and recovery recipients on a fresh clone; if
-it is missing, `sops updatekeys` rebuilds the list from the personal key alone
-and drops the others.
+The bootstrap commits `.sops.yaml` (public recipients only), `secrets/secrets.yaml`,
+and the values it writes to `home/default/amac.nix` and `users.nix`. You push
+them from the checkout. Tracking `.sops.yaml` keeps the anix, Mac, and recovery
+recipients on a fresh clone; if it is missing, `sops updatekeys` rebuilds the
+list from the personal key alone and drops the others.
 
 [Secrets](docs/secrets.md) covers adding, rotating, and recovering keys.
 

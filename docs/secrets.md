@@ -102,13 +102,30 @@ SOPS_AGE_KEY_FILE=~/anix-recovery-YYYYMMDD.txt sops -d secrets/secrets.yaml
 `--prepare` names the file `~/anix-recovery-$(date +%Y%m%d).txt` unless you
 give another path.
 
-If the personal key is lost, generate a new one, replace the `personal`
-recipient in `.sops.yaml`, run `sops updatekeys`, and rebuild. `updatekeys`
-needs a key that can still unwrap the data key, so run it with the recovery key
-(`SOPS_AGE_KEY_FILE=~/anix-recovery-YYYYMMDD.txt`) or with a host key
-(`SOPS_AGE_SSH_PRIVATE_KEY_FILE=/etc/ssh/ssh_host_ed25519_key`). If a host key is
-lost, regenerate it with `sudo ssh-keygen -A`, add the new recipient, and
-rebuild that host.
+If the personal key is lost, generate a new one and make it a recipient:
+
+```sh
+age-keygen -o ~/.config/sops/age/keys.txt
+```
+
+Replace the `personal` recipient in `.sops.yaml` with the new public key, then
+run `sops updatekeys` with a key that can still unwrap the data key. The
+recovery key works directly:
+
+```sh
+SOPS_AGE_KEY_FILE=~/anix-recovery-YYYYMMDD.txt sops updatekeys -y secrets/secrets.yaml
+```
+
+A host key works too, but it must be converted first; `SOPS_AGE_SSH_PRIVATE_KEY_FILE`
+only covers native `ssh-ed25519` recipients:
+
+```sh
+SOPS_AGE_KEY=$(sudo ssh-to-age -private-key -i /etc/ssh/ssh_host_ed25519_key) \
+  sops updatekeys -y secrets/secrets.yaml
+```
+
+If a host key is lost, regenerate it with `sudo ssh-keygen -A`, add the new
+recipient, and rebuild that host.
 
 ## Security notes
 

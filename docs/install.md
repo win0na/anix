@@ -31,9 +31,9 @@ off so the Mac can auto-login and accept SSH after a reboot.
 ## Fork the repository
 
 Create your fork at https://github.com/win0na/anix/fork. The installer clones
-your fork, and the bootstrap writes your keys and usernames there. Commit them
-when it finishes. Do not point it at the template unless you plan to re-point
-the remote before the first push.
+your fork, and the bootstrap commits your keys, the usernames, and the recipient
+list there. You push them at the end. Do not point it at the template unless you
+plan to re-point the remote before the first push.
 
 ## Path A: Ubuntu WSL
 
@@ -51,19 +51,23 @@ The installer asks for:
 3. The macOS short name for amac. Run `whoami` on the Mac if you are unsure.
 
 It then installs Nix, clones the fork to `~/.config/anix`, and runs
-`scripts/bootstrap --prepare`, which asks for:
+`scripts/bootstrap --prepare`, which:
 
-1. Whether to generate the personal age key, the Mac builder key, and
+1. Asks whether to generate the personal age key, the Mac builder key, and
    `secrets/secrets.yaml`. Answer yes on a first run.
-2. The Cachix token. Leave it blank to skip the cache.
-3. The Mac login password, used for auto-login. Leave it blank to disable
-   auto-login instead of storing a password.
-4. The recovery key path. The default is `~/anix-recovery-$(date +%Y%m%d).txt`.
-5. Whether to commit the result. It does not push; a NixOS install usually has
-   no GitHub credentials.
+2. Asks for the Cachix token. Leave it blank to skip the cache.
+3. Asks for the Mac login password, used for auto-login. Leave it blank to
+   disable auto-login instead of storing a password.
+4. Confirms each key and recipient update.
+5. Offers an offline recovery key, and if you create one it offers to commit
+   and to push; the path defaults to
+   `~/anix-recovery-$(date +%Y%m%d).txt`. Both prompts default to no.
+
+Because of those prompts, the first run needs a terminal. `--yes` accepts the
+defaults, skips the recovery key, and leaves the commits to you.
 
 `provision` then asks for the project root (default `src`; type `code` or an
-absolute path under `/home` or `/mnt` if your projects already live there),
+absolute path under the anix home or `/mnt` if your projects already live there),
 confirms the `users.nix` write, offers a backup of Ubuntu, and shows the
 directory checklist.
 
@@ -209,12 +213,14 @@ the only manual step: `secrets/secrets.yaml`, `.sops.yaml`,
 only, and tracking it keeps the host and recovery keys on a fresh clone.
 
 ```sh
+git -C ~/.config/anix status --short
 git -C ~/.config/anix push
 ```
 
-If NixOS has no GitHub credential, run that from a checkout on a host where
-`git push` already works. Until it succeeds, the ciphertext and the recipient
-list exist only on the NixOS disk.
+NixOS usually has no GitHub credential, so the push asks for one. An SSH key
+or a token works; `git -C ~/.config/anix remote set-url origin` takes the SSH
+form of your fork URL. Until the push succeeds, the ciphertext and the
+recipient list exist only on the NixOS disk, and another host cannot decrypt.
 
 ## If a step stops
 

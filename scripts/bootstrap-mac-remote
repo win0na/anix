@@ -137,7 +137,11 @@ fi
 nix_mac=/nix/var/nix/profiles/default/bin/nix
 if ! "${SSH[@]}" "test -x $nix_mac"; then
   ask "Install Nix on the Mac now? It asks for the Mac sudo password once." y || die "Nix is required"
-  "${SSH[@]}" -tt 'curl -L https://nixos.org/nix/install | sh -s -- --daemon'
+  # Download first: a truncated pipe into sh is hard to diagnose, and curl
+  # exits before sh has run.
+  "${SSH[@]}" 'curl --proto "=https" --tlsv1.2 -sSfL https://nixos.org/nix/install -o "$HOME/anix-nix-install.sh"' ||
+    die "could not download the Nix installer on the Mac"
+  "${SSH[@]}" -tt 'sh "$HOME/anix-nix-install.sh" --daemon; status=$?; rm -f "$HOME/anix-nix-install.sh"; exit $status'
   "${SSH[@]}" "test -x $nix_mac" || die "Nix was not installed"
 fi
 
@@ -147,7 +151,13 @@ if "${SSH[@]}" 'test -e "$HOME/.config/anix/.git"'; then
   fi
 fi
 say "Copying the repository to ~/.config/anix"
-tar -C "$repo_root" -cf - . | "${SSH[@]}" 'set -e; rm -rf "$HOME/.config/anix"; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
+# Build the new checkout beside the old one, then swap. A failed copy leaves
+# the previous checkout in place, and the old one is kept as .bak.<epoch>.
+tar -C "$repo_root" -cf - . |
+  "${SSH[@]}" 'set -euo pipefail; rm -rf "$HOME/.config/anix.new"; mkdir -p "$HOME/.config/anix.new"; tar -xf - -C "$HOME/.config/anix.new"' ||
+  die "could not copy the repository to the Mac"
+"${SSH[@]}" 'set -euo pipefail; if [ -e "$HOME/.config/anix" ]; then mv "$HOME/.config/anix" "$HOME/.config/anix.bak.$(date +%Y%m%d%H%M%S)"; fi; mv "$HOME/.config/anix.new" "$HOME/.config/anix"' ||
+  die "could not move the new checkout into place on the Mac"
 
 say "Generating the Mac host key"
 "${SSH[@]}" -tt 'sudo ssh-keygen -A'
@@ -170,9 +180,9 @@ if [[ $dry_run -eq 0 ]]; then
   grep -qF "$recipient" secrets/secrets.yaml ||
     die "the amac recipient is missing from secrets/secrets.yaml; check .sops.yaml"
   git add .sops.yaml secrets/secrets.yaml
-  if ! git diff --cached --quiet; then
+  if ! git diff --cached --quiet -- .sops.yaml secrets/secrets.yaml; then
     if ! git -c user.name=anix-bootstrap -c user.email=anix-bootstrap@localhost \
-      commit -m "bootstrap: add the amac sops recipient"; then
+      commit -m "bootstrap: add the amac sops recipient" -- .sops.yaml secrets/secrets.yaml; then
       warn "the amac recipient commit failed; the working tree still goes to the Mac"
     fi
   fi

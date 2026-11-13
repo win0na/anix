@@ -38,17 +38,17 @@ done
 # checkout this script lives in.
 if [[ -z ${ANIX_PROJECTS_DIR:-} ]]; then
   script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-  users_file="$script_dir/../users.nix"
-  if [[ -r $users_file ]]; then
-    ANIX_PROJECTS_DIR=$(sed -n 's/^[[:space:]]*projectsDir[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$users_file" | head -1)
-  fi
+  # shellcheck source=anix-config.sh
+  # shellcheck disable=SC1091
+  . "$script_dir/anix-config.sh"
+  ANIX_PROJECTS_DIR=$(anix_projects_dir "$script_dir/../users.nix")
 fi
 
 project_name=${ANIX_PROJECTS_DIR:-src}
 project_name=${project_name%/}
 project_name=${project_name##*/}
 [[ -n $project_name ]] || {
-  echo "error: empty project root in $users_file; set projectsDir in users.nix" >&2
+  echo "error: empty project root; set projectsDir in users.nix" >&2
   exit 1
 }
 if [[ -n ${ANIX_MAC_HOME:-} ]]; then
