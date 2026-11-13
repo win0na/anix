@@ -143,10 +143,12 @@
           x86_64-linux.herdr = (pkgsFor nixpkgs "x86_64-linux").herdr;
           x86_64-linux.herdr-sidebar = (pkgsFor nixpkgs "x86_64-linux").herdr-sidebar;
           x86_64-linux.ttt = (pkgsFor nixpkgs "x86_64-linux").ttt;
+          aarch64-darwin.brew-shim = (pkgsFor nixpkgs-2605 "aarch64-darwin").brew-shim;
           aarch64-darwin.fff-mcp = (pkgsFor nixpkgs-2605 "aarch64-darwin").fff-mcp;
           aarch64-darwin.herdr = (pkgsFor nixpkgs-2605 "aarch64-darwin").herdr;
           aarch64-darwin.herdr-sidebar = (pkgsFor nixpkgs-2605 "aarch64-darwin").herdr-sidebar;
           aarch64-darwin.ttt = (pkgsFor nixpkgs-2605 "aarch64-darwin").ttt;
+          x86_64-darwin.brew-shim = (pkgsFor nixpkgs-2605 "x86_64-darwin").brew-shim;
           x86_64-darwin.fff-mcp = (pkgsFor nixpkgs-2605 "x86_64-darwin").fff-mcp;
           x86_64-darwin.herdr = (pkgsFor nixpkgs-2605 "x86_64-darwin").herdr;
           x86_64-darwin.herdr-sidebar = (pkgsFor nixpkgs-2605 "x86_64-darwin").herdr-sidebar;

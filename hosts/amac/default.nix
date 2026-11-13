@@ -12,6 +12,7 @@ in
   imports = [
     ../../modules/common
     ../../modules/darwin
+    ../../modules/darwin/macports.nix
     inputs.home-manager-2605.darwinModules.home-manager
     inputs.nix-homebrew.darwinModules.nix-homebrew
   ] ++ lib.optional (builtins.pathExists secretsFile) ./sops.nix;
@@ -59,7 +60,7 @@ in
     ttt
     typos
     typescript-language-server
-  ];
+  ] ++ lib.optional (hostSystem == "x86_64-darwin") pkgs.brew-shim;
 
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];

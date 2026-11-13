@@ -1,0 +1,17 @@
+[package]
+name = "brew-shim"
+version = "0.1.0"
+edition = "2021"
+description = "Homebrew-compatible shim backed by MacPorts"
+license = "MIT"
+
+[[bin]]
+name = "brew"
+path = "src/main.rs"
+
+[lib]
+name = "brew_shim"
+path = "src/lib.rs"
+
+[profile.release]
+strip = true

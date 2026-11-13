@@ -22,6 +22,22 @@ that the helper failed, read that file, fix the item, and rerun the same
 command. The helper is idempotent; it skips an existing distribution and the
 first switch when the anix user already exists.
 
+## MacPorts package install fails
+
+Activation prints `macports: pkg install failed` with the exact `sudo installer`
+command. Run it in Terminal, then rerun `scripts/rebuild amac`. The package
+postinstall runs `port selfupdate`, which needs network access and can take
+several minutes.
+
+A warning about `port sync` means the index is stale, not that the switch
+failed. Run `sudo port sync` when you have network access.
+
+## brew cannot find Homebrew
+
+On Intel, `brew` is the shim that maps to MacPorts. `brew --caskroom` and every
+`--cask` command call the real Homebrew at `/usr/local/bin/brew`. If that file
+is missing, install Homebrew or use `port` for the package.
+
 ## NFS export does not start
 
 The 6.6 WSL kernel builds `nfsd` and the `nft_ct`/`nft_fib` helpers as modules,

@@ -5,6 +5,7 @@ final: prev:
   ttt = final.callPackage ../pkgs/ttt { };
 }
 // prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
+  brew-shim = final.callPackage ../pkgs/brew-shim { };
   nuvio = final.callPackage ../pkgs/nuvio { };
 }
 // prev.lib.optionalAttrs prev.stdenv.hostPlatform.isLinux {

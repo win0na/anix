@@ -39,6 +39,25 @@ It evaluates both host configurations, parses the Windows helper with pwsh,
 then runs `bash -n`, shellcheck, and typos over the repository. Missing tools come from `nix shell nixpkgs#...`, so the
 check works before either host is installed.
 
+## Packages on the Mac
+
+Apple silicon uses Homebrew only.
+
+On Intel, MacPorts is the default and Homebrew is kept for casks:
+
+```sh
+brew install jq           # port when an archive exists, Homebrew otherwise
+brew list                 # ports and Homebrew formulae
+brew install --cask stats # the real Homebrew
+sudo port install cmake   # full MacPorts syntax when you need variants
+```
+
+Mutations need a password: the shim runs `sudo -n` and prints the exact
+`sudo port ...` command instead of prompting. The first switch installs
+MacPorts 2.12.7 from the signed package, and every switch runs `port sync` with
+a 120 second timeout. A failed sync or package install is a warning; the
+switch still completes.
+
 ## Backups
 
 Keep two things outside the repository: the personal age key in a password

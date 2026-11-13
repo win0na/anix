@@ -28,6 +28,10 @@ stops receiving Nix security updates on 2026-12-31. The installer prints a
 warning when it detects one. FileVault stays off so the Mac can auto-login and
 accept SSH after a reboot.
 
+On packages, the two Macs differ: Apple silicon uses Homebrew, and Intel uses
+MacPorts with a `brew` shim, so scripts that call `brew` keep working. Casks
+still go to Homebrew on both.
+
 ## How it works
 
 `flake.nix` defines both hosts and shares the Home Manager modules that have

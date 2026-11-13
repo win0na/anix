@@ -45,6 +45,29 @@ sops-nix is pinned twice for the same reason.
 | `~/.vscode/cli/token.json` | anix | Code tunnel OAuth state. |
 | `/run/secrets/<name>` | both | Decrypted sops secrets at runtime. |
 | `~/.config/herdr` | both | Herdr config and palette. |
+| `/opt/local` | amac Intel | MacPorts prefix, with the shim's `Cellar` and `opt` links. |
+
+## Mac packages
+
+Apple silicon takes Homebrew through `nix-homebrew`. The Intel host adds
+MacPorts 2.12.7 and keeps Homebrew for casks, because MacPorts has no cask
+equivalent and no ports for `ghostty`, `stats`, `macs-fan-control`, or
+`visual-studio-code`.
+
+On Intel, `brew` is a shim (`pkgs/brew-shim`) that speaks to `port`:
+
+| `brew` | Intel |
+| --- | --- |
+| `brew --prefix` | `/opt/local` |
+| `brew --prefix jq` | `/opt/local/opt/jq` |
+| `brew install jq` | `sudo port -b install jq`, Homebrew when no archive exists |
+| `brew list` | ports and Homebrew formulae |
+| `brew install --cask stats` | the real Homebrew at `/usr/local/bin/brew` |
+| `tap`, `bundle`, `pin`, `--json` | refused, with the `port` command to run instead |
+
+Activation mirrors every installed port as `/opt/local/Cellar/<name>/<version>`
+and `/opt/local/opt/<name>`, both pointing at `/opt/local`, so the prefix paths
+brew-shaped tools expect exist.
 
 ## Ports
 

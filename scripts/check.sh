@@ -10,6 +10,7 @@ Validate the repository without installing anything:
   - run bash -n on every file in scripts/
   - run shellcheck on every scripts/ file from PATH or nixpkgs
   - parse scripts/bootstrap-windows.ps1 with pwsh
+  - run the brew-shim Rust tests
   - run typos over the repository when typos is on PATH
 
 Options:
@@ -87,6 +88,16 @@ if [[ -n $pwsh_bin ]]; then
 else
   nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#powershell -c pwsh -NoProfile -Command '$e = $null; $t = $null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "scripts/bootstrap-windows.ps1"), [ref]$t, [ref]$e) | Out-Null; if ($e) { $e | ForEach-Object { Write-Error $_ }; exit 1 }' ||
     fail "PowerShell parse failed for scripts/bootstrap-windows.ps1"
+fi
+
+echo "==> cargo test pkgs/brew-shim"
+if command -v cargo >/dev/null 2>&1; then
+  cargo test --quiet --manifest-path "$repo_root/pkgs/brew-shim/Cargo.toml" ||
+    fail "brew-shim tests failed"
+else
+  nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#cargo nixpkgs#rustc -c \
+    cargo test --quiet --manifest-path "$repo_root/pkgs/brew-shim/Cargo.toml" ||
+    fail "brew-shim tests failed"
 fi
 
 echo "==> typos"

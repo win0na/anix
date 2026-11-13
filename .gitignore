@@ -12,3 +12,6 @@ __pycache__/
 node_modules/
 
 .serena/
+
+# Rust build output for flake-packaged crates.
+pkgs/*/target/
