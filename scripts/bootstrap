@@ -520,7 +520,10 @@ ensure_secrets() {
       printf "cachix-token: %s\n" "$(yaml_quote "$cachix")"
       printf "mac-login-password: %s\n" "$(yaml_quote "$macpass")"
     } > "$tmp"
-    ( cd "$tmpdir" && sops_cmd encrypt --age "$age_pub" "$tmp" > "$secrets_file" )
+    ( cd "$tmpdir" && sops_cmd encrypt --age "$age_pub" "$tmp" > "$tmp.enc" ) ||
+      { rm -f "$tmp.enc"; die "sops encrypt failed; no secrets were written"; }
+    # A failed redirect would otherwise leave an empty secrets.yaml behind.
+    mv -f "$tmp.enc" "$secrets_file"
     chmod 600 "$secrets_file"
     rm -rf "$tmpdir"
     trap - EXIT

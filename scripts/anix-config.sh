@@ -5,8 +5,11 @@
 
 anix_value_from_users() {
   local key=$1 file=${2:-${repo_root:-}/users.nix}
-  [[ -n $file ]] || return 1
-  sed -n "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$file" | head -1
+  [[ -n $file && -s $file ]] || return 1
+  # Flatten first: a hand-written one-line users.nix would otherwise read empty.
+  tr '\n\r' '  ' < "$file" |
+    sed -n "s/.*[^A-Za-z0-9_]${key}[[:space:]]*=[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" |
+    head -1
 }
 
 anix_projects_dir() {

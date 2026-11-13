@@ -134,6 +134,7 @@ else
 fi
 
 derived="$(mktemp -d "${TMPDIR:-/tmp}/anix-ios.XXXXXX")"
+trap 'rm -rf "$derived"' EXIT
 common=("${target_args[@]}" -scheme "$scheme" -configuration "$configuration" -destination "generic/platform=iOS" -derivedDataPath "$derived")
 
 printf '==>'

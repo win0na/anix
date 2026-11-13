@@ -86,6 +86,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# --yes never unregisters Ubuntu: the recovery recipient is optional in that
+# mode, so the final check must not run and fail the whole install.
+if [[ $assume_yes -eq 1 ]]; then
+  do_finalize=0
+fi
+
 ask() {
   local prompt=$1 default=${2:-n} reply
   if [[ $assume_yes -eq 1 ]]; then [[ $default == y ]]; return; fi
@@ -198,7 +204,7 @@ if [[ $dry_run -eq 0 ]] && ! SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt s
 fi
 
 value_from_users() {
-  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$repo_root/users.nix" | head -1
+  anix_value_from_users "$1" "$repo_root/users.nix"
 }
 [[ -n $anix_user ]] || anix_user=$(value_from_users anix)
 [[ -n $mac_user ]] || mac_user=$(value_from_users amac)
@@ -260,7 +266,8 @@ echo "  windows: writes .wslconfig, opens TCP 2049, imports the image"
 
 if [[ $do_backup -eq 1 ]]; then
   if [[ -z $backup ]]; then
-    win_home=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n')
+    win_home=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n') ||
+      die "powershell.exe failed; run this from WSL with Windows interop enabled"
     [[ -n $win_home ]] || die "could not read the Windows user profile"
     backup="$win_home\\anix-ubuntu-backup.tar"
   fi
@@ -274,7 +281,8 @@ if [[ $do_backup -eq 1 ]]; then
 fi
 
 say "Installing NixOS-WSL alongside $WSL_DISTRO_NAME"
-win_temp=$(powershell.exe -NoProfile -Command '$env:TEMP' | tr -d '\r\n')
+win_temp=$(powershell.exe -NoProfile -Command '$env:TEMP' | tr -d '\r\n') ||
+  die "powershell.exe failed; run this from WSL with Windows interop enabled"
 [[ -n $win_temp ]] || die "could not read the Windows temp directory"
 win_temp_unix=$(wslpath -u "$win_temp")
 win_stage="$win_temp_unix/anix"
@@ -286,7 +294,8 @@ win_helper=$(wslpath -w "$win_stage/bootstrap-windows.ps1")
 win_log="$win_temp\\anix\\anix-bootstrap-windows.log"
 stage_cleanup() { rm -f "$win_stage/bootstrap-windows.ps1" "$win_stage/anix-elevate.ps1"; }
 trap stage_cleanup EXIT
-admin=$(powershell.exe -NoProfile -Command '([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)' | tr -d '\r\n')
+admin=$(powershell.exe -NoProfile -Command '([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)' | tr -d '\r\n') ||
+  die "powershell.exe failed; run this from WSL with Windows interop enabled"
 helper_args=("-Yes" "-SkipWslUpdate" "-NoShutdown" "-NoFirstSwitch" "-NoClone" "-DistroName" "$distro" "-AnixUser" "$anix_user" "-ProjectsDir" "$projects_dir" "-ImageUrl" "$image_url" "-ImageSha256" "$image_sha")
 
 if [[ $dry_run -eq 1 ]]; then
@@ -408,7 +417,8 @@ else
     --exclude='*/.next' --exclude='*/.venv' --exclude='*/Pods' \
     --exclude='*/xcuserdata' --exclude='*.dSYM' \
     -cf - .config/sops/age/keys.txt .ssh/mac-builder "${selected[@]}" |
-    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - --skip-old-files -C "$HOME"; chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"; chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt" "$HOME/.config/anix/secrets/secrets.yaml" 2>/dev/null || true'
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - --skip-old-files -C "$HOME"; chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"; chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt" "$HOME/.config/anix/secrets/secrets.yaml" 2>/dev/null || true' ||
+    die "transferring the keys to $distro failed; rerun: scripts/provision ${original_args[*]:-}"
 fi
 
 say "Running the anix bootstrap inside $distro"
@@ -468,7 +478,9 @@ if [[ $do_finalize -eq 1 && $do_mac -eq 1 ]]; then
     die "refusing to unregister the distribution this script is running in"
   fi
   if [[ $dry_run -eq 0 ]] && ! grep -q '^  recovery: &recovery ' "$repo_root/.sops.yaml" 2>/dev/null; then
-    die "no recovery recipient in .sops.yaml; run scripts/bootstrap --prepare in ~/.config/anix, then rerun this script. Nothing was unregistered."
+    warn "no recovery recipient in .sops.yaml; Ubuntu was not unregistered."
+    warn "add one with scripts/bootstrap --prepare in ~/.config/anix, then rerun this script."
+    do_finalize=0
   fi
   [[ -n $backup ]] || backup=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n')
   [[ $backup == *.age || $backup == *.tar ]] || backup="$backup\\anix-ubuntu-backup.tar"

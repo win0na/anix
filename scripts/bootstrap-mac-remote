@@ -50,7 +50,9 @@ ask() {
   local prompt=$1 default=${2:-n} reply
   if [[ $assume_yes -eq 1 ]]; then [[ $default == y ]]; return; fi
   if [[ $default == y ]]; then prompt="$prompt [Y/n]"; else prompt="$prompt [y/N]"; fi
-  read -r -p "$prompt " reply || true
+  # On EOF, treat the answer as "no" rather than silently taking the default,
+  # so a non-interactive run cannot loop forever.
+  read -r -p "$prompt " reply || return 1
   reply=${reply:-$default}
   [[ $reply == [Yy]* ]]
 }
@@ -62,8 +64,12 @@ cd "$repo_root"
 [[ -s $HOME/.config/sops/age/keys.txt ]] || die "missing personal age key"
 [[ -s secrets/secrets.yaml ]] || die "missing secrets/secrets.yaml"
 
+# shellcheck source=anix-config.sh
+# shellcheck disable=SC1091
+. "$script_dir/anix-config.sh"
+
 value_from_users() {
-  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$repo_root/users.nix" | head -1
+  anix_value_from_users "$1" "$repo_root/users.nix"
 }
 [[ -n $mac_user ]] || mac_user=$(value_from_users amac)
 [[ -n $anix_user ]] || anix_user=$(value_from_users anix)
@@ -118,7 +124,6 @@ while true; do
   if ! ask "SSH is not available yet. Retry?" y; then die "enable Remote Login and rerun"; fi
   sleep 5
 done
-
 say "Checking the Mac"
 mac_arch=$("${SSH[@]}" 'uname -m') || die "could not read the Mac architecture"
 case "$mac_arch" in
