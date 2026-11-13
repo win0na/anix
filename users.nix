@@ -1,5 +1,5 @@
 {
-  anix = "anix";
+  anix = "newuser";
   amac = "amac";
   projectsDir = "src";
 }
