@@ -334,6 +334,8 @@ require_amac() {
     touch "$HOME/.ssh/authorized_keys"
     chmod 600 "$HOME/.ssh/authorized_keys"
     if ! grep -qxF "$(cat "$pub")" "$HOME/.ssh/authorized_keys"; then
+      # A file without a trailing newline would otherwise glue the keys together.
+      [[ -z $(tail -c 1 "$HOME/.ssh/authorized_keys") ]] || printf '\n' >> "$HOME/.ssh/authorized_keys"
       cat "$pub" >> "$HOME/.ssh/authorized_keys"
       say "builder key authorized for SSH"
     fi
@@ -906,7 +908,7 @@ bootstrap_anix() {
     if [[ ! -s $secrets_file ]]; then
       warn "secrets are missing; sops stays off"
     elif [[ ! -s /etc/nix/mac-builder ]]; then
-      warn "builder key is still missing; check the sops secret and the switch"
+      die "the switch applied, but sops did not install /etc/nix/mac-builder; run: sudo systemctl restart sops-install-secrets, then rerun scripts/bootstrap --host anix"
     else
       say "sops is active; builder key installed"
     fi

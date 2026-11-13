@@ -173,7 +173,6 @@ fi
 sops_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#sops -c sops "$@"; }
 age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#age -c age "$@"; }
 age_keygen_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#age -c age-keygen "$@"; }
-ssh_to_age_cmd() { nix --extra-experimental-features 'nix-command flakes' shell --inputs-from "$repo_root" nixpkgs#ssh-to-age -c ssh-to-age "$@"; }
 
 export_ubuntu() {
   local dest=${1%.age} unix recipient out
@@ -472,15 +471,19 @@ if [[ $do_mac -eq 1 ]]; then
   fi
 fi
 
+# A missing recovery recipient means the archive below would be the only copy
+# of a key nobody can replace, so do not offer to unregister at all.
+if [[ $do_finalize -eq 1 && $dry_run -eq 0 ]] &&
+  ! grep -q '^  recovery: &recovery ' "$repo_root/.sops.yaml" 2>/dev/null; then
+  warn "no recovery recipient in .sops.yaml; Ubuntu will be kept."
+  warn "add one with scripts/bootstrap --prepare in ~/.config/anix, then rerun this script."
+  do_finalize=0
+fi
+
 if [[ $do_finalize -eq 1 && $do_mac -eq 1 ]]; then
   say "Final check"
   if [[ $WSL_DISTRO_NAME == "$distro" ]]; then
     die "refusing to unregister the distribution this script is running in"
-  fi
-  if [[ $dry_run -eq 0 ]] && ! grep -q '^  recovery: &recovery ' "$repo_root/.sops.yaml" 2>/dev/null; then
-    warn "no recovery recipient in .sops.yaml; Ubuntu was not unregistered."
-    warn "add one with scripts/bootstrap --prepare in ~/.config/anix, then rerun this script."
-    do_finalize=0
   fi
   [[ -n $backup ]] || backup=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n')
   [[ $backup == *.age || $backup == *.tar ]] || backup="$backup\\anix-ubuntu-backup.tar"

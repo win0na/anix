@@ -26,11 +26,6 @@ anix_projects_path() {
   esac
 }
 
-anix_projects_name() {
-  local path=$1
-  printf '%s\n' "${path##*/}"
-}
-
 anix_check_projects_dir() {
   local dir=$1 home=${2:-} segment lower
   local -a parts=()

@@ -15,6 +15,9 @@ in
     chmod 700 "$HOME/.ssh"
     touch "$HOME/.ssh/authorized_keys"
     chmod 600 "$HOME/.ssh/authorized_keys"
-    grep -qxF "$key" "$HOME/.ssh/authorized_keys" || printf '%s\n' "$key" >> "$HOME/.ssh/authorized_keys"
+    if ! grep -qxF "$key" "$HOME/.ssh/authorized_keys"; then
+      [ -z "$(tail -c 1 "$HOME/.ssh/authorized_keys")" ] || printf '\n' >> "$HOME/.ssh/authorized_keys"
+      printf '%s\n' "$key" >> "$HOME/.ssh/authorized_keys"
+    fi
   '');
 }

@@ -158,7 +158,10 @@ if [[ ! -d "$app" ]]; then
 fi
 
 if [[ "$build_only" == "1" ]]; then
+  # Keep the derived data so the printed app path stays valid.
+  trap - EXIT
   echo "==> build complete: $app"
+  echo "    remove it later: rm -rf ${derived}"
   exit 0
 fi
 

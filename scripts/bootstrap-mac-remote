@@ -138,7 +138,7 @@ say "Mac architecture: $mac_arch"
 # Accept the winona-era ordering: authorize the builder key before nix-darwin
 # disables password login, otherwise a failed switch locks SSH out.
 say "Authorizing the builder key for $mac_user"
-"${SSH[@]}" 'set -e; mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"; touch "$HOME/.ssh/authorized_keys"; chmod 600 "$HOME/.ssh/authorized_keys"; key=$(cat); grep -qxF "$key" "$HOME/.ssh/authorized_keys" || printf "%s\n" "$key" >> "$HOME/.ssh/authorized_keys"' < "$HOME/.ssh/mac-builder.pub"
+"${SSH[@]}" 'set -e; mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"; touch "$HOME/.ssh/authorized_keys"; chmod 600 "$HOME/.ssh/authorized_keys"; key=$(cat); if ! grep -qxF "$key" "$HOME/.ssh/authorized_keys"; then [ -z "$(tail -c 1 "$HOME/.ssh/authorized_keys")" ] || printf "\n" >> "$HOME/.ssh/authorized_keys"; printf "%s\n" "$key" >> "$HOME/.ssh/authorized_keys"; fi' < "$HOME/.ssh/mac-builder.pub"
 
 say "Checking the Command Line Tools on the Mac"
 if ! "${SSH[@]}" 'xcode-select -p >/dev/null 2>&1'; then
