@@ -68,8 +68,8 @@ while [[ $# -gt 0 ]]; do
     --projects-dir=*) projects_dir_arg=${1#*=}; shift ;;
     --mac-host) [[ $# -ge 2 ]] || usage_error "--mac-host needs a host"; mac_host=$2; shift 2 ;;
     --mac-host=*) mac_host=${1#*=}; shift ;;
-    --dir) [[ $# -ge 2 ]] || usage_error "--dir needs a path"; extra_dirs+=("$2"); shift 2 ;;
-    --dir=*) extra_dirs+=("${1#*=}"); shift ;;
+    --dir) [[ $# -ge 2 && -n $2 ]] || usage_error "--dir needs a path"; extra_dirs+=("$2"); shift 2 ;;
+    --dir=*) [[ -n ${1#*=} ]] || usage_error "--dir needs a path"; extra_dirs+=("${1#*=}"); shift ;;
     --backup) [[ $# -ge 2 ]] || usage_error "--backup needs a Windows path"; backup=$2; shift 2 ;;
     --backup=*) backup=${1#*=}; shift ;;
     --image-url) [[ $# -ge 2 ]] || usage_error "--image-url needs a URL"; image_url=$2; shift 2 ;;
@@ -247,8 +247,9 @@ if [[ $anix_user != $(value_from_users anix) || $mac_user != $(value_from_users 
   projectsDir = "$projects_dir";
 }
 EOF
-      run git -C "$repo_root" add users.nix
-      run git -C "$repo_root" -c user.name=anix-bootstrap -c user.email=anix-bootstrap@localhost commit -m "bootstrap: set the host usernames and project root" -- users.nix
+      run git -C "$repo_root" add users.nix || die "could not stage users.nix; rerun scripts/provision"
+      run git -C "$repo_root" -c user.name=anix-bootstrap -c user.email=anix-bootstrap@localhost commit -m "bootstrap: set the host usernames and project root" -- users.nix ||
+        die "could not commit users.nix; rerun scripts/provision"
     fi
   else
     die "users.nix does not match the requested values"
@@ -410,16 +411,31 @@ fi
 
 say "Transferring keys and ${#selected[@]} project paths"
 if [[ $dry_run -eq 1 ]]; then
-  printf '  $ tar -C %s -cf - .config/sops/age/keys.txt .ssh/mac-builder %s | wsl.exe ...\n' "$HOME" "${selected[*]}"
+  printf '  $ tar -C %s -cf - .config/sops/age/keys.txt .ssh/mac-builder | wsl.exe ...\n' "$HOME"
+  printf '  $ tar -C %s -cf - %s | wsl.exe ... (--skip-old-files)\n' "$HOME" "${selected[*]}"
 else
-  tar -C "$HOME" \
-    --exclude='*/target' --exclude='*/node_modules' --exclude='*/DerivedData' \
-    --exclude='*/.direnv' --exclude='*/.cache' --exclude='*/__pycache__' \
-    --exclude='*/.next' --exclude='*/.venv' --exclude='*/Pods' \
-    --exclude='*/xcuserdata' --exclude='*.dSYM' \
-    -cf - .config/sops/age/keys.txt .ssh/mac-builder "${selected[@]}" |
-    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - --skip-old-files -C "$HOME"; chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"; chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt" "$HOME/.config/anix/secrets/secrets.yaml" 2>/dev/null || true' ||
-    die "transferring the keys to $distro failed; rerun: scripts/provision ${original_args[*]:-}"
+  # Keys overwrite: a truncated transfer must not leave a 0-byte key that
+  # --skip-old-files then keeps on every rerun.
+  tar -C "$HOME" -cf - .config/sops/age/keys.txt .ssh/mac-builder |
+    wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc '
+      set -euo pipefail
+      mkdir -p "$HOME/.config/sops/age" "$HOME/.ssh"
+      tar -xf - -C "$HOME"
+      chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"
+      chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt"
+      chmod 600 "$HOME/.config/anix/secrets/secrets.yaml" 2>/dev/null || true
+      [ -s "$HOME/.config/sops/age/keys.txt" ] && [ -s "$HOME/.ssh/mac-builder" ]
+    ' || die "transferring the keys to $distro failed; rerun: scripts/provision ${original_args[*]:-}"
+  if (( ${#selected[@]} > 0 )); then
+    tar -C "$HOME" \
+      --exclude='*/target' --exclude='*/node_modules' --exclude='*/DerivedData' \
+      --exclude='*/.direnv' --exclude='*/.cache' --exclude='*/__pycache__' \
+      --exclude='*/.next' --exclude='*/.venv' --exclude='*/Pods' \
+      --exclude='*/xcuserdata' --exclude='*.dSYM' \
+      -cf - "${selected[@]}" |
+      wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - --skip-old-files -C "$HOME"' ||
+      die "transferring the project directories to $distro failed; rerun: scripts/provision ${original_args[*]:-}"
+  fi
 fi
 
 say "Running the anix bootstrap inside $distro"

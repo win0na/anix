@@ -268,7 +268,8 @@ if [[ -z $repo_root ]]; then
     die "$target exists but is not a git checkout"
   else
     say "cloning $repo_url to $target"
-    run git clone "$repo_url" "$target"
+    run git clone "$repo_url" "$target" ||
+      die "git clone failed; check the URL and your access, then rerun scripts/install"
     repo_root=$target
   fi
 fi

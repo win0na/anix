@@ -56,7 +56,9 @@ ask() {
   else
     prompt="$prompt [y/N]"
   fi
-  read -r -p "$prompt " reply || true
+  # EOF means "no": an unattended run must not answer yes to generating keys or
+  # rewriting .sops.yaml.
+  read -r -p "$prompt " reply || return 1
   reply=${reply:-$default}
   [[ $reply == [Yy]* ]]
 }
@@ -184,12 +186,13 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     --host)
-      [[ $# -ge 2 ]] || usage_error "--host requires anix or amac"
+      [[ $# -ge 2 && -n $2 ]] || usage_error "--host requires anix or amac"
       host=$2
       shift 2
       ;;
     --host=*)
       host=${1#*=}
+      [[ -n $host ]] || usage_error "--host requires anix or amac"
       shift
       ;;
     -y|--yes)
@@ -377,8 +380,19 @@ ensure_personal_key() {
     fi
     run mkdir -p "$(dirname "$personal_key")"
     run chmod 700 "$(dirname "$personal_key")"
-    run age_keygen -o "$personal_key"
-    run chmod 600 "$personal_key"
+    if [[ $dry_run -eq 1 ]]; then
+      say "would generate an age key at $personal_key"
+    else
+      # Generate aside and move: a failed run must not leave a truncated key
+      # that a later run accepts.
+      tmp_key=$(mktemp "${TMPDIR:-/tmp}/anix-age.XXXXXX")
+      if ! ( umask 077; age_keygen -o "$tmp_key" ); then
+        rm -f "$tmp_key"
+        die "age-keygen failed; nothing was written to $personal_key"
+      fi
+      chmod 600 "$tmp_key"
+      mv -f "$tmp_key" "$personal_key"
+    fi
   fi
   age_pub="$(age_keygen -y "$personal_key")"
   say "personal age recipient: $age_pub"
@@ -431,8 +445,19 @@ ensure_builder_key() {
       fi
       run mkdir -p "$HOME/.ssh"
       run chmod 700 "$HOME/.ssh"
-      run ssh-keygen -q -t ed25519 -C anix-builder -f "$builder_key" -N ""
-      builder_pub="$(cat "$builder_key.pub")"
+      if [[ $dry_run -eq 1 ]]; then
+        say "would generate an ed25519 key at $builder_key"
+      else
+        tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/anix-ssh.XXXXXX")
+        if ! ssh-keygen -q -t ed25519 -C anix-builder -f "$tmp_dir/key" -N ""; then
+          rm -rf "$tmp_dir"
+          die "ssh-keygen failed; nothing was written to $builder_key"
+        fi
+        install -m 600 "$tmp_dir/key" "$builder_key"
+        install -m 644 "$tmp_dir/key.pub" "$builder_key.pub"
+        rm -rf "$tmp_dir"
+        builder_pub="$(cat "$builder_key.pub")"
+      fi
     fi
   else
     if [[ ! -s "${builder_key}.pub" ]]; then
