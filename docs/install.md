@@ -49,12 +49,23 @@ The installer asks for:
 1. Your fork URL. Create one at the link above, then paste it here.
 2. The Linux username for anix. The default is `$USER`.
 3. The macOS short name for amac. Run `whoami` on the Mac if you are unsure.
-4. The project root. The default is `src`; type `code` or an absolute path if
-   your projects already live there.
 
-Then it installs Nix, clones the fork to `~/.config/anix`, creates the personal age
-key, the Mac builder key, `.sops.yaml`, and `secrets/secrets.yaml`, and starts
-`scripts/provision`.
+It then installs Nix, clones the fork to `~/.config/anix`, and runs
+`scripts/bootstrap --prepare`, which asks for:
+
+1. Whether to generate the personal age key, the Mac builder key, and
+   `secrets/secrets.yaml`. Answer yes on a first run.
+2. The Cachix token. Leave it blank to skip the cache.
+3. The Mac login password, used for auto-login. Leave it blank to disable
+   auto-login instead of storing a password.
+4. The recovery key path. The default is `~/anix-recovery-$(date +%Y%m%d).txt`.
+5. Whether to commit the result. It does not push; a NixOS install usually has
+   no GitHub credentials.
+
+`provision` then asks for the project root (default `src`; type `code` or an
+absolute path under `/home` or `/mnt` if your projects already live there),
+confirms the `users.nix` write, offers a backup of Ubuntu, and shows the
+directory checklist.
 
 `provision` exports Ubuntu, installs NixOS-WSL alongside it, transfers the
 repository and the projects you select, runs the anix bootstrap, and prepares
@@ -163,7 +174,20 @@ the commands above.
 
 ## After both hosts pass
 
+Restart the WSL VM once so `.wslconfig` takes effect. It sets mirrored
+networking, and WSL reads the file only when the VM starts. Without the restart
+the Mac cannot reach the NFS server. Run this in a Windows PowerShell, not in
+Ubuntu: `wsl --shutdown` ends the shell you run it from.
+
+```powershell
+wsl --shutdown
+wsl -d NixOS
+```
+
+Then, in the NixOS shell, where `ssh amac` and the scripts are configured:
+
 ```sh
+cd ~/.config/anix
 scripts/check.sh
 ssh amac uname -m
 ```
@@ -172,15 +196,6 @@ ssh amac uname -m
 pwsh, and runs `bash -n`, shellcheck, and typos. The SSH command prints `arm64`
 on Apple silicon or `x86_64` on Intel.
 
-Restart the WSL VM once so `.wslconfig` takes effect. It sets mirrored
-networking, and WSL reads the file only when the VM starts. Without the restart
-the Mac cannot reach the NFS server.
-
-```powershell
-wsl --shutdown
-wsl -d NixOS
-```
-
 On the Mac, confirm the NFS mount and the editor stack:
 
 ```sh
@@ -188,10 +203,18 @@ mount | grep " on /Users/"
 herdr plugin list
 ```
 
-Then commit what the bootstrap changed in your fork: `secrets/secrets.yaml`,
-`.sops.yaml`, `home/default/amac.nix`, and `users.nix`. `.sops.yaml` holds
-public recipients only, and tracking it keeps the host and recovery keys on a
-fresh clone.
+Then push the commits the bootstrap made. They are already local, so this is
+the only manual step: `secrets/secrets.yaml`, `.sops.yaml`,
+`home/default/amac.nix`, and `users.nix`. `.sops.yaml` holds public recipients
+only, and tracking it keeps the host and recovery keys on a fresh clone.
+
+```sh
+git -C ~/.config/anix push
+```
+
+If NixOS has no GitHub credential, run that from a checkout on a host where
+`git push` already works. Until it succeeds, the ciphertext and the recipient
+list exist only on the NixOS disk.
 
 ## If a step stops
 

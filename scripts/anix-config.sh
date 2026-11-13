@@ -32,7 +32,11 @@ anix_check_projects_dir() {
   local dir=$1 home=${2:-} segment name
   local -a parts=()
   [[ -n $dir && $dir != "/" ]] || return 1
+  # The flake strips one trailing slash; do the same so both agree on `src/`.
+  dir=${dir%/}
+  [[ -n $dir && $dir != "/" ]] || return 1
   [[ $dir =~ ^[A-Za-z0-9._/-]+$ ]] || return 1
+  [[ $dir == *//* ]] && return 1
   IFS=/ read -r -a parts <<< "$dir"
   for segment in "${parts[@]}"; do
     [[ $segment == "." || $segment == ".." ]] && return 1
@@ -40,7 +44,7 @@ anix_check_projects_dir() {
   case "$dir" in
     /*)
       [[ $dir == /home/* || $dir == /mnt/* ]] || return 1
-      [[ $dir == /mnt/c/* ]] && return 1
+      [[ $dir == /mnt/[A-Za-z] || $dir == /mnt/[A-Za-z]/* ]] && return 1
       ;;
   esac
   [[ -n $home && $dir == "$home" ]] && return 1

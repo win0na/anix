@@ -152,7 +152,8 @@ in
   # The lid stays closed. A macOS update can reset this; activation restores it.
   # power is one of the activation script names nix-darwin actually runs.
   system.activationScripts.power.text = lib.mkAfter ''
-    /usr/bin/pmset -a disablesleep 1 sleep 0 hibernatemode 0 standby 0 autopoweroff 0 womp 1 autorestart 1
+    /usr/bin/pmset -a disablesleep 1 sleep 0 hibernatemode 0 standby 0 autopoweroff 0 womp 1 autorestart 1 ||
+      echo "warning: pmset rejected one or more settings on this Mac" >&2
   '';
 
   # FileVault must be off for this to work. sops-nix writes the secret in

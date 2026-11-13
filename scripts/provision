@@ -187,7 +187,8 @@ export_ubuntu() {
     die "backup cancelled; nothing was unregistered"
   fi
   warn "the plaintext archive contains the age key; protect or delete it"
-  wsl.exe --export "$WSL_DISTRO_NAME" "$dest"
+  wsl.exe --export "$WSL_DISTRO_NAME" "$dest" ||
+    die "the plaintext export failed; nothing was unregistered"
   backup=$dest
 }
 
@@ -297,7 +298,7 @@ else
   {
     echo '$ErrorActionPreference = "Stop"'
     printf '$p = Start-Process -FilePath powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList @('
-    printf "'-NoProfile','-ExecutionPolicy','Bypass','-File',%s" "$(printf "'%s'" "${win_helper//\'/\'\'}")"
+    printf "'-NoProfile','-ExecutionPolicy','Bypass','-File','\"%s\"'" "$(printf '%s' "${win_helper//\'/\'\'}")"
     for arg in "${helper_args[@]}"; do printf ",%s" "$(printf "'%s'" "${arg//\'/\'\'}")"; done
     echo ')'
     echo 'if ($p.ExitCode -ne 0) {'
@@ -326,14 +327,17 @@ if [[ $first_switch -eq 0 ]]; then
 else
   say "Staging the repository for the first switch"
   if [[ $dry_run -eq 0 ]]; then
-    tar -C "$repo_root" --exclude=.git -cf - . | wsl.exe -d "$distro" -u nixos --exec bash -lc 'set -euo pipefail; rm -rf /tmp/anix; mkdir -p /tmp/anix; tar -xf - -C /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml'
+    tar -C "$repo_root" --exclude=.git -cf - . | wsl.exe -d "$distro" -u nixos --exec bash -lc 'set -euo pipefail; rm -rf /tmp/anix; mkdir -p /tmp/anix; tar -xf - -C /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml' ||
+      die "staging the repository for the first switch failed; rerun scripts/provision"
   else
     echo "  $ tar -C $repo_root --exclude=.git -cf - . | wsl.exe -d $distro -u nixos --exec tar -xf - -C /tmp/anix"
   fi
   say "Running the first anix switch"
-  run wsl.exe -d "$distro" -u nixos --exec bash -lc 'set -euo pipefail; export PATH=/nix/var/nix/profiles/default/bin:$PATH; sudo env PATH="$PATH" NIX_CONFIG="experimental-features = nix-command flakes" nixos-rebuild boot --flake /tmp/anix#anix'
+  run wsl.exe -d "$distro" -u nixos --exec bash -lc 'set -euo pipefail; export PATH=/nix/var/nix/profiles/default/bin:$PATH; sudo env PATH="$PATH" NIX_CONFIG="experimental-features = nix-command flakes" nixos-rebuild boot --flake /tmp/anix#anix' ||
+    die "the first anix switch failed; rerun scripts/provision"
   run wsl.exe --terminate "$distro"
-  run wsl.exe -d "$distro" -u "$anix_user" --exec true
+  run wsl.exe -d "$distro" -u "$anix_user" --exec true ||
+    die "the new distribution did not start as $anix_user; rerun scripts/provision"
 fi
 
 if [[ $do_transfer -eq 1 ]]; then

@@ -22,7 +22,7 @@ Options:
   -h, --help        Show this help and exit.
 
 The script is idempotent. It never deletes a distribution, never force-pushes,
-and never commits without a prompt.
+and never pushes without a prompt. With --yes it commits without asking.
 EOF
 }
 
@@ -880,7 +880,7 @@ bootstrap_mac() {
 
 prepare_next_steps() {
   say "next steps"
-  printf '  .sops.yaml is local and gitignored; it is not part of the fork.\n'
+  printf '  .sops.yaml is tracked; commit it with secrets/secrets.yaml. It holds public recipients only.\n'
   printf '  secrets/secrets.yaml is staged; commit it to the fork as the ciphertext backup.\n'
   case "$(uname -s)" in
     Darwin)

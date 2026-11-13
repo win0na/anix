@@ -3,6 +3,29 @@
 # sidebar on the left, agent in the center, ttt at 35% on the bottom.
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: scripts/herdr-ide
+
+Split the focused Herdr pane into the IDE layout: sidebar on the left, agent
+in the center, ttt at 35% on the bottom. Run it inside the workspace you want
+to change; it acts on the focused pane.
+
+Environment:
+  HERDR_BIN_PATH   Herdr binary. Defaults to herdr.
+  HERDR_PANE_ID    Pane to build the layout around. Defaults to the focused one.
+
+Options:
+  -h, --help       Show this help and exit.
+EOF
+}
+
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+  "") ;;
+  *) echo "herdr-ide: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+esac
+
 herdr=${HERDR_BIN_PATH:-herdr}
 command -v jq >/dev/null || { echo "herdr-ide: jq is required" >&2; exit 1; }
 

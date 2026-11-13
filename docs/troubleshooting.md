@@ -38,12 +38,14 @@ Retry with `sudo ~/.config/anix/scripts/mount-src`.
 
 ## NFS permission denied
 
+On anix, check the export path and its owner:
+
 ```sh
 ls -ld "$ANIX_SRC_ROOT"
 ```
 
 If the owner is `root`, an older generation created it before the tmpfiles
-rule existed. Fix it once and rebuild:
+rule existed. Fix it once on anix and rebuild:
 
 ```sh
 sudo chown -R "$(id -un)":users "$ANIX_SRC_ROOT"

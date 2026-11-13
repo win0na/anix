@@ -45,11 +45,21 @@ if [[ -z ${ANIX_PROJECTS_DIR:-} ]]; then
 fi
 
 project_name=${ANIX_PROJECTS_DIR:-src}
+project_name=${project_name%/}
 project_name=${project_name##*/}
+[[ -n $project_name ]] || {
+  echo "error: empty project root in $users_file; set projectsDir in users.nix" >&2
+  exit 1
+}
 if [[ -n ${ANIX_MAC_HOME:-} ]]; then
   default_mount="${ANIX_MAC_HOME}/${project_name}"
 elif [[ "$(id -u)" -eq 0 ]]; then
+  # /dev/console is owned by root before the first GUI login.
   console_user=$(/usr/bin/stat -f%Su /dev/console)
+  [[ -n $console_user && $console_user != root ]] || {
+    echo "error: no logged-in console user; set ANIX_MOUNT_POINT or ANIX_MAC_HOME" >&2
+    exit 1
+  }
   default_mount="/Users/${console_user}/${project_name}"
 else
   default_mount="$HOME/${project_name}"

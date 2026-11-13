@@ -103,7 +103,10 @@ SOPS_AGE_KEY_FILE=~/anix-recovery-YYYYMMDD.txt sops -d secrets/secrets.yaml
 give another path.
 
 If the personal key is lost, generate a new one, replace the `personal`
-recipient in `.sops.yaml`, run `sops updatekeys`, and rebuild. If a host key is
+recipient in `.sops.yaml`, run `sops updatekeys`, and rebuild. `updatekeys`
+needs a key that can still unwrap the data key, so run it with the recovery key
+(`SOPS_AGE_KEY_FILE=~/anix-recovery-YYYYMMDD.txt`) or with a host key
+(`SOPS_AGE_SSH_PRIVATE_KEY_FILE=/etc/ssh/ssh_host_ed25519_key`). If a host key is
 lost, regenerate it with `sudo ssh-keygen -A`, add the new recipient, and
 rebuild that host.
 

@@ -92,9 +92,11 @@ the builder key at `~/.ssh/mac-builder`, and the encrypted
 `secrets/secrets.yaml`. The personal key is the only file you cannot
 regenerate. Copy it to a password manager before the first switch.
 
-`.sops.yaml` stays local and gitignored, so your fork never inherits another
-person's recipient. Commit `secrets/secrets.yaml` and the public values the
-bootstrap writes to `home/default/amac.nix` and `users.nix`.
+Commit `.sops.yaml` (public recipients only), `secrets/secrets.yaml`, and the
+values the bootstrap writes to `home/default/amac.nix` and `users.nix`. Tracking
+`.sops.yaml` keeps the anix, Mac, and recovery recipients on a fresh clone; if
+it is missing, `sops updatekeys` rebuilds the list from the personal key alone
+and drops the others.
 
 [Secrets](docs/secrets.md) covers adding, rotating, and recovering keys.
 
@@ -108,7 +110,8 @@ nix flake update      # move inputs
 ```
 
 Rebuild both hosts after an input update. `scripts/check.sh` evaluates both
-configurations and runs `bash -n`, shellcheck, and typos.
+configurations, parses the Windows helper with pwsh, and runs `bash -n`,
+shellcheck, and typos.
 
 ## Docs
 

@@ -64,7 +64,7 @@ code tunnel needs no inbound rule.
 | `scripts/install [REPO_URL]` | Install Nix, clone the fork, create keys and secrets, then run the host install. |
 | `scripts/bootstrap-windows.ps1` | Install WSL and NixOS-WSL from Windows, then run the anix bootstrap. |
 | `scripts/rebuild [anix\|amac]` | Switch the named host; with no target, pick from the OS. |
-| `scripts/check.sh` | Evaluate both hosts, then `bash -n`, shellcheck, and typos. |
+| `scripts/check.sh` | Evaluate both hosts, parse the Windows helper with pwsh, then `bash -n`, shellcheck, and typos. |
 | `scripts/provision` | Replace an Ubuntu WSL with NixOS-WSL, transfer data, bootstrap both hosts. |
 | `scripts/bootstrap --prepare` | Create keys and secrets on any host, without switching. |
 | `scripts/bootstrap --host anix` | Finish the anix side and switch. |
@@ -81,8 +81,9 @@ code tunnel needs no inbound rule.
 `--no-pull`, and `--ensure-nix`. `scripts/provision`, `scripts/bootstrap`, and
 `scripts/bootstrap-mac-remote` accept `--dry-run`. `scripts/provision` also
 takes `--anix-user`, `--mac-user`, `--distro`, `--projects-dir`, `--backup`,
-`--dir`, `--no-mac`, `--no-transfer`, `--skip-backup`, and `--yes`. Each script
-prints `--help`.
+`--dir`, `--no-mac`, `--no-transfer`, `--skip-backup`, and `--yes`.
+`scripts/bootstrap` also takes `--host`, `--no-switch`, `--no-install`,
+`--force-ssh`, `--prepare`, and `--repo`. Each script prints `--help`.
 
 `scripts/install`, `scripts/provision`, and `scripts/bootstrap` install Nix
 with the upstream installer when it is missing. `scripts/bootstrap

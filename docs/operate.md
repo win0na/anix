@@ -35,8 +35,8 @@ input. Update both hosts in the same session, then check them.
 scripts/check.sh
 ```
 
-It evaluates both host configurations, then runs `bash -n`, shellcheck, and
-typos over the repository. Missing tools come from `nix shell nixpkgs#...`, so the
+It evaluates both host configurations, parses the Windows helper with pwsh,
+then runs `bash -n`, shellcheck, and typos over the repository. Missing tools come from `nix shell nixpkgs#...`, so the
 check works before either host is installed.
 
 ## Backups

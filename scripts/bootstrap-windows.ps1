@@ -63,15 +63,25 @@ $ProgressPreference = "SilentlyContinue"
 # Without this, PowerShell 5.1 decodes wsl.exe output as OEM and the version
 # check below silently never matches.
 $env:WSL_UTF8 = "1"
-$logPath = Join-Path $env:TEMP "anix-bootstrap-windows.log"
+$logDir = Join-Path $env:TEMP "anix"
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+$logPath = Join-Path $logDir "anix-bootstrap-windows.log"
 try { Start-Transcript -Path $logPath -Force | Out-Null } catch { $logPath = "" }
-# The elevated window closes on exit, so print the failure and keep the log.
+# The elevated window closes on exit, so print the failure first and pause; a
+# trap that runs Stop-Transcript first loses the message from the console.
+function Stop-Log {
+  if ($logPath) { try { Stop-Transcript | Out-Null } catch { } }
+}
+function Pause-OnFailure {
+  if (-not $Yes -and $Host.Name -eq "ConsoleHost") { Read-Host "Press Enter to close" }
+}
 trap {
-  Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
   Write-Host ""
   Write-Host "ERROR: $($_.Exception.Message)"
   if ($logPath) { Write-Host "Log: $logPath" }
   Write-Host "Fix the error above, then rerun this script."
+  Stop-Log
+  Pause-OnFailure
   exit 1
 }
 $Distro = $DistroName
@@ -81,6 +91,21 @@ function Test-Admin {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
   $principal = New-Object Security.Principal.WindowsPrincipal($identity)
   return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# PowerShell 5.1 does not escape embedded double quotes when it builds a native
+# command line, so a bash script passed through -lc arrives truncated. Encode
+# the script as base64; the command line then carries no quotes at all.
+function Invoke-WslScript {
+  param(
+    [string]$Distribution,
+    [string]$User,
+    [string]$Script
+  )
+  $bytes = [Text.Encoding]::UTF8.GetBytes($Script.Replace("`r", ""))
+  $encoded = [Convert]::ToBase64String($bytes)
+  wsl.exe -d $Distribution -u $User --exec bash -lc "echo $encoded | base64 -d | bash"
+  return $LASTEXITCODE
 }
 
 if (-not (Test-Admin)) {
@@ -138,6 +163,12 @@ if ($projectSegments -contains "." -or $projectSegments -contains "..") {
 }
 if ($ProjectsDir.StartsWith("/") -and -not ($ProjectsDir.StartsWith("/home/") -or $ProjectsDir.StartsWith("/mnt/"))) {
   throw "ProjectsDir must be under /home or /mnt: $ProjectsDir"
+}
+if ($ProjectsDir -match '^/mnt/[A-Za-z](/|$)') {
+  throw "ProjectsDir must not be a Windows drive mount; NFS cannot export it: $ProjectsDir"
+}
+if ($ProjectsDir.Contains("//")) {
+  throw "ProjectsDir must not contain empty segments: $ProjectsDir"
 }
 $projectName = ($projectSegments[-1]).ToLower()
 if ($projectName -in @("applications","desktop","documents","downloads","library","movies","music","pictures","public","system","users",".config",".ssh")) {
@@ -263,9 +294,14 @@ if ($distroExists) {
   wsl -d $Distro -u root --exec id $AnixUser *> $null
   $needsFirstSwitch = ($LASTEXITCODE -ne 0)
   $ErrorActionPreference = $savedPreference
-  if ($needsFirstSwitch) {
+  if ($NoFirstSwitch) {
+    # provision always passes -NoFirstSwitch; it runs the switch itself, and a
+    # rerun must not be blocked by the half-installed state it left behind.
+    Write-Host "==> first switch skipped (NoFirstSwitch)"
+    $needsFirstSwitch = $false
+  } elseif ($needsFirstSwitch) {
     if ($Yes) {
-      throw "A distribution named $Distro already exists and has no $AnixUser. Pass -DistroName with a different name, or remove that distribution first."
+      throw "A distribution named $Distro exists and has no $AnixUser. Pass -DistroName with a different name, or rerun with -NoFirstSwitch if its first switch failed."
     }
     if (-not (Confirm "$Distro exists without $AnixUser. The first switch will replace its configuration. Continue?")) {
       throw "Install cancelled."
@@ -310,15 +346,25 @@ if ($distroExists) {
   if ($LASTEXITCODE -ne 0) { throw "wsl --install failed with exit code $LASTEXITCODE" }
   $needsFirstSwitch = $true
 }
-if ($NoFirstSwitch) {
+if ($NoFirstSwitch -and $needsFirstSwitch) {
   Write-Host "==> first switch skipped (NoFirstSwitch)"
   $needsFirstSwitch = $false
 }
 
 if ($needsFirstSwitch) {
   Write-Host "==> first switch in $Distro"
-  wsl -d $Distro -u nixos --exec bash -lc "set -euo pipefail; rm -rf /tmp/anix; export PATH=/nix/var/nix/profiles/default/bin:`$PATH; nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone $RepoQuoted /tmp/anix; rm -f /tmp/anix/secrets/secrets.yaml; printf '{\n  anix = \x22%s\x22;\n  amac = \x22%s\x22;\n  projectsDir = \x22%s\x22;\n}\n' '$AnixUser' '$MacUser' '$ProjectsDir' > /tmp/anix/users.nix; sudo env PATH=`"`$PATH`" NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild boot --flake /tmp/anix#anix"
-  if ($LASTEXITCODE -ne 0) { throw "the first NixOS switch failed; read the error above, then rerun this script." }
+  $firstSwitch = @'
+set -euo pipefail
+rm -rf /tmp/anix
+export PATH=/nix/var/nix/profiles/default/bin:$PATH
+nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#git -c git clone __REPO__ /tmp/anix
+rm -f /tmp/anix/secrets/secrets.yaml
+printf '{\n  anix = "%s";\n  amac = "%s";\n  projectsDir = "%s";\n}\n' '__ANIX__' '__MAC__' '__DIR__' > /tmp/anix/users.nix
+sudo env "PATH=$PATH" NIX_CONFIG='experimental-features = nix-command flakes' nixos-rebuild boot --flake /tmp/anix#anix
+'@
+  $firstSwitch = $firstSwitch.Replace("__REPO__", $RepoQuoted).Replace("__ANIX__", $AnixUser).Replace("__MAC__", $MacUser).Replace("__DIR__", $ProjectsDir)
+  $firstCode = Invoke-WslScript -Distribution $Distro -User "nixos" -Script $firstSwitch
+  if ($firstCode -ne 0) { throw "the first NixOS switch failed; read the error above, then rerun this script." }
   wsl --terminate $Distro
   wsl -d $Distro -u $AnixUser --exec true
   if ($LASTEXITCODE -ne 0) { throw "the new distribution did not start as $AnixUser; rerun this script." }
@@ -340,19 +386,16 @@ elif ! grep -q 'anix = "__ANIX__"' "$f"; then
   need=1
 elif grep -q 'amac = "amac"' "$f" && [ "__MAC__" != "amac" ]; then
   need=1
+elif ! grep -q 'projectsDir = "__DIR__"' "$f"; then
+  need=1
 fi
 if [ "$need" -eq 1 ]; then
-  dir="__DIR__"
-  if [ -f "$f" ]; then
-    cur=$(sed -n 's/.*projectsDir *= *"\([^"]*\)".*/\1/p' "$f" | head -1)
-    [ -n "$cur" ] && dir=$cur
-  fi
-  printf '{\n  anix = "%s";\n  amac = "%s";\n  projectsDir = "%s";\n}\n' "__ANIX__" "__MAC__" "$dir" > "$f"
+  printf '{\n  anix = "%s";\n  amac = "%s";\n  projectsDir = "%s";\n}\n' '__ANIX__' '__MAC__' '__DIR__' > "$f"
 fi
 '@
   $usersScript = $usersScript.Replace("__ANIX__", $AnixUser).Replace("__MAC__", $MacUser).Replace("__DIR__", $ProjectsDir)
-  wsl -d $Distro -u $AnixUser --exec bash -lc $usersScript
-  if ($LASTEXITCODE -ne 0) { throw "could not write users.nix in ~/.config/anix; rerun this script." }
+  $usersCode = Invoke-WslScript -Distribution $Distro -User $AnixUser -Script $usersScript
+  if ($usersCode -ne 0) { throw "could not write users.nix in ~/.config/anix; rerun this script." }
 }
 
 if (-not $NoTask) {
@@ -396,4 +439,5 @@ if (-not $NoBootstrap -and -not $NoClone) {
   Write-Host "Windows is ready; the caller continues the bootstrap."
 }
 
-Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
+Stop-Log
+Write-Host "Log: $logPath"

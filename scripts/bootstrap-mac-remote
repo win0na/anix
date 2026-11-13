@@ -121,7 +121,12 @@ say "Authorizing the builder key for $mac_user"
 say "Checking the Command Line Tools on the Mac"
 if ! "${SSH[@]}" 'xcode-select -p >/dev/null 2>&1'; then
   echo "  Install the Command Line Tools on the Mac: xcode-select --install"
+  if [[ $assume_yes -eq 1 ]]; then
+    die "the Command Line Tools are missing on the Mac; run xcode-select --install there, then rerun this script"
+  fi
   ask "Continue once the installer is finished?" y || die "CLT is required"
+  "${SSH[@]}" 'xcode-select -p >/dev/null 2>&1' ||
+    die "the Command Line Tools are still missing on the Mac; run xcode-select --install there"
 fi
 
 say "Checking the builder key in the Mac host config"
@@ -180,7 +185,7 @@ if [[ $do_switch -eq 0 ]]; then
 fi
 
 say "Writing the first switch command"
-"${SSH[@]}" 'mkdir -p "$HOME/anix-first-switch"; rm -f "$HOME/anix-first-switch/post.ok"'
+"${SSH[@]}" 'mkdir -p "$HOME/anix-first-switch"; rm -f "$HOME/anix-first-switch/post.ok" "$HOME/anix-first-switch/post.fail"'
 "${SSH[@]}" 'cat > "$HOME/anix-first-switch/first-switch.command"' <<'EOS'
 #!/bin/zsh
 set -euo pipefail
