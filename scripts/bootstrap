@@ -613,13 +613,20 @@ ensure_recovery_key() {
     warn "no recovery recipient; if the personal key is lost the secrets are unrecoverable"
     return 0
   fi
-  local path pub
+  local path pub tmp_key
   read -r -p "Recovery key path [$HOME/anix-recovery-$(date +%Y%m%d).txt]: " path || true
   path=${path:-$HOME/anix-recovery-$(date +%Y%m%d).txt}
   [[ ! -e $path ]] || die "refusing to overwrite $path"
+  # Generate aside and move: a failed run must not leave a short file that a
+  # rerun refuses to replace and that could be archived as the recovery key.
+  tmp_key=$(mktemp "${path}.XXXXXX")
   # The subshell keeps umask 077 from leaking into the later nixos-rebuild.
-  ( umask 077; age_keygen -o "$path" )
-  chmod 600 "$path"
+  if ! ( umask 077; age_keygen -o "$tmp_key" ); then
+    rm -f "$tmp_key"
+    die "age-keygen failed; nothing was written to $path"
+  fi
+  chmod 600 "$tmp_key"
+  mv -f "$tmp_key" "$path"
   pub=$(age_keygen -y "$path")
   add_recipient recovery "$pub"
   say "Recovery key written to $path"
