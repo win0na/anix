@@ -166,7 +166,7 @@ if ($ProjectsDir -notmatch '^[A-Za-z0-9._/-]+$' -or $ProjectsDir -eq "/" -or $Pr
 if ($ProjectsDir.Contains("//")) {
   throw "ProjectsDir must not contain empty segments: $ProjectsDir"
 }
-$projectSegments = $ProjectsDir -split "/"
+$projectSegments = $ProjectsDir.TrimStart("/") -split "/"
 $protected = @("applications","desktop","documents","downloads","library","movies","music","pictures","public","system","users")
 foreach ($segment in $projectSegments) {
   if ([string]::IsNullOrEmpty($segment)) { throw "ProjectsDir must not contain empty segments: $ProjectsDir" }
@@ -407,7 +407,7 @@ if [ ! -f "$f" ]; then
   need=1
 elif ! grep -q 'anix = "__ANIX__"' "$f"; then
   need=1
-elif grep -q 'amac = "amac"' "$f" && [ "__MAC__" != "amac" ]; then
+elif ! grep -q "amac = \"__MAC__\"" "$f"; then
   need=1
 elif ! grep -q 'projectsDir = "__DIR__"' "$f"; then
   need=1

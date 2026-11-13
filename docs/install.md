@@ -20,8 +20,9 @@ The project root defaults to `src` under the anix home. If your projects
 already live in `code`, `projects`, or an absolute path, keep them there and
 use that parent as `projectsDir`. The directories keep their names; `provision`
 copies the ones you select into the NixOS home. An absolute root must already
-exist on the NixOS-WSL disk and start with `/home` or `/mnt`; a Windows drive
-under `/mnt/c` cannot be exported over NFS, so use a relative root there.
+exist on the NixOS-WSL disk and be under `/home/<anix-user>` or `/mnt/<name>`;
+a Windows drive under `/mnt/c` cannot be exported over NFS, so use a relative
+root there.
 
 Two limits apply before the first switch. nixpkgs 26.05 is the last release
 that builds for `x86_64-darwin`, so an Intel Mac stops receiving Nix security
@@ -78,8 +79,9 @@ the Mac. Ubuntu stays until both hosts pass, and it is removed only after you
 type the distribution name.
 
 The Mac phase needs the NFS export, and the export needs the WSL kernel
-modules, which load only when the WSL VM starts. If `nfs-server` is not running
-yet, `provision` stops before the Mac phase and prints these commands instead:
+modules, which load only when the WSL VM starts. If the kernel has not loaded
+`nfsd` yet, `provision` stops before the Mac phase and prints these commands
+instead:
 
 ```powershell
 wsl --shutdown

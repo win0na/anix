@@ -700,7 +700,9 @@ switch_anix() {
   # --plain keeps systemd from printing a status glyph as the first column.
   failed=$(systemctl --failed --no-legend --no-pager --plain 2>/dev/null | awk '{print $1}' || true)
   for unit in $failed; do
-    case "$unit" in
+    # systemctl prints the unit with its suffix; match on the bare name but keep
+    # the original in the message so a .mount failure is not reported as .service.
+    case "${unit%%.*}" in
       nfs-*|rpc-*|rpcbind|nftables|code-tunnel) ;;
       *) bad+=" $unit" ;;
     esac

@@ -57,8 +57,8 @@ that host.
 
 anix exports the configured project root to amac over Tailscale. The Mac
 mounts it at `$ANIX_MAC_HOME/<name>`. A launchd daemon named `anix-nfs` runs
-`~/.config/anix/scripts/mount-src` at login and retries when the server is not
-ready.
+`scripts/mount-src` from the Nix store at login and retries when the server is
+not ready.
 
 ```sh
 sudo ~/.config/anix/scripts/mount-src

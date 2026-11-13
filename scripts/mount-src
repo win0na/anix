@@ -42,6 +42,12 @@ if [[ -z ${ANIX_PROJECTS_DIR:-} ]]; then
   # shellcheck disable=SC1091
   . "$script_dir/anix-config.sh"
   ANIX_PROJECTS_DIR=$(anix_projects_dir "$script_dir/../users.nix")
+  anix_user=$(anix_value_from_users anix "$script_dir/../users.nix")
+  # A hand-edited users.nix must not mount the export over a system folder.
+  anix_check_projects_dir "$ANIX_PROJECTS_DIR" "/home/${anix_user:-$(id -un)}" || {
+    echo "error: invalid projectsDir in users.nix: $ANIX_PROJECTS_DIR" >&2
+    exit 1
+  }
 fi
 
 project_name=${ANIX_PROJECTS_DIR:-src}
