@@ -4,7 +4,36 @@ use crate::exec::{self, CliError};
 use crate::formula;
 use crate::port;
 
-const NO_ARCHIVE: &str = "not found, required when binary-only is set";
+const NO_ARCHIVE: &[&str] = &[
+    "not found, required when binary-only is set",
+    "failed to archivefetch",
+];
+
+/// `port -b` exits 1 for every failure. Only a missing binary archive may fall
+/// back to Homebrew, so the error text decides; a network error must surface.
+fn missing_archive(stdout: &str, stderr: &str) -> bool {
+    ["failed to archivefetch", "not found, required when binary-only is set"]
+        .iter()
+        .any(|marker| {
+            stdout.to_ascii_lowercase().contains(marker)
+                || stderr.to_ascii_lowercase().contains(marker)
+        })
+}
+
+fn network_error(stdout: &str, stderr: &str) -> bool {
+    const MARKERS: &[&str] = &[
+        "couldn't resolve host",
+        "could not resolve host",
+        "connection timed out",
+        "connection refused",
+        "network is unreachable",
+        "operation timed out",
+    ];
+    MARKERS.iter().any(|marker| {
+        stdout.to_ascii_lowercase().contains(marker)
+            || stderr.to_ascii_lowercase().contains(marker)
+    })
+}
 
 pub fn install(config: &Config, args: &[String]) -> Result<(), CliError> {
     let mut force = false;
@@ -63,7 +92,7 @@ pub fn install(config: &Config, args: &[String]) -> Result<(), CliError> {
             return Err(password_error(&hint));
         }
 
-        if stdout.contains(NO_ARCHIVE) || stderr.contains(NO_ARCHIVE) {
+        if missing_archive(&stdout, &stderr) && !network_error(&stdout, &stderr) {
             eprintln!(
                 "==> No MacPorts archive for {}; installing with Homebrew.",
                 formula
@@ -152,6 +181,21 @@ pub fn reinstall(args: &[String]) -> Result<(), CliError> {
                 port_name.clone(),
             ],
             &format!("-n upgrade --force {}", port_name),
+        )?;
+    }
+    Ok(())
+}
+
+pub fn upgrade(args: &[String]) -> Result<(), CliError> {
+    let formulas = plain_args(args, "upgrade")?;
+    if formulas.is_empty() {
+        return Err(CliError::new("upgrade requires at least one formula"));
+    }
+    for formula in &formulas {
+        let port_name = formula::resolve(formula)?;
+        sudo_port(
+            &["upgrade".to_string(), port_name.clone()],
+            &format!("upgrade {}", port_name),
         )?;
     }
     Ok(())

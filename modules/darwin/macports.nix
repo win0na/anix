@@ -40,10 +40,19 @@ in
     macports_have=$(
       "$macports_prefix/bin/port" version 2>/dev/null | /usr/bin/awk '{ print $2 }' || true
     )
-    # Install only a missing or wrong release, and only once: the sentinel says
-    # a pkg install already succeeded, so a removed prefix is not re-created
-    # behind the operator's back on every switch.
-    if [ ! -e "$macports_prefix/.anix-pkg-588f14cc" ] && [ "$macports_have" != "${pkgVersion}" ]; then
+    # Install only when the release is missing or older. A newer release than
+    # the pin, or a sentinel from an earlier install, is left alone so a switch
+    # cannot downgrade the base behind the operator's back.
+    macports_install=0
+    if [ ! -e "$macports_prefix/.anix-pkg-588f14cc" ]; then
+      if [ -z "$macports_have" ]; then
+        macports_install=1
+      elif [ "$macports_have" != "${pkgVersion}" ] && \
+        [ "$(/usr/bin/printf '%s\n%s\n' "$macports_have" "${pkgVersion}" | /usr/bin/sort -V | /usr/bin/head -n 1)" = "$macports_have" ]; then
+        macports_install=1
+      fi
+    fi
+    if [ "$macports_install" = 1 ]; then
       if /usr/sbin/installer -pkg ${pkg} -target /; then
         /usr/bin/touch "$macports_prefix/.anix-pkg-588f14cc"
       else
@@ -54,7 +63,7 @@ in
     if [ -x "$macports_prefix/bin/port" ]; then
       # Refresh the port index only. selfupdate rebuilds MacPorts itself and
       # can take minutes, so a stale index wins over a failed switch.
-      if ! ${lib.getExe' pkgs.coreutils "timeout"} 120 "$macports_prefix/bin/port" sync; then
+      if ! ${lib.getExe' pkgs.coreutils "timeout"} 300 "$macports_prefix/bin/port" sync; then
         echo "macports: port sync failed; run: sudo port sync" >&2
       fi
     fi
@@ -64,6 +73,7 @@ in
     # Both are symlinks to the prefix, where the real files live.
     if macports_installed=$("$macports_prefix/bin/port" -q installed 2>/dev/null); then
       /bin/mkdir -p "$macports_prefix/Cellar" "$macports_prefix/opt"
+      macports_map=$(/usr/bin/mktemp /tmp/anix-macports.XXXXXX)
       printf '%s\n' "$macports_installed" | /usr/bin/awk '
         $2 ~ /^@/ {
           name = $1
@@ -73,27 +83,34 @@ in
           sub(/_[0-9]+$/, "", version)
           if (name != "" && version != "") print name, version
         }
-      ' | while read -r macports_name macports_version; do
+      ' > "$macports_map"
+      while read -r macports_name macports_version; do
         macports_cellar="$macports_prefix/Cellar/$macports_name"
         /bin/mkdir -p "$macports_cellar"
-        macports_link="$macports_cellar/$macports_version"
-        if [ -L "$macports_link" ] || [ ! -e "$macports_link" ]; then
-          /bin/ln -sfn "$macports_prefix" "$macports_link"
-        fi
-        macports_opt="$macports_prefix/opt/$macports_name"
-        if [ -L "$macports_opt" ] || [ ! -e "$macports_opt" ]; then
-          /bin/ln -sfn "$macports_prefix" "$macports_opt"
-        fi
-      done
-      # A link whose target vanished is worse than no link.
+        /bin/ln -sfn "$macports_prefix" "$macports_cellar/$macports_version"
+        /bin/ln -sfn "$macports_prefix" "$macports_prefix/opt/$macports_name"
+      done < "$macports_map"
+      # Drop links for ports or versions that are no longer installed; every
+      # link points at the prefix itself, so a target test cannot detect this.
       for macports_link in "$macports_prefix"/opt/*; do
         [ -L "$macports_link" ] || continue
-        [ -e "$macports_link" ] || /bin/rm -f "$macports_link"
+        macports_name=''${macports_link##*/}
+        /usr/bin/awk -v n="$macports_name" '$1 == n { found = 1 } END { exit !found }' "$macports_map" ||
+          /bin/rm -f "$macports_link"
       done
       for macports_cellar in "$macports_prefix"/Cellar/*; do
         [ -d "$macports_cellar" ] || continue
+        macports_name=''${macports_cellar##*/}
+        for macports_link in "$macports_cellar"/*; do
+          [ -L "$macports_link" ] || continue
+          macports_version=''${macports_link##*/}
+          /usr/bin/awk -v n="$macports_name" -v v="$macports_version" \
+            '$1 == n && $2 == v { found = 1 } END { exit !found }' "$macports_map" ||
+            /bin/rm -f "$macports_link"
+        done
         /bin/rmdir "$macports_cellar" 2>/dev/null || true
       done
+      /bin/rm -f "$macports_map"
     else
       echo "macports: port -q installed failed; leaving the brew-shaped tree alone" >&2
     fi

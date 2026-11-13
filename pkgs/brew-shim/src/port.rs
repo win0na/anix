@@ -44,19 +44,22 @@ pub fn leaves() -> Result<Vec<String>, CliError> {
 }
 
 pub fn deps(name: &str) -> Result<Vec<String>, CliError> {
-    port_relation("deps", name)
+    echo_relation("depof", name)
 }
 
 pub fn dependents(name: &str) -> Result<Vec<String>, CliError> {
-    port_relation("dependents", name)
+    echo_relation("dependentof", name)
 }
 
-fn port_relation(subcommand: &str, name: &str) -> Result<Vec<String>, CliError> {
-    let out = run(&["-q", subcommand, name])?;
+/// `port -q echo depof:<name>` prints one dependency name per line. The
+/// `port deps` listing prints labels and versions, which is not a name list.
+fn echo_relation(kind: &str, name: &str) -> Result<Vec<String>, CliError> {
+    let query = format!("{}:{}", kind, name);
+    let out = run(&["-q", "echo", &query])?;
     if !out.status.success() {
         return Err(CliError::new(format!(
             "failed to query {} for {}",
-            subcommand, name
+            kind, name
         )));
     }
     Ok(parse_name_lines(&exec::text(&out.stdout), Some(name)))
@@ -90,6 +93,21 @@ fn run(args: &[&str]) -> Result<Output, CliError> {
     exec::output("port", &owned)
 }
 
+/// Strip `+variant` suffixes and the `_<revision>` tail.
+pub fn normalize_version(raw: &str) -> String {
+    let version = raw.trim_start_matches('@');
+    let without_variants = version.split('+').next().unwrap_or(version);
+    match without_variants.rsplit_once('_') {
+        Some((base, revision))
+            if !base.is_empty()
+                && !revision.is_empty()
+                && revision.chars().all(|ch| ch.is_ascii_digit()) =>
+        {
+            base.to_string()
+        }
+        _ => without_variants.to_string(),
+    }
+}
 /// Parse `port -q installed` output:
 ///
 /// ```text
@@ -110,7 +128,7 @@ pub fn parse_installed(text: &str) -> Vec<InstalledPort> {
         }
         let version = fields
             .next()
-            .map(|token| token.trim_start_matches('@').to_string())
+            .map(normalize_version)
             .unwrap_or_default();
         if version.is_empty() {
             continue;
@@ -133,8 +151,11 @@ pub fn parse_info(text: &str) -> Option<(String, String)> {
         return None;
     }
     let version = match fields.as_slice() {
-        [_, version, revision, ..] if *revision != "0" => format!("{}_{}", version, revision),
-        [_, version, ..] => (*version).to_string(),
+        [_, version, revision, ..] if *revision != "0" => normalize_version(&format!(
+            "{}_{}",
+            version, revision
+        )),
+        [_, version, ..] => normalize_version(version),
         _ => return None,
     };
     Some((name, version))
@@ -157,8 +178,8 @@ pub fn parse_outdated(text: &str) -> Vec<(String, String, String)> {
         }
         rows.push((
             name.to_string(),
-            fields[arrow - 1].trim_start_matches('@').to_string(),
-            fields[arrow + 1].trim_start_matches('@').to_string(),
+            normalize_version(fields[arrow - 1]),
+            normalize_version(fields[arrow + 1]),
         ));
     }
     rows
@@ -206,6 +227,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn normalizes_revision_and_variants() {
+        assert_eq!(normalize_version("@1.24.5_0+universal"), "1.24.5");
+        assert_eq!(normalize_version("3.12.7_0"), "3.12.7");
+        assert_eq!(normalize_version("2.0.1"), "2.0.1");
+        assert_eq!(normalize_version("1.0_12"), "1.0");
+    }
+
+    #[test]
     fn parses_installed_variants_and_active_marker() {
         let text = "\
 The following ports are currently installed:
@@ -216,9 +245,9 @@ The following ports are currently installed:
         let ports = parse_installed(text);
         assert_eq!(ports.len(), 3);
         assert_eq!(ports[0].name, "python312");
-        assert_eq!(ports[0].version, "3.12.7_0+universal");
+        assert_eq!(ports[0].version, "3.12.7");
         assert!(ports[0].active);
-        assert_eq!(ports[1].version, "22.9.0_0");
+        assert_eq!(ports[1].version, "22.9.0");
         assert!(!ports[1].active);
         assert!(ports[2].active);
     }
@@ -231,7 +260,7 @@ The following ports are currently installed:
         );
         assert_eq!(
             parse_info("python312 3.12.7 2"),
-            Some(("python312".into(), "3.12.7_2".into()))
+            Some(("python312".into(), "3.12.7".into()))
         );
     }
 
@@ -240,7 +269,7 @@ The following ports are currently installed:
         let rows = parse_outdated("python312 3.12.7_0 < 3.12.8_0\n");
         assert_eq!(
             rows,
-            vec![("python312".into(), "3.12.7_0".into(), "3.12.8_0".into())]
+            vec![("python312".into(), "3.12.7".into(), "3.12.8".into())]
         );
     }
 }

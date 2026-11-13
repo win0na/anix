@@ -6,20 +6,10 @@ use crate::brew;
 use crate::config::Config;
 use crate::exec::CliError;
 
-const UNSUPPORTED: &[&str] = &["tap", "untap", "pin", "unpin", "bundle", "switch"];
+const UNSUPPORTED: &[&str] = &["switch"];
 
 pub fn run(args: &[String]) -> Result<(), CliError> {
     let config = Config::from_env();
-
-    if let Some(flag) = args
-        .iter()
-        .find(|arg| *arg == "--json" || arg.starts_with("--json="))
-    {
-        return Err(CliError::new(format!(
-            "\"{}\" is not supported by brew-shim",
-            flag
-        )));
-    }
 
     let Some(command) = args.first().map(String::as_str) else {
         print_help();
@@ -28,6 +18,25 @@ pub fn run(args: &[String]) -> Result<(), CliError> {
 
     let cask = has_flag(args, "--cask");
     let rest = &args[1..];
+
+    // Homebrew-owned commands may receive --json; only the port-backed ones
+    // cannot synthesise it.
+    let delegated = cask
+        || matches!(
+            command,
+            "tap" | "untap" | "pin" | "unpin" | "bundle"
+        );
+    if !delegated {
+        if let Some(flag) = args
+            .iter()
+            .find(|arg| *arg == "--json" || arg.starts_with("--json="))
+        {
+            return Err(CliError::new(format!(
+                "\"{}\" is not supported by brew-shim",
+                flag
+            )));
+        }
+    }
 
     match command {
         "-h" | "--help" | "help" => {
@@ -63,14 +72,16 @@ pub fn run(args: &[String]) -> Result<(), CliError> {
         "uninstall" | "remove" | "rm" => mutate::uninstall(&config, rest),
         "reinstall" => mutate::reinstall(rest),
         "upgrade" if rest.is_empty() => mutate::synchronize("upgrade", &["outdated"]),
+        "upgrade" => mutate::upgrade(rest),
         "update" if rest.is_empty() => mutate::synchronize("sync", &[]),
         "cleanup" if rest.is_empty() => mutate::synchronize("reclaim", &[]),
-        "upgrade" | "update" | "cleanup" => {
+        "update" | "cleanup" => {
             Err(CliError::new(format!("{} takes no arguments", command)))
         }
         "link" => mutate::link(rest, true),
         "unlink" => mutate::link(rest, false),
         "fetch" => mutate::fetch(rest),
+        "tap" | "untap" | "pin" | "unpin" | "bundle" => brew::delegate(&config, args),
         "services" => services::run(rest),
         other if UNSUPPORTED.contains(&other) => Err(CliError::new(format!(
             "\"{}\" is not supported by brew-shim; use port directly",
@@ -101,10 +112,11 @@ Read-only:
 
 Mutating:
   install [-f] [--dry-run] <formula>..., uninstall|remove|rm [-f] <formula>...
-  reinstall <formula>..., upgrade, update, cleanup, link|unlink <formula>
+  reinstall <formula>..., upgrade [formula]..., update, cleanup, link|unlink <formula>
   fetch <formula>..., services [list|start|stop] [name]
 
-Casks are delegated to the real Homebrew at ANIX_BREW_REAL.
+Casks, taps, bundles, and pins are delegated to the real Homebrew at
+ANIX_BREW_REAL. `--json` is refused for port-backed commands.
 ",
         env!("CARGO_PKG_VERSION")
     );

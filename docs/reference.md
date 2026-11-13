@@ -63,7 +63,7 @@ On Intel, `brew` is a shim (`pkgs/brew-shim`) that speaks to `port`:
 | `brew install jq` | `sudo port -b install jq`, Homebrew when no archive exists |
 | `brew list` | ports and Homebrew formulae |
 | `brew install --cask stats` | the real Homebrew at `/usr/local/bin/brew` |
-| `tap`, `bundle`, `pin`, `--json` | refused, with the `port` command to run instead |
+| `tap`, `bundle`, `pin`, `switch` | the real Homebrew; `switch` is refused |
 
 Activation mirrors every installed port as `/opt/local/Cellar/<name>/<version>`
 and `/opt/local/opt/<name>`, both pointing at `/opt/local`, so the prefix paths

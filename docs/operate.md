@@ -52,6 +52,9 @@ brew install --cask stats # the real Homebrew
 sudo port install cmake   # full MacPorts syntax when you need variants
 ```
 
+Casks, taps, and bundles go to the real Homebrew at `/usr/local/bin/brew`;
+everything else is answered from MacPorts.
+
 Mutations need a password: the shim runs `sudo -n` and prints the exact
 `sudo port ...` command instead of prompting. The first switch installs
 MacPorts 2.12.7 from the signed package, and every switch runs `port sync` with

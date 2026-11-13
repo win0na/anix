@@ -56,6 +56,12 @@ case "$*" in
   "-q deps "*)
     [ -f "$STUB_DIR/deps.txt" ] && cat "$STUB_DIR/deps.txt"
     ;;
+  "-q echo depof:"*)
+    [ -f "$STUB_DIR/depof.txt" ] && cat "$STUB_DIR/depof.txt"
+    ;;
+  "-q echo dependentof:"*)
+    [ -f "$STUB_DIR/dependentof.txt" ] && cat "$STUB_DIR/dependentof.txt"
+    ;;
   "-q dependents "*)
     [ -f "$STUB_DIR/dependents.txt" ] && cat "$STUB_DIR/dependents.txt"
     ;;
@@ -224,7 +230,7 @@ fn list_versions_keeps_ports_winning_over_brew() {
     assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
     assert_eq!(
         stdout(&output),
-        "nodejs22 22.9.0\npython312 3.12.7_0+universal\n"
+        "nodejs22 22.9.0\npython312 3.12.7\n"
     );
 }
 
@@ -270,7 +276,7 @@ fn missing_archive_falls_back_to_brew_with_clean_environment() {
     fixture.write("search_exact.txt", "foo @1.0\n");
     fixture.write(
         "install_failure.txt",
-        "Error: foo: not found, required when binary-only is set\n",
+        "Error: Failed to archivefetch foo: version @1.0_0: HTTP response code said error\n",
     );
 
     let output = fixture.run_env(
@@ -293,6 +299,40 @@ fn missing_archive_falls_back_to_brew_with_clean_environment() {
         brew_env.is_empty(),
         "Homebrew inherited shim variables: {}",
         brew_env
+    );
+}
+
+#[test]
+fn archivefetch_network_error_is_reported_without_brew_fallback() {
+    let fixture = Fixture::new();
+    fixture.write("search_exact.txt", "foo @1.0\n");
+    fixture.write(
+        "install_failure.txt",
+        "Error: Failed to archivefetch foo: version @1.0_0: Couldn't resolve host name\n",
+    );
+
+    let output = fixture.run(&["install", "foo"]);
+    assert_eq!(code(&output), 1, "stderr: {}", stderr(&output));
+    assert!(
+        !fixture.log_exists("brew.log"),
+        "a network error must not fall back to Homebrew"
+    );
+}
+
+#[test]
+fn deps_reads_depof_names_not_labels() {
+    let fixture = Fixture::new();
+    fixture.write("search_exact.txt", "wget @1.24.5_0 (www)\n");
+    fixture.write("depof.txt", "libidn2\nopenssl3\n");
+
+    let output = fixture.run(&["deps", "wget"]);
+    assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "libidn2\nopenssl3\n");
+    let port_log = fixture.log("port.log").expect("port was not called");
+    assert!(
+        port_log.contains("-q echo depof:wget"),
+        "port log: {}",
+        port_log
     );
 }
 
@@ -370,15 +410,24 @@ fn cask_without_real_brew_names_the_missing_path() {
 }
 
 #[test]
-fn unsupported_commands_and_json_exit_one() {
+fn brew_owned_commands_delegate_and_json_stays_rejected() {
     let fixture = Fixture::new();
 
     let tap = fixture.run(&["tap", "homebrew/core"]);
-    assert_eq!(code(&tap), 1);
+    assert_eq!(code(&tap), 0, "stderr: {}", stderr(&tap));
+    let brew_log = fixture.log("brew.log").expect("brew was not called");
     assert!(
-        stderr(&tap).contains("not supported"),
+        brew_log.contains("brew tap homebrew/core"),
+        "brew log: {}",
+        brew_log
+    );
+
+    let switch = fixture.run(&["switch", "openjdk"]);
+    assert_eq!(code(&switch), 1);
+    assert!(
+        stderr(&switch).contains("not supported"),
         "stderr: {}",
-        stderr(&tap)
+        stderr(&switch)
     );
 
     let json = fixture.run(&["outdated", "--json"]);
@@ -387,6 +436,15 @@ fn unsupported_commands_and_json_exit_one() {
         stderr(&json).contains("not supported"),
         "stderr: {}",
         stderr(&json)
+    );
+
+    let cask_json = fixture.run(&["install", "--cask", "--json=v2", "iterm2"]);
+    assert_eq!(code(&cask_json), 0, "stderr: {}", stderr(&cask_json));
+    let brew_log = fixture.log("brew.log").expect("brew was not called");
+    assert!(
+        brew_log.contains("install --cask --json=v2 iterm2"),
+        "brew log: {}",
+        brew_log
     );
 }
 
@@ -491,6 +549,18 @@ fn brew_installed_formula_uninstalls_through_brew() {
         !fixture.log_exists("sudo.log"),
         "brew formulae must not be uninstalled through port"
     );
+}
+
+#[test]
+fn upgrade_with_a_formula_upgrades_that_port() {
+    let fixture = Fixture::new();
+    fixture.write("installed.txt", "  wget @1.24.5_0 (active)\n");
+    fixture.write("search_exact.txt", "wget @1.24.5_0 (www)\n");
+
+    let output = fixture.run(&["upgrade", "wget"]);
+    assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
+    let sudo_log = fixture.log("sudo.log").expect("sudo was not called");
+    assert!(sudo_log.contains("upgrade wget"), "sudo log: {}", sudo_log);
 }
 
 #[test]
