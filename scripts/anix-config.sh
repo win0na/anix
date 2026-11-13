@@ -6,10 +6,13 @@
 anix_value_from_users() {
   local key=$1 file=${2:-${repo_root:-}/users.nix}
   [[ -n $file && -s $file ]] || return 1
-  # Flatten first: a hand-written one-line users.nix would otherwise read empty.
-  tr '\n\r' '  ' < "$file" |
-    sed -n "s/.*[^A-Za-z0-9_]${key}[[:space:]]*=[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" |
-    head -1
+  # Strip comments and flatten first: a commented-out assignment or a
+  # hand-written one-line users.nix must not change the answer.
+  sed 's/#.*//' "$file" |
+    tr '\n\r' '  ' |
+    grep -oE "(^|[^A-Za-z0-9_])${key}[[:space:]]*=[[:space:]]*\"[^\"]*\"" |
+    head -1 |
+    sed 's/^[^"]*"//; s/"$//' || true
 }
 
 anix_projects_dir() {

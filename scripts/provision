@@ -266,7 +266,7 @@ echo "  windows: writes .wslconfig, opens TCP 2049, imports the image"
 if [[ $do_backup -eq 1 ]]; then
   if [[ -z $backup ]]; then
     win_home=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n') ||
-      die "powershell.exe failed; run this from WSL with Windows interop enabled"
+      die "powershell.exe failed; run this from WSL with Windows interop enabled, then rerun scripts/provision"
     [[ -n $win_home ]] || die "could not read the Windows user profile"
     backup="$win_home\\anix-ubuntu-backup.tar"
   fi
@@ -281,7 +281,7 @@ fi
 
 say "Installing NixOS-WSL alongside $WSL_DISTRO_NAME"
 win_temp=$(powershell.exe -NoProfile -Command '$env:TEMP' | tr -d '\r\n') ||
-  die "powershell.exe failed; run this from WSL with Windows interop enabled"
+  die "powershell.exe failed; run this from WSL with Windows interop enabled, then rerun scripts/provision"
 [[ -n $win_temp ]] || die "could not read the Windows temp directory"
 win_temp_unix=$(wslpath -u "$win_temp")
 win_stage="$win_temp_unix/anix"
@@ -294,7 +294,7 @@ win_log="$win_temp\\anix\\anix-bootstrap-windows.log"
 stage_cleanup() { rm -f "$win_stage/bootstrap-windows.ps1" "$win_stage/anix-elevate.ps1"; }
 trap stage_cleanup EXIT
 admin=$(powershell.exe -NoProfile -Command '([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)' | tr -d '\r\n') ||
-  die "powershell.exe failed; run this from WSL with Windows interop enabled"
+  die "powershell.exe failed; run this from WSL with Windows interop enabled, then rerun scripts/provision"
 helper_args=("-Yes" "-SkipWslUpdate" "-NoShutdown" "-NoFirstSwitch" "-NoClone" "-DistroName" "$distro" "-AnixUser" "$anix_user" "-ProjectsDir" "$projects_dir" "-ImageUrl" "$image_url" "-ImageSha256" "$image_sha")
 
 if [[ $dry_run -eq 1 ]]; then
@@ -439,7 +439,7 @@ if [[ $do_mac -eq 1 ]]; then
   [[ $assume_yes -eq 1 ]] && mac_retry+=(--yes)
   if [[ $dry_run -eq 1 ]]; then
     say "would check that nfs-server is running, then run scripts/bootstrap-mac-remote inside $distro"
-  elif ! wsl.exe -d "$distro" -u root --exec bash -c 'test -e /proc/fs/nfsd && systemctl is-active --quiet nfs-server' >/dev/null 2>&1; then
+  elif ! wsl.exe -d "$distro" -u root --exec bash -lc 'grep -qw nfsd /proc/filesystems && systemctl is-active --quiet nfs-server' >/dev/null 2>&1; then
     # The 6.6 WSL kernel builds nfsd as a module, and WSL loads modules only
     # when the VM starts. The Mac mount cannot work before that restart.
     say "The Mac phase needs the NFS export, which is not running yet"
@@ -485,7 +485,8 @@ if [[ $do_finalize -eq 1 && $do_mac -eq 1 ]]; then
   if [[ $WSL_DISTRO_NAME == "$distro" ]]; then
     die "refusing to unregister the distribution this script is running in"
   fi
-  [[ -n $backup ]] || backup=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n')
+  [[ -n $backup ]] || backup=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n') ||
+    die "powershell.exe failed; rerun scripts/provision --backup <windows path>"
   [[ $backup == *.age || $backup == *.tar ]] || backup="$backup\\anix-ubuntu-backup.tar"
   if [[ $dry_run -eq 1 ]]; then
     say "would export $WSL_DISTRO_NAME to an age-encrypted archive"

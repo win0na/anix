@@ -270,6 +270,9 @@ if (Test-Path $wslconfig) {
       $backup = "$wslconfig.before-anix.$(Get-Date -Format yyyyMMddHHmmss)"
       Copy-Item $wslconfig $backup -Force
       Set-Content -Path $wslconfig -Value $content -Encoding ASCII
+    } else {
+      Write-Warning "$wslconfig was left unchanged."
+      Write-Warning "Add 'loadKernelModules=nfsd,nft_ct,nft_fib,nft_reject' under [wsl2], then run: wsl --shutdown"
     }
   }
 } else {

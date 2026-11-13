@@ -94,7 +94,7 @@ fi
 
 say "Checking the NFS export"
 if ! systemctl is-active --quiet nfs-server 2>/dev/null; then
-  if [[ ! -e /proc/fs/nfsd ]]; then
+  if ! grep -qw nfsd /proc/filesystems 2>/dev/null; then
     warn "nfs-server is not running and the kernel has not loaded nfsd"
     warn "the 6.6 WSL kernel builds nfsd as a module and WSL loads it only when the VM starts"
     say "from Windows PowerShell"

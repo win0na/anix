@@ -61,7 +61,8 @@ It then installs Nix, clones the fork to `~/.config/anix`, and runs
 4. Confirms each key and recipient update.
 5. Offers an offline recovery key, and if you create one it offers to commit
    and to push; the path defaults to
-   `~/anix-recovery-$(date +%Y%m%d).txt`. Both prompts default to no.
+   `~/anix-recovery-$(date +%Y%m%d).txt`. The commit prompt defaults to yes;
+   the push prompt defaults to no.
 
 Because of those prompts, the first run needs a terminal. `--yes` accepts the
 defaults, skips the recovery key, and leaves the commits to you.
@@ -75,6 +76,23 @@ directory checklist.
 repository and the projects you select, runs the anix bootstrap, and prepares
 the Mac. Ubuntu stays until both hosts pass, and it is removed only after you
 type the distribution name.
+
+The Mac phase needs the NFS export, and the export needs the WSL kernel
+modules, which load only when the WSL VM starts. If `nfs-server` is not running
+yet, `provision` stops before the Mac phase and prints these commands instead:
+
+```powershell
+wsl --shutdown
+wsl -d NixOS
+```
+
+```sh
+cd ~/.config/anix && scripts/bootstrap-mac-remote
+```
+
+That path keeps Ubuntu; remove it yourself with `wsl.exe --unregister` in
+PowerShell once the Mac is configured. Ubuntu is also kept when `.sops.yaml`
+has no recovery recipient.
 
 Approve the Windows UAC prompt when it appears. Enable Remote Login on the Mac
 when the Mac phase starts.
@@ -185,10 +203,10 @@ the commands above.
 
 ## After both hosts pass
 
-Restart the WSL VM once so `.wslconfig` takes effect. It sets mirrored
-networking, and WSL reads the file only when the VM starts. Without the restart
-the Mac cannot reach the NFS server. Run this in a Windows PowerShell, not in
-Ubuntu: `wsl --shutdown` ends the shell you run it from.
+Restart the WSL VM once, if you have not already, so `.wslconfig` takes effect.
+It sets mirrored networking, and WSL reads the file only when the VM starts.
+Without the restart the Mac cannot reach the NFS server. Run this in a Windows
+PowerShell, not in Ubuntu: `wsl --shutdown` ends the shell you run it from.
 
 ```powershell
 wsl --shutdown

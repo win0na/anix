@@ -686,7 +686,7 @@ switch_anix() {
     say "would run sudo nixos-rebuild switch --flake $repo_root#anix"
     return 0
   fi
-  local status=0 failed
+  local status=0 failed bad="" unit
   # Exit 4 means the configuration applied but units failed. On a stock WSL
   # kernel that is how a missing nfsd module shows up, and it must not stop the
   # rest of the bootstrap.
@@ -697,9 +697,16 @@ switch_anix() {
   if [[ $status -ne 4 ]]; then
     die "the anix switch failed (status $status); rerun scripts/bootstrap --host anix"
   fi
-  failed=$(systemctl --failed --no-legend --no-pager 2>/dev/null | awk '{print $1}' | paste -sd' ' - || true)
-  if [[ $failed == *sops* ]]; then
-    die "the switch applied, but the secrets unit failed ($failed); rerun scripts/bootstrap --host anix"
+  # --plain keeps systemd from printing a status glyph as the first column.
+  failed=$(systemctl --failed --no-legend --no-pager --plain 2>/dev/null | awk '{print $1}' || true)
+  for unit in $failed; do
+    case "$unit" in
+      nfs-*|rpc-*|rpcbind|nftables|code-tunnel) ;;
+      *) bad+=" $unit" ;;
+    esac
+  done
+  if [[ -n $bad ]]; then
+    die "the switch applied, but these units failed:$bad; fix them, then rerun scripts/bootstrap --host anix"
   fi
   warn "the switch applied, but these units failed: ${failed:-unknown}"
   warn "if nfs-server is in that list, the WSL kernel has not loaded nfsd."
