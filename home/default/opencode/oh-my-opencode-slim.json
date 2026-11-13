@@ -332,7 +332,7 @@
         ]
       },
       "oracle": {
-        "model": "anthropic/claude-sonnet-5-5",
+        "model": "opencode-go/deepseek-v4.1-flash",
         "variant": "high",
         "skills": [
           "simplify"
