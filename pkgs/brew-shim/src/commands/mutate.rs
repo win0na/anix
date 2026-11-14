@@ -11,9 +11,12 @@ fn missing_archive(stdout: &str, stderr: &str) -> bool {
     let text = format!("{}\n{}", stdout, stderr).to_ascii_lowercase();
     let archive = text.contains("failed to archivefetch")
         || text.contains("not found, required when binary-only is set");
-    archive
-        && (text.contains("404") || text.contains("not found"))
-        && !network_error(stdout, stderr)
+    // A bare "404" also appears in checksums and hashes. Only curl's status
+    // line, or the legacy not-found text, proves the archive is absent.
+    let absent = text.contains("returned error: 404")
+        || text.contains("404 not found")
+        || text.contains("not found, required when binary-only is set");
+    archive && absent && !network_error(stdout, stderr)
 }
 
 fn network_error(stdout: &str, stderr: &str) -> bool {
@@ -261,7 +264,14 @@ pub(super) fn sudo_port(port_args: &[String], hint: &str) -> Result<(), CliError
 }
 
 fn sudo_port_output(port_args: &[String]) -> Result<std::process::Output, CliError> {
-    let mut argv = vec!["-n".to_string(), "port".to_string()];
+    // Resolve port before sudo: sudo keeps the caller's PATH, so a bare name
+    // could execute a user-writable earlier entry as root.
+    let port_bin = std::env::var_os("ANIX_MACPORTS_PREFIX")
+        .map(|prefix| std::path::PathBuf::from(prefix).join("bin").join("port"))
+        .filter(|candidate| candidate.is_file())
+        .or_else(|| exec::find_in_path("port"))
+        .ok_or_else(|| CliError::new("MacPorts port not found"))?;
+    let mut argv = vec!["-n".to_string(), port_bin.to_string_lossy().into_owned()];
     argv.extend(port_args.iter().cloned());
     exec::output("sudo", &argv)
 }

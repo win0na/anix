@@ -32,4 +32,14 @@ impl Config {
     pub fn opt(&self, port_name: &str) -> PathBuf {
         self.prefix.join("opt").join(port_name)
     }
+
+    /// Resolve `port` to an absolute path: sudo keeps the caller's PATH, so
+    /// passing a bare name would let an earlier PATH entry run as root.
+    pub fn port_bin(&self) -> PathBuf {
+        let candidate = self.prefix.join("bin").join("port");
+        if candidate.is_file() {
+            return candidate;
+        }
+        crate::exec::find_in_path("port").unwrap_or(candidate)
+    }
 }

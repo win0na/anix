@@ -19,6 +19,12 @@ pub fn run(args: &[String]) -> Result<(), CliError> {
     let cask = has_flag(args, "--cask");
     let rest = &args[1..];
 
+    // Any cask request belongs to Homebrew: MacPorts has no cask concept, and
+    // refusing individual cask flags would silently change the command.
+    if cask && !UNSUPPORTED.contains(&command) {
+        return brew::delegate(&config, args);
+    }
+
     // Homebrew-owned commands may receive --json; only the port-backed ones
     // cannot synthesise it.
     let delegated = (cask

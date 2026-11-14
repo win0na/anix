@@ -16,7 +16,14 @@ pub fn prefix(config: &Config, formula: Option<&str>) -> Result<(), CliError> {
         Ok(port_name) => {
             let installed = port::installed()?;
             if installed.iter().any(|entry| entry.name == port_name) {
-                println!("{}", config.opt(&port_name).display());
+                // The activation step refreshes the brew layout, so a port
+                // installed moments ago may not have its link yet.
+                let opt = config.opt(&port_name);
+                if opt.exists() {
+                    println!("{}", opt.display());
+                } else {
+                    println!("{}", config.prefix_str());
+                }
                 return Ok(());
             }
             if brew::has_formula(config, formula) {

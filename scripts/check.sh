@@ -102,9 +102,9 @@ fi
 
 echo "==> typos"
 if command -v typos >/dev/null 2>&1; then
-  typos --force-exclude || fail "typos found spelling errors"
+  typos --force-exclude --exclude 'pkgs/*/target' || fail "typos found spelling errors"
 else
-  nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#typos -c typos --force-exclude ||
+  nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#typos -c typos --force-exclude --exclude 'pkgs/*/target' ||
     fail "typos found spelling errors"
 fi
 

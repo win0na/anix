@@ -246,7 +246,22 @@ fn prefix_reports_installed_port_and_rejects_unknown_formula() {
 
     let installed = fixture.run(&["--prefix", "python312"]);
     assert_eq!(code(&installed), 0, "stderr: {}", stderr(&installed));
-    assert_eq!(stdout(&installed), format!("{}/opt/python312\n", PREFIX));
+    // Without the activation layout there is no opt link, so the prefix itself
+    // is the honest answer; it always exists.
+    assert_eq!(stdout(&installed), format!("{PREFIX}\n"));
+
+    let prefix = fixture.dir.join("prefix");
+    fs::create_dir_all(prefix.join("opt")).expect("create test prefix");
+    std::os::unix::fs::symlink(&prefix, prefix.join("opt/python312")).expect("link port");
+    let linked = fixture.run_env(
+        &["--prefix", "python312"],
+        &[("ANIX_MACPORTS_PREFIX", prefix.to_str().expect("utf-8 path"))],
+    );
+    assert_eq!(code(&linked), 0, "stderr: {}", stderr(&linked));
+    assert_eq!(
+        stdout(&linked),
+        format!("{}/opt/python312\n", prefix.display())
+    );
 
     let unknown = fixture.run(&["--prefix", "foobar"]);
     assert_eq!(code(&unknown), 1);
