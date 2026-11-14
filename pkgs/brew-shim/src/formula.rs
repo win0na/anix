@@ -33,6 +33,16 @@ pub fn curated(name: &str) -> Option<&'static str> {
         .map(|(_, port_name)| *port_name)
 }
 
+/// The Homebrew name a port stands in for, when the map has one. Used by
+/// `brew list` so a script grepping for `openssl@3` sees an installed
+/// `openssl3`.
+pub fn brew_name(port_name: &str) -> Option<&'static str> {
+    CURATED
+        .iter()
+        .find(|(_, port)| *port == port_name)
+        .map(|(formula, _)| *formula)
+}
+
 /// Translate a Homebrew formula name into a MacPorts port name, consulting
 /// the curated map, then the installed set, then an exact name search.
 /// Unknown names produce an error listing fuzzy-search candidates.

@@ -11,6 +11,13 @@ const UNSUPPORTED: &[&str] = &["switch"];
 pub fn run(args: &[String]) -> Result<(), CliError> {
     let config = Config::from_env();
 
+    // A leading -v is brew's verbose flag, not a version request.
+    let mut shifted = args.to_vec();
+    if shifted.len() > 1 && shifted[0] == "-v" {
+        shifted.remove(0);
+    }
+    let args = &shifted[..];
+
     let Some(command) = args.first().map(String::as_str) else {
         print_help();
         return Ok(());

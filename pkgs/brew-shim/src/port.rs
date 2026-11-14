@@ -47,6 +47,11 @@ pub fn deps(name: &str) -> Result<Vec<String>, CliError> {
     echo_relation("depof", name)
 }
 
+/// Recursive dependencies, matching `brew deps` without `--direct`.
+pub fn rdeps(name: &str) -> Result<Vec<String>, CliError> {
+    echo_relation("rdepof", name)
+}
+
 pub fn dependents(name: &str) -> Result<Vec<String>, CliError> {
     echo_relation("dependentof", name)
 }
@@ -180,6 +185,14 @@ pub fn parse_outdated(text: &str) -> Vec<(String, String, String)> {
             normalize_version(fields[arrow - 1]),
             normalize_version(fields[arrow + 1]),
         ));
+        // A revision-only bump normalises to the same string on both sides.
+        // Keep the raw compounds then, or brew would print "1.2.3 < 1.2.3".
+        if let Some(last) = rows.last_mut() {
+            if last.1 == last.2 {
+                last.1 = fields[arrow - 1].to_string();
+                last.2 = fields[arrow + 1].to_string();
+            }
+        }
     }
     rows
 }

@@ -59,6 +59,9 @@ case "$*" in
   "-q echo depof:"*)
     [ -f "$STUB_DIR/depof.txt" ] && cat "$STUB_DIR/depof.txt"
     ;;
+  "-q echo rdepof:"*)
+    [ -f "$STUB_DIR/rdepof.txt" ] && cat "$STUB_DIR/rdepof.txt"
+    ;;
   "-q echo dependentof:"*)
     [ -f "$STUB_DIR/dependentof.txt" ] && cat "$STUB_DIR/dependentof.txt"
     ;;
@@ -214,7 +217,7 @@ The following ports are currently installed:
 
     let output = fixture.run(&["list"]);
     assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
-    assert_eq!(stdout(&output), "nodejs22\npython312\nsharedport\n");
+    assert_eq!(stdout(&output), "nodejs22\npython@3.12\nsharedport\n");
 }
 
 #[test]
@@ -224,13 +227,13 @@ fn list_versions_keeps_ports_winning_over_brew() {
         "installed.txt",
         "  python312 @3.12.7_0+universal (active)\n",
     );
-    fixture.write("brew_versions.txt", "python312 3.12.6\nnodejs22 22.9.0\n");
+    fixture.write("brew_versions.txt", "nodejs22 22.9.0\n");
 
     let output = fixture.run(&["list", "--versions"]);
     assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
     assert_eq!(
         stdout(&output),
-        "nodejs22 22.9.0\npython312 3.12.7\n"
+        "nodejs22 22.9.0\npython@3.12 3.12.7\n"
     );
 }
 
@@ -369,20 +372,21 @@ fn archivefetch_network_error_is_reported_without_brew_fallback() {
 }
 
 #[test]
-fn deps_reads_depof_names_not_labels() {
+fn deps_is_recursive_and_direct_is_opt_in() {
     let fixture = Fixture::new();
     fixture.write("search_exact.txt", "wget @1.24.5_0 (www)\n");
-    fixture.write("depof.txt", "libidn2\nopenssl3\n");
+    fixture.write("rdepof.txt", "libidn2\nopenssl3\nzlib\n");
+    fixture.write("depof.txt", "libidn2\n");
 
     let output = fixture.run(&["deps", "wget"]);
     assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
-    assert_eq!(stdout(&output), "libidn2\nopenssl3\n");
+    assert_eq!(stdout(&output), "libidn2\nopenssl3\nzlib\n");
     let port_log = fixture.log("port.log").expect("port was not called");
-    assert!(
-        port_log.contains("-q echo depof:wget"),
-        "port log: {}",
-        port_log
-    );
+    assert!(port_log.contains("-q echo rdepof:wget"), "port log: {}", port_log);
+
+    let direct = fixture.run(&["deps", "--direct", "wget"]);
+    assert_eq!(code(&direct), 0, "stderr: {}", stderr(&direct));
+    assert_eq!(stdout(&direct), "libidn2\n");
 }
 
 #[test]
@@ -644,4 +648,53 @@ fn info_marks_brew_installed_formula_as_installed() {
         "stdout: {}",
         stdout(&output)
     );
+}
+
+#[test]
+fn leading_v_is_verbose_not_version() {
+    let fixture = Fixture::new();
+    fixture.write("search_exact.txt", "wget @1.24.5_0 (www)\n");
+
+    let output = fixture.run(&["-v", "install", "wget"]);
+    assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
+    assert!(!stdout(&output).contains("Homebrew"), "stdout: {}", stdout(&output));
+    let port_log = fixture.log("port.log").expect("port was not called");
+    assert!(port_log.contains("-b install wget"), "port log: {}", port_log);
+}
+
+#[test]
+fn versions_keep_every_installed_revision() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "installed.txt",
+        "  wget @1.21.4_0 (active)\n  wget @1.21.5_0\n",
+    );
+
+    let output = fixture.run(&["list", "--versions"]);
+    assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "wget 1.21.4 1.21.5\n");
+}
+
+#[test]
+fn revision_only_outdated_keeps_raw_versions() {
+    let fixture = Fixture::new();
+    fixture.write("outdated.txt", "python312  3.12.7_0 < 3.12.7_1\n");
+
+    let output = fixture.run(&["outdated"]);
+    assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "python312 (3.12.7_0) < 3.12.7_1\n");
+}
+
+#[test]
+fn dependency_archive_miss_does_not_fall_back() {
+    let fixture = Fixture::new();
+    fixture.write("search_exact.txt", "wget @1.24.5_0 (www)\n");
+    fixture.write(
+        "install_failure.txt",
+        "Error: Failed to archivefetch libdep: version @2.0_0: The requested URL returned error: 404\n",
+    );
+
+    let output = fixture.run(&["install", "wget"]);
+    assert_eq!(code(&output), 1, "stderr: {}", stderr(&output));
+    assert!(!fixture.log_exists("brew.log"), "a dependency miss must not call brew");
 }

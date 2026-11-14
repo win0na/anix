@@ -7,8 +7,13 @@ use crate::port;
 /// `port -b` exits 1 for every failure. Only a missing binary archive may fall
 /// back to Homebrew: the archivefetch failure must also read as not-found, and
 /// a network error must surface instead.
-fn missing_archive(stdout: &str, stderr: &str) -> bool {
+fn missing_archive(stdout: &str, stderr: &str, port_name: &str) -> bool {
     let text = format!("{}\n{}", stdout, stderr).to_ascii_lowercase();
+    let port = port_name.to_ascii_lowercase();
+    // A dependency's missing archive must not send this formula to Homebrew.
+    let scoped = text.contains(&format!("archivefetch {}", port))
+        || text.contains(&format!("archive {} ", port))
+        || text.contains(&format!("archive {}:", port));
     let archive = text.contains("failed to archivefetch")
         || text.contains("not found, required when binary-only is set");
     // A bare "404" also appears in checksums and hashes. Only curl's status
@@ -16,7 +21,7 @@ fn missing_archive(stdout: &str, stderr: &str) -> bool {
     let absent = text.contains("returned error: 404")
         || text.contains("404 not found")
         || text.contains("not found, required when binary-only is set");
-    archive && absent && !network_error(stdout, stderr)
+    scoped && archive && absent && !network_error(stdout, stderr)
 }
 
 fn network_error(stdout: &str, stderr: &str) -> bool {
@@ -91,7 +96,7 @@ pub fn install(config: &Config, args: &[String]) -> Result<(), CliError> {
             return Err(password_error(&hint));
         }
 
-        if missing_archive(&stdout, &stderr) && !network_error(&stdout, &stderr) {
+        if missing_archive(&stdout, &stderr, &port_name) && !network_error(&stdout, &stderr) {
             eprintln!(
                 "==> No MacPorts archive for {}; installing with Homebrew.",
                 formula

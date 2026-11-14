@@ -85,7 +85,14 @@ pub fn list(config: &Config, args: &[String]) -> Result<(), CliError> {
     } else {
         let brew_formulae =
             brew::capture(config, &["list".into(), "--formula".into()]).unwrap_or_default();
-        let mut names: BTreeSet<String> = ports.iter().map(|entry| entry.name.clone()).collect();
+        let mut names: BTreeSet<String> = ports
+            .iter()
+            .map(|entry| {
+                formula::brew_name(&entry.name)
+                    .unwrap_or(entry.name.as_str())
+                    .to_string()
+            })
+            .collect();
         for line in brew_formulae.lines() {
             let name = line.trim();
             if is_brew_name(name) {
@@ -100,11 +107,14 @@ pub fn list(config: &Config, args: &[String]) -> Result<(), CliError> {
 }
 
 fn versions_union(ports: &[port::InstalledPort], brew_versions: &str) {
-    let mut versions: BTreeMap<String, String> = BTreeMap::new();
+    // A port can be installed in several revisions; brew prints them all.
+    let mut versions: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for entry in ports {
-        versions
-            .entry(entry.name.clone())
-            .or_insert_with(|| entry.version.clone());
+        let name = formula::brew_name(&entry.name).unwrap_or(entry.name.as_str());
+        let list = versions.entry(name.to_string()).or_default();
+        if !list.contains(&entry.version) {
+            list.push(entry.version.clone());
+        }
     }
     for line in brew_versions.lines() {
         let line = line.trim();
@@ -114,12 +124,14 @@ fn versions_union(ports: &[port::InstalledPort], brew_versions: &str) {
         if !is_brew_name(name) {
             continue;
         }
-        versions
-            .entry(name.to_string())
-            .or_insert_with(|| version.trim().to_string());
+        let version = version.trim();
+        let list = versions.entry(name.to_string()).or_default();
+        if !list.iter().any(|have| have == version) {
+            list.push(version.to_string());
+        }
     }
-    for (name, version) in versions {
-        println!("{} {}", name, version);
+    for (name, list) in versions {
+        println!("{} {}", name, list.join(" "));
     }
 }
 
@@ -226,7 +238,15 @@ pub fn outdated() -> Result<(), CliError> {
 }
 
 pub fn deps(config: &Config, args: &[String]) -> Result<(), CliError> {
-    relation(config, args, "deps", port::deps, "deps")
+    // brew deps is recursive unless --direct is given.
+    let direct = args.iter().any(|arg| arg == "--direct");
+    let filtered: Vec<String> = args
+        .iter()
+        .filter(|arg| arg.as_str() != "--direct")
+        .cloned()
+        .collect();
+    let lookup = if direct { port::deps } else { port::rdeps };
+    relation(config, &filtered, "deps", lookup, "deps")
 }
 
 pub fn uses(config: &Config, args: &[String]) -> Result<(), CliError> {
