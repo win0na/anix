@@ -5,7 +5,10 @@ use crate::exec::{self, CliError};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstalledPort {
     pub name: String,
+    /// Homebrew-shaped version, revision stripped.
     pub version: String,
+    /// Version with the MacPorts revision kept (`1.21.4_1`), for duplicates.
+    pub compound: String,
     pub active: bool,
 }
 
@@ -131,16 +134,17 @@ pub fn parse_installed(text: &str) -> Vec<InstalledPort> {
         if !is_port_name(name) || name.eq_ignore_ascii_case("none") {
             continue;
         }
-        let version = fields
-            .next()
-            .map(normalize_version)
-            .unwrap_or_default();
+        let raw = fields.next().unwrap_or_default();
+        let version = normalize_version(raw);
         if version.is_empty() {
             continue;
         }
+        let compound = raw.trim_start_matches('@');
+        let compound = compound.split('+').next().unwrap_or(compound).to_string();
         ports.push(InstalledPort {
             name: name.to_string(),
             version,
+            compound,
             active: trimmed.contains("(active)"),
         });
     }

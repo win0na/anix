@@ -11,7 +11,9 @@ fn missing_archive(stdout: &str, stderr: &str, port_name: &str) -> bool {
     let text = format!("{}\n{}", stdout, stderr).to_ascii_lowercase();
     let port = port_name.to_ascii_lowercase();
     // A dependency's missing archive must not send this formula to Homebrew.
-    let scoped = text.contains(&format!("archivefetch {}", port))
+    let scoped = text.contains(&format!("archivefetch {}:", port))
+        || text.contains(&format!("archivefetch {} ", port))
+        || text.contains(&format!("archivefetch {}\n", port))
         || text.contains(&format!("archive {} ", port))
         || text.contains(&format!("archive {}:", port));
     let archive = text.contains("failed to archivefetch")

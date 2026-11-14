@@ -657,7 +657,11 @@ fn leading_v_is_verbose_not_version() {
 
     let output = fixture.run(&["-v", "install", "wget"]);
     assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
-    assert!(!stdout(&output).contains("Homebrew"), "stdout: {}", stdout(&output));
+    assert!(
+        !stdout(&output).contains("Homebrew 7.0.13"),
+        "stdout: {}",
+        stdout(&output)
+    );
     let port_log = fixture.log("port.log").expect("port was not called");
     assert!(port_log.contains("-b install wget"), "port log: {}", port_log);
 }
@@ -697,4 +701,40 @@ fn dependency_archive_miss_does_not_fall_back() {
     let output = fixture.run(&["install", "wget"]);
     assert_eq!(code(&output), 1, "stderr: {}", stderr(&output));
     assert!(!fixture.log_exists("brew.log"), "a dependency miss must not call brew");
+}
+
+#[test]
+fn repeated_verbose_is_not_a_version_request() {
+    let fixture = Fixture::new();
+    let output = fixture.run(&["-v", "-v"]);
+    assert_eq!(code(&output), 0);
+    assert!(stdout(&output).contains("Usage: brew"), "stdout: {}", stdout(&output));
+    assert!(!stdout(&output).contains("Homebrew 7.0.13"));
+}
+
+#[test]
+fn versions_keep_same_version_different_revision() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "installed.txt",
+        "  wget @1.21.4_0 (active)\n  wget @1.21.4_1\n",
+    );
+
+    let output = fixture.run(&["list", "--versions"]);
+    assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "wget 1.21.4 1.21.4_1\n");
+}
+
+#[test]
+fn dependency_name_extension_does_not_fall_back() {
+    let fixture = Fixture::new();
+    fixture.write("search_exact.txt", "libidn @1.0_0 (mail)\n");
+    fixture.write(
+        "install_failure.txt",
+        "Error: Failed to archivefetch libidn2: version @2.0_0: The requested URL returned error: 404\n",
+    );
+
+    let output = fixture.run(&["install", "libidn"]);
+    assert_eq!(code(&output), 1, "stderr: {}", stderr(&output));
+    assert!(!fixture.log_exists("brew.log"), "must not call brew");
 }

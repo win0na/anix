@@ -112,8 +112,15 @@ fn versions_union(ports: &[port::InstalledPort], brew_versions: &str) {
     for entry in ports {
         let name = formula::brew_name(&entry.name).unwrap_or(entry.name.as_str());
         let list = versions.entry(name.to_string()).or_default();
-        if !list.contains(&entry.version) {
-            list.push(entry.version.clone());
+        // The first row shows the plain version; a second revision of the same
+        // version keeps its `_rev` so it is not silently dropped.
+        let display = if list.iter().any(|have| have == &entry.version) {
+            entry.compound.clone()
+        } else {
+            entry.version.clone()
+        };
+        if !list.contains(&display) {
+            list.push(display);
         }
     }
     for line in brew_versions.lines() {

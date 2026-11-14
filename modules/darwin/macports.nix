@@ -68,7 +68,7 @@ in
         macports_sync_status=$?
       if [ "''${macports_sync_status:-0}" -ne 0 ]; then
         if [ "''${macports_sync_status:-0}" -eq 124 ]; then
-          /usr/bin/find "$macports_prefix/var/macports/sources" -maxdepth 2 -name '*.lock' \
+          /usr/bin/find "$macports_prefix/var/macports/sources" -maxdepth 6 -name '*.lock' \
             -delete 2>/dev/null || true
           echo "macports: port sync timed out; cleared stale locks, rerun: sudo port sync" >&2
         else
@@ -106,7 +106,9 @@ in
         [ -L "$macports_cellar" ] && continue
         /bin/mkdir -p "$macports_cellar" || { macports_layout_ok=0; continue; }
         macports_version_dir="$macports_cellar/$macports_version"
-        [ -L "$macports_version_dir" ] && continue
+        if [ -L "$macports_version_dir" ]; then
+          /bin/rm -f -- "$macports_version_dir" || { macports_layout_ok=0; continue; }
+        fi
         /bin/mkdir -p "$macports_version_dir" || { macports_layout_ok=0; continue; }
         for macports_sub in bin sbin lib include share etc libexec; do
           [ -e "$macports_prefix/$macports_sub" ] &&
