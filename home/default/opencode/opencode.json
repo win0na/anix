@@ -13,8 +13,7 @@
         "type": "local",
         "command": [
           "fff-mcp"
-        ],
-        "enabled": true
+        ]
       },
       "headroom": {
         "type": "local",
@@ -25,8 +24,7 @@
           "headroom",
           "mcp",
           "serve"
-        ],
-        "enabled": true
+        ]
       },
       "serena": {
         "type": "local",
@@ -41,8 +39,7 @@
           "agent",
           "--open-web-dashboard",
           "False"
-        ],
-        "enabled": true
+        ]
       }
     }
   },
@@ -58,10 +55,7 @@
     {
       "package": "headroom-opencode",
       "options": {
-        "proxyUrl": "http://127.0.0.1:8787",
-        "excludeHosts": [
-          "api.anthropic.com"
-        ]
+        "proxyUrl": "http://127.0.0.1:8787"
       }
     },
     "./plugins/opencode-dcp-fix"
