@@ -738,3 +738,11 @@ fn dependency_name_extension_does_not_fall_back() {
     assert_eq!(code(&output), 1, "stderr: {}", stderr(&output));
     assert!(!fixture.log_exists("brew.log"), "must not call brew");
 }
+
+#[test]
+fn solo_v_still_prints_the_version() {
+    let fixture = Fixture::new();
+    let output = fixture.run(&["-v"]);
+    assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "Homebrew 7.0.13\n");
+}

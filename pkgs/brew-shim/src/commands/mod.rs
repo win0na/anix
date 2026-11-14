@@ -14,7 +14,14 @@ pub fn run(args: &[String]) -> Result<(), CliError> {
     // A leading -v is brew's verbose flag, not a version request. More than
     // one -v with no command is still not a version request.
     let only_verbose = args.len() > 1 && args.iter().all(|arg| arg == "-v");
-    let mut shifted: Vec<String> = args.iter().filter(|arg| arg.as_str() != "-v").cloned().collect();
+    let mut shifted: Vec<String> = if args.len() == 1 {
+        args.to_vec()
+    } else {
+        args.iter()
+            .filter(|arg| arg.as_str() != "-v")
+            .cloned()
+            .collect()
+    };
     if only_verbose {
         shifted.clear();
     }

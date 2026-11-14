@@ -41,22 +41,17 @@ in
       "$macports_prefix/bin/port" version 2>/dev/null | /usr/bin/awk '{ print $2 }' || true
     )
     # Install when the release is missing or older. A newer release than the
-    # pin is left alone; the sentinel is trusted only together with a working
-    # port binary at the pinned version, so a stale file cannot suppress the
-    # install.
+    # pin is left alone.
     macports_install=0
     if [ ! -x "$macports_prefix/bin/port" ] || [ "$macports_have" != "${pkgVersion}" ]; then
       if [ -z "$macports_have" ]; then
         macports_install=1
-      elif [ ! -e "$macports_prefix/.anix-pkg-${pkgVersion}-588f14cc" ] && \
-        [ "$(/usr/bin/printf '%s\n%s\n' "$macports_have" "${pkgVersion}" | /usr/bin/sort -V | /usr/bin/head -n 1)" = "$macports_have" ]; then
+      elif [ "$(/usr/bin/printf '%s\n%s\n' "$macports_have" "${pkgVersion}" | /usr/bin/sort -V | /usr/bin/head -n 1)" = "$macports_have" ]; then
         macports_install=1
       fi
     fi
     if [ "$macports_install" = 1 ]; then
-      if /usr/sbin/installer -pkg ${pkg} -target / && [ -x "$macports_prefix/bin/port" ]; then
-        /usr/bin/touch "$macports_prefix/.anix-pkg-${pkgVersion}-588f14cc"
-      else
+      if ! /usr/sbin/installer -pkg ${pkg} -target /; then
         echo "macports: pkg install failed; rerun: sudo installer -pkg ${pkg} -target /" >&2
       fi
     fi
