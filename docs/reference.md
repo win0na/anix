@@ -66,9 +66,12 @@ On Intel, `brew` is a shim (`pkgs/brew-shim`) that speaks to `port`:
 | `tap`, `untap`, `bundle`, `pin`, `unpin` | the real Homebrew at `/usr/local/bin/brew` |
 | `switch` | refused |
 
-Activation mirrors every installed port as `/opt/local/Cellar/<name>/<version>`
-and `/opt/local/opt/<name>`, both pointing at `/opt/local`, so the prefix paths
-brew-shaped tools expect exist.
+Activation gives every installed port a `/opt/local/Cellar/<name>/<version>`
+directory whose entries (`bin`, `lib`, `include`, `share`, `etc`) link into the
+prefix, plus `/opt/local/opt/<name>` pointing at that directory. The tree never
+links to the prefix itself, so scanning one formula cannot walk every port.
+Until the layout has run for a port, `brew --prefix <name>` prints `/opt/local`
+rather than a path that does not exist yet.
 
 ## Ports
 
