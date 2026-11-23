@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# xdg-open for anix. A Rootshel client asks the device to open HTTP(S) links;
+# everything else falls through to the desktop browser.
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+usage: xdg-open URL
+
+Open one HTTP(S) URL. Under Herdr or Mosh from the Rootshel app the request is
+sent to the device; otherwise the desktop xdg-open or open is used.
+EOF
+}
+
+die() {
+  printf 'xdg-open: %s\n' "$*" >&2
+  exit 1
+}
+
+usage_error() {
+  printf 'xdg-open: %s\n' "$*" >&2
+  usage
+  exit 64
+}
+
+# Mosh keeps no marker in the environment, but the session is a child of
+# mosh-server. Herdr's server is often detached, so walk the process tree.
+mosh_ancestor() {
+  local pid=$$ comm parent
+  while [[ $pid =~ ^[0-9]+$ ]] && ((pid > 1)); do
+    comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
+    case "$comm" in
+      mosh-server|mosh-client) return 0 ;;
+    esac
+    parent=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]')
+    [[ -n $parent ]] || return 1
+    pid=$parent
+  done
+  return 1
+}
+
+from_rootshell() {
+  [[ ${ROOTSHELL_OPEN:-1} == 0 ]] && return 1
+  [[ -n ${LC_ROOTSHELL_PANE:-} ]] && return 0
+  [[ -n ${HERDR_ENV:-}${HERDR_SOCKET_PATH:-} ]] && return 0
+  mosh_ancestor
+}
+
+# Herdr does not forward OSC 1337, but it does forward OSC 52 clipboard writes,
+# so a Herdr pane must use the clipboard transport. Mosh only preserves
+# clipboard state; a direct SSH session can use the OpenURL sequence.
+pick_transport() {
+  case "${ROOTSHELL_OPEN_MODE:-auto}" in
+    openurl|clipboard)
+      printf '%s\n' "${ROOTSHELL_OPEN_MODE:-auto}"
+      return 0
+      ;;
+    auto) ;;
+    *) die "ROOTSHELL_OPEN_MODE must be auto, openurl, or clipboard" ;;
+  esac
+  if [[ -n ${HERDR_ENV:-}${HERDR_SOCKET_PATH:-} || -n ${TMUX:-} ]]; then
+    printf 'clipboard\n'
+  elif mosh_ancestor; then
+    printf 'clipboard\n'
+  else
+    printf 'openurl\n'
+  fi
+}
+
+# Never look this up on PATH: our own name is xdg-open.
+fallback() {
+  local candidate self
+  self=$(readlink -f "$0" 2>/dev/null || printf '%s\n' "$0")
+  for candidate in /run/current-system/sw/bin/xdg-open /usr/bin/xdg-open /usr/local/bin/xdg-open; do
+    [[ -x $candidate ]] || continue
+    [[ $(readlink -f "$candidate" 2>/dev/null) == "$self" ]] && continue
+    exec "$candidate" "$1"
+  done
+  if command -v open >/dev/null 2>&1; then
+    exec open "$1"
+  fi
+  printf 'xdg-open: no desktop browser; URL: %s\n' "$1" >&2
+  exit 1
+}
+
+if [[ $# -ne 1 ]]; then
+  usage_error "expected one URL"
+fi
+url=$1
+case "$url" in
+  http://*|https://*) ;;
+  *) usage_error "expected an HTTP(S) URL" ;;
+esac
+
+if ! from_rootshell; then
+  fallback "$url"
+fi
+
+helper="$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s\n' "$0")")/rootshell-open"
+[[ -x $helper ]] || die "rootshell-open is missing next to $0"
+[[ -w /dev/tty ]] || die "no controlling terminal; URL: $url"
+
+if [[ $(pick_transport) == clipboard ]]; then
+  exec "$helper" --clipboard "$url"
+fi
+exec "$helper" "$url"

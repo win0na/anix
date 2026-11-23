@@ -92,6 +92,15 @@ while IFS= read -r -d '' file; do
   bash -n "$file" || fail "syntax error in ${file#"$repo_root"/}"
 done < <(find "$repo_root/tests/e2e" -type f \( -name '*.sh' -o -name '*.bash' -o -path '*/stubs/*' \) -print0)
 
+echo "==> shellcheck home/default/rootshell/xdg-open"
+if command -v shellcheck >/dev/null 2>&1; then
+  shellcheck "$repo_root/home/default/rootshell/xdg-open" || fail "shellcheck failed for home/default/rootshell/xdg-open"
+else
+  nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#shellcheck -c \
+    shellcheck "$repo_root/home/default/rootshell/xdg-open" ||
+    fail "shellcheck failed for home/default/rootshell/xdg-open"
+fi
+
 echo "==> shellcheck scripts/*"
 while IFS= read -r -d '' file; do
   if command -v shellcheck >/dev/null 2>&1; then

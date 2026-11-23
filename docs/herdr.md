@@ -77,6 +77,19 @@ The plugin list also includes `oh-my-opencode-slim`, the DCP plugin, the
 Anthropic auth plugin, and the quota plugin. `service.json` and `auth.json` are
 local state; they stay out of the repository.
 
+## Opening links
+
+`xdg-open` on anix sends HTTP(S) links to the Rootshel device. Herdr forwards
+the clipboard envelope the wrapper writes, so a link opens in the browser on
+the connected device instead of on the host.
+
+Enable **Settings > Terminal > Open Links from Programs** in Rootshel. It is off
+by default.
+
+`BROWSER` points at the same wrapper, so tools that spawn a browser use it too.
+`ROOTSHELL_OPEN_MODE=openurl|clipboard` selects the transport and
+`ROOTSHELL_OPEN=0` falls back to the desktop `xdg-open`.
+
 ## What stays manual
 
 Plugin pins live in `flake.nix`. Update a pin, rebuild, and run
