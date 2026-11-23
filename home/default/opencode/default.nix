@@ -11,7 +11,7 @@
     "opencode/plugins/herdr-agent-state.js".source = ./plugins/herdr-agent-state.js;
     "opencode/plugins/rootshell-push.ts".source = ./plugins/rootshell-push.ts;
     "opencode/plugins/rtk.ts".source = ./plugins/rtk.ts;
-    "opencode/plugins/opencode-dcp-fix".source = ../../../pkgs/opencode-dcp-fix;
+    "opencode/dcp-fix".source = ../../../pkgs/opencode-dcp-fix;
     "opencode/oc-title-strip/tui.js".source = ./oc-title-strip/tui.js;
     "opencode/dcp-prompts".source = ./dcp-prompts;
   };

@@ -154,7 +154,5 @@
           x86_64-darwin.herdr-sidebar = (pkgsFor nixpkgs-2605 "x86_64-darwin").herdr-sidebar;
           x86_64-darwin.ttt = (pkgsFor nixpkgs-2605 "x86_64-darwin").ttt;
         };
-
-      checks = { };
     };
 }

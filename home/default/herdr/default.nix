@@ -10,6 +10,10 @@
 
   # Replace the GitHub herdr-sidebar with the single-ttt-pane build.
   home.activation.herdrSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    ${pkgs.herdr}/bin/herdr plugin link ${pkgs.herdr-sidebar}/plugins/herdr-sidebar || true
+    if [ -z "''${DRY_RUN:-}" ]; then
+      if ! ${pkgs.herdr}/bin/herdr plugin link ${pkgs.herdr-sidebar}/plugins/herdr-sidebar; then
+        echo "anix: herdr sidebar link failed; run: herdr plugin link" >&2
+      fi
+    fi
   '';
 }

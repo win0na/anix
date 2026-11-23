@@ -58,7 +58,7 @@
         "proxyUrl": "http://127.0.0.1:8787"
       }
     },
-    "./plugins/opencode-dcp-fix"
+    "./dcp-fix"
   ],
   "compaction": {
     "prune": true

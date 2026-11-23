@@ -1053,7 +1053,7 @@ bootstrap_anix() {
     if [[ ! -s $secrets_file ]]; then
       warn "secrets are missing; sops stays off"
     elif [[ ! -s /etc/nix/mac-builder ]]; then
-      die "the switch applied, but sops did not install /etc/nix/mac-builder; run: sudo systemctl restart sops-install-secrets, then rerun scripts/bootstrap --host anix"
+      die "the switch applied, but sops did not install /etc/nix/mac-builder; rerun scripts/rebuild anix"
     else
       say "sops is active; builder key installed"
     fi

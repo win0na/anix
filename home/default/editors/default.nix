@@ -23,16 +23,18 @@ in
   # machine-scoped keys into the existing file instead of linking it.
   home.activation.remoteVscodeSettings = lib.mkIf (!isDarwin) (
     lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      mkdir -p ${lib.escapeShellArg (dirOf machineSettings)}
-      tmp="$(mktemp)"
-      if [ -s ${lib.escapeShellArg machineSettings} ]; then
-        ${pkgs.jq}/bin/jq -s '.[0] * .[1]' \
-          ${lib.escapeShellArg machineSettings} ${./machine-settings.json} > "$tmp"
-      else
-        cp ${./machine-settings.json} "$tmp"
+      if [ -z "''${DRY_RUN:-}" ]; then
+        mkdir -p ${lib.escapeShellArg (dirOf machineSettings)}
+        tmp="$(mktemp)"
+        if [ -s ${lib.escapeShellArg machineSettings} ]; then
+          ${pkgs.jq}/bin/jq -s '.[0] * .[1]' \
+            ${lib.escapeShellArg machineSettings} ${./machine-settings.json} > "$tmp"
+        else
+          cp ${./machine-settings.json} "$tmp"
+        fi
+        install -m 644 "$tmp" ${lib.escapeShellArg machineSettings}
+        rm -f "$tmp"
       fi
-      install -m 644 "$tmp" ${lib.escapeShellArg machineSettings}
-      rm -f "$tmp"
     ''
   );
 }
