@@ -11,6 +11,8 @@ Validate the repository without installing anything:
   - run shellcheck on every scripts/ file from PATH or nixpkgs
   - parse scripts/bootstrap-windows.ps1 with pwsh
   - run the brew-shim Rust tests
+  - run the opencode-dcp-fix Node tests
+  - syntax-check and shellcheck the Intel activation fragment
   - run the apw adapter self-test
   - run typos over the repository when typos is on PATH
 
@@ -50,6 +52,9 @@ fi
 
 cd "$repo_root"
 
+tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/anix-check.XXXXXX")
+trap 'rm -rf "$tmp_dir"' EXIT
+
 nix_flags=(--extra-experimental-features "nix-command flakes")
 
 echo "==> nix eval .#nixosConfigurations.anix"
@@ -61,6 +66,20 @@ for config in amac amac-intel; do
   nix "${nix_flags[@]}" eval --raw ".#darwinConfigurations.$config.config.system.build.toplevel.drvPath" >/dev/null ||
     fail "$config configuration eval failed"
 done
+
+echo "==> activation fragment: amac-intel"
+fragment="$tmp_dir/macports-activation.sh"
+printf '#!/usr/bin/env bash\n' >"$fragment"
+nix "${nix_flags[@]}" eval --raw \
+  ".#darwinConfigurations.amac-intel.config.system.activationScripts.postActivation.text" >>"$fragment" ||
+  fail "could not evaluate the Intel activation fragment"
+bash -n "$fragment" || fail "syntax error in the Intel activation fragment"
+if command -v shellcheck >/dev/null 2>&1; then
+  shellcheck -s bash "$fragment" || fail "shellcheck failed for the Intel activation fragment"
+else
+  nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#shellcheck -c \
+    shellcheck -s bash "$fragment" || fail "shellcheck failed for the Intel activation fragment"
+fi
 
 echo "==> bash -n scripts/*"
 while IFS= read -r -d '' file; do
@@ -99,6 +118,14 @@ else
   nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#cargo nixpkgs#rustc -c \
     cargo test --quiet --manifest-path "$repo_root/pkgs/brew-shim/Cargo.toml" ||
     fail "brew-shim tests failed"
+fi
+
+echo "==> node --test pkgs/opencode-dcp-fix"
+if command -v node >/dev/null 2>&1; then
+  node --test "$repo_root/pkgs/opencode-dcp-fix/test/" || fail "opencode-dcp-fix tests failed"
+else
+  nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#nodejs -c \
+    node --test "$repo_root/pkgs/opencode-dcp-fix/test/" || fail "opencode-dcp-fix tests failed"
 fi
 
 echo "==> apw adapter self-test"

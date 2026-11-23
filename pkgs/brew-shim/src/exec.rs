@@ -26,10 +26,20 @@ impl CliError {
 /// Run a command, capturing stdout and stderr. Missing programs become a
 /// user-facing error naming the command.
 pub fn output(program: &str, args: &[String]) -> Result<Output, CliError> {
-    Command::new(program)
-        .args(args)
-        .output()
-        .map_err(|err| spawn_error(program, err))
+    // ETXTBSY is 26 on Linux and macOS. A concurrent `port` upgrade can hold
+    // the binary open for a moment; retry briefly instead of failing the brew
+    // command outright.
+    let mut attempts = 0;
+    loop {
+        match Command::new(program).args(args).output() {
+            Ok(output) => return Ok(output),
+            Err(err) if attempts < 2 && err.raw_os_error() == Some(26) => {
+                attempts += 1;
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
+            Err(err) => return Err(spawn_error(program, err)),
+        }
+    }
 }
 
 pub fn spawn_error(program: &str, err: io::Error) -> CliError {

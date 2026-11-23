@@ -180,8 +180,14 @@ With mirrored networking, the WSL resolver follows Windows. Check:
 
 ```sh
 cat /etc/resolv.conf
+```
+
+```powershell
 tailscale status
 ```
+
+Run `tailscale status` in Windows PowerShell; anix does not install Tailscale
+inside WSL.
 
 Restart WSL after a `.wslconfig` change:
 

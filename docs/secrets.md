@@ -47,15 +47,21 @@ recipient; keep the private half offline.
 wraps it for the personal age key, so the key can live in Apple Passwords, not
 only in a manual copy.
 
-On anix, install the binary with cargo and sign in:
+On anix, install the binary with cargo and sign in. Start an anisette server
+before `apw login`; the [apw install docs](https://github.com/win0na/apw/blob/main/docs/install.md)
+show the podman command.
 
 ```sh
 scripts/install-apw
 apw login
 apw sync
+grep '^AGE-SECRET-KEY-' ~/.config/sops/age/keys.txt |
+  scripts/apw secret set anix-sops-age-key --stdin
 scripts/apw backup check
 ```
 
+`backup check` reports whether the login exists and compares it with
+`~/.config/sops/age/keys.txt` when that file is present.
 `scripts/bootstrap --prepare` offers to restore a missing personal key from
 Apple Passwords and to save a newly generated one. The login is named
 `anix-sops-age-key`; only the `AGE-SECRET-KEY-...` line is stored.
@@ -67,12 +73,10 @@ grep '^AGE-SECRET-KEY-' ~/.config/sops/age/keys.txt |
   scripts/apw secret set anix-sops-age-key --stdin
 ```
 
-The wrapper reads `~/.config/apw/sync.env` for `APW_PASSPHRASE` and
-`APW_ANISETTE_URL`, the same file the hourly timer uses. `APW_MODE=off` skips
-Apple Passwords; `APW_MODE=required` makes `--prepare` stop when `apw` cannot
-read the snapshot. `apw` needs an anisette server; the [apw install
-docs](https://github.com/win0na/apw/blob/main/docs/install.md) show the podman
-command.
+`scripts/bootstrap --prepare` reads `~/.config/apw/sync.env` for
+`APW_PASSPHRASE` and `APW_ANISETTE_URL`, the same file the hourly timer uses.
+`APW_MODE=off` skips Apple Passwords; `APW_MODE=required` makes `--prepare`
+stop when `apw` cannot read the snapshot.
 
 ## Add a secret
 

@@ -234,7 +234,7 @@ fi
 # The applications step can fail once until App Management is approved. Leave a
 # marker so the anix side stops waiting and can say how to retry.
 trap 'date > "$dir/post.fail"' ZERR
-for f in /etc/nix/nix.conf /etc/nix/nix.custom.conf /etc/bashrc /etc/zshrc; do
+for f in /etc/nix/nix.conf /etc/nix/nix.custom.conf /etc/bashrc /etc/zshrc /etc/zprofile /etc/shells; do
   if [ -e "$f" ] && [ ! -e "$f.before-nix-darwin" ]; then
     sudo mv "$f" "$f.before-nix-darwin"
   fi

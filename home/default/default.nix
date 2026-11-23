@@ -3,13 +3,15 @@
 {
   imports = [
     ./editors
+    ./ghostwriter
     ./herdr
     ./opencode
     ./ttt
   ];
 
   home.username = userName;
-  home.sessionPath = [ "$HOME/.local/bin" ];
+  home.sessionPath = [ "$HOME/.local/bin" ]
+    ++ lib.optional (pkgs.stdenv.hostPlatform.isDarwin && pkgs.stdenv.hostPlatform.isAarch64) "/opt/homebrew/bin";
   home.sessionVariables = {
     # The sops CLI on macOS looks under ~/Library by default; both hosts use
     # the same key path so an edit works from either one.

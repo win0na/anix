@@ -92,6 +92,12 @@ if [[ $assume_yes -eq 1 ]]; then
   do_finalize=0
 fi
 
+# The helper creates a new distribution, so the target must never be the one
+# this process is running in. --yes and --no-finalize must not disable this.
+if [[ ${WSL_DISTRO_NAME:-} == "$distro" ]]; then
+  die "refusing to run against $distro while inside it; run from Windows or another WSL distribution"
+fi
+
 ask() {
   local prompt=$1 default=${2:-n} reply
   if [[ $assume_yes -eq 1 ]]; then [[ $default == y ]]; return; fi
@@ -255,10 +261,6 @@ EOF
   else
     die "users.nix does not match the requested values; rerun with --yes or edit users.nix"
   fi
-fi
-
-if [[ $do_finalize -eq 1 && $do_mac -eq 1 && $WSL_DISTRO_NAME == "$distro" ]]; then
-  die "refusing to run with finalize against $distro; this is the new host"
 fi
 
 say "Plan"
@@ -507,6 +509,15 @@ if [[ $do_finalize -eq 1 && $dry_run -eq 0 ]] &&
   warn "no recovery recipient in .sops.yaml; Ubuntu will be kept."
   warn "add one with scripts/bootstrap --prepare in ~/.config/anix, then rerun this script."
   do_finalize=0
+fi
+if [[ $do_finalize -eq 1 && $dry_run -eq 0 ]]; then
+  recovery_recipient=$(awk '/^  recovery: &recovery /{ print $3; exit }' "$repo_root/.sops.yaml" 2>/dev/null || true)
+  if [[ -n $recovery_recipient ]] &&
+    ! grep -qF "$recovery_recipient" "$repo_root/secrets/secrets.yaml" 2>/dev/null; then
+    warn "the recovery recipient is in .sops.yaml but not in secrets/secrets.yaml; Ubuntu will be kept."
+    warn "run sops updatekeys -y secrets/secrets.yaml, then rerun this script."
+    do_finalize=0
+  fi
 fi
 
 if [[ $do_finalize -eq 1 && $do_mac -eq 1 ]]; then

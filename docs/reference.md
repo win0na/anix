@@ -13,8 +13,8 @@ scripts select one from `uname -m`, so use `scripts/rebuild amac` on either.
 Both usernames live in `users.nix`; commands write them as `<anix-user>` and
 `<mac-user>`. `projectsDir` in the same file sets the project root: a relative
 name stays under the anix home, and an absolute path is used as-is. `anix`
-follows `nixpkgs` and `home-manager` master; `amac` follows the 26.05 branches.
-sops-nix is pinned twice for the same reason.
+follows `nixos-unstable` and `home-manager` master; `amac` follows the 26.05
+branches. sops-nix is pinned twice for the same reason.
 
 ## Flake inputs
 
@@ -44,7 +44,7 @@ sops-nix is pinned twice for the same reason.
 | `~/.ssh/mac-builder` | anix | Builder key before sops installs it. |
 | `~/.vscode/cli/token.json` | anix | Code tunnel OAuth state. |
 | `~/.local/bin/apw` | anix | apw binary from `scripts/install-apw`. |
-| `~/.config/apw/` | anix | apw config, snapshot, and sync timer. |
+| `~/.config/apw/` | anix | apw config, `sync.env`, and snapshot; the timer is a systemd user unit. |
 | `/run/secrets/<name>` | both | Decrypted sops secrets at runtime. |
 | `~/.config/herdr` | both | Herdr config and palette. |
 | `/opt/local` | amac Intel | MacPorts prefix, with the shim's `Cellar` and `opt` links. |
@@ -61,7 +61,7 @@ On Intel, `brew` is a shim (`pkgs/brew-shim`) that speaks to `port`:
 | `brew` | Intel |
 | --- | --- |
 | `brew --prefix` | `/opt/local` |
-| `brew --prefix jq` | `/opt/local/opt/jq` |
+| `brew --prefix jq` | `/opt/local/opt/jq` after the first activation |
 | `brew install jq` | `sudo port -b install jq`, Homebrew when no archive exists |
 | `brew list` | ports and Homebrew formulae |
 | `brew install --cask stats` | the real Homebrew at `/usr/local/bin/brew` |
@@ -93,13 +93,14 @@ code tunnel needs no inbound rule.
 | `scripts/install [REPO_URL]` | Install Nix, clone the fork, create keys and secrets, then run the host install. |
 | `scripts/bootstrap-windows.ps1` | Install WSL and NixOS-WSL from Windows, then run the anix bootstrap. |
 | `scripts/rebuild [anix\|amac]` | Switch the named host; with no target, pick from the OS. |
-| `scripts/check.sh` | Evaluate both hosts, parse the Windows helper with pwsh, then `bash -n`, shellcheck, and typos. |
+| `scripts/check.sh` | Evaluate all hosts, parse the Windows helper with pwsh, run the activation, Rust, Node, and apw checks, then shellcheck and typos. |
+| `scripts/smoke [anix\|amac]` | Read-only checks for the live host: services, secrets, SSH, brew/MacPorts, and the NFS mount. |
 | `scripts/provision` | Replace an Ubuntu WSL with NixOS-WSL, transfer data, bootstrap both hosts. |
 | `scripts/bootstrap --prepare` | Create keys and secrets on any host, without switching. |
 | `scripts/bootstrap --host anix` | Finish the anix side and switch. |
 | `scripts/bootstrap-mac-remote` | Prepare the Mac over SSH and start its first switch. |
 | `sudo scripts/mount-src` | Mount the NFS export on the Mac. |
-| `scripts/ios <project> <scheme> [udid]` | Build an iOS app on the Mac and install it. |
+| `scripts/ios <project> <scheme> <udid>` | Build an iOS app on the Mac and install it; `--build-only` skips the device. |
 | `scripts/install-herdr-plugins.sh` | Link the first-party sidebar plugin and list the set. |
 | `scripts/herdr-ide` | Build the sidebar, agent, and ttt layout. Bound to `prefix+i`. |
 | `scripts/ttt-handoff vscode <path> [line] [col]` | Open a file in VS Code through the tunnel. |
@@ -121,7 +122,8 @@ local checkout and `--force` to replace an existing binary.
 takes `--anix-user`, `--mac-user`, `--distro`, `--projects-dir`, `--backup`,
 `--dir`, `--no-mac`, `--no-transfer`, `--skip-backup`, and `--yes`.
 `scripts/bootstrap` also takes `--host`, `--no-switch`, `--no-install`,
-`--force-ssh`, `--prepare`, and `--repo`. Each script prints `--help`.
+`--force-ssh`, `--prepare`, and `--repo`. Most scripts print `--help`;
+`scripts/ttt-handoff` takes its arguments directly.
 
 `scripts/install`, `scripts/provision`, and `scripts/bootstrap` install Nix
 with the upstream installer when it is missing. `scripts/bootstrap
@@ -130,6 +132,8 @@ with the upstream installer when it is missing. `scripts/bootstrap
 `scripts/provision` also takes `--mac-host`, `--image-url`, `--image-sha`, and
 `--no-finalize`. `scripts/bootstrap-mac-remote` takes `--mac-host`,
 `--mac-user`, `--anix-user`, `--no-first-switch`, `--yes`, and `--dry-run`.
+The NixOS NFS export and `scripts/rebuild` use the fixed names `anix` and
+`amac`; `--mac-host` changes only the Mac SSH target.
 
 ## Versions
 

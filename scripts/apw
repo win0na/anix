@@ -189,7 +189,7 @@ cmd_secret_set() {
   esac
   if ! "$apw_bin" sync </dev/null >/dev/null 2>&1; then
     printf 'apw: saved %s locally; run `apw sync` to push it\n' "$name" >&2
-    return 0
+    return 5
   fi
   printf 'apw: saved %s\n' "$name" >&2
 }
@@ -245,18 +245,25 @@ cmd_secret_verify() {
 }
 
 cmd_backup_check() {
-  local name=${1:-${ANIX_APW_SECRET:-anix-sops-age-key}} status
+  local name=${1:-${ANIX_APW_SECRET:-anix-sops-age-key}} status stored local_key
   validate_name "$name"
   require_apw
   if ! "$apw_bin" --wide status </dev/null; then
     unavailable "cannot read the Apple Passwords snapshot"
   fi
   set +e
-  get_value "$name" >/dev/null
+  stored=$(get_value "$name")
   status=$?
   set -e
   case "$status" in
     0)
+      if [[ -r "$HOME/.config/sops/age/keys.txt" ]]; then
+        local_key=$(grep -m 1 '^AGE-SECRET-KEY-' "$HOME/.config/sops/age/keys.txt" || true)
+        if [[ -n $local_key && $stored != "$local_key" ]]; then
+          printf 'apw: %s is present but does not match the local age key; the backup is stale\n' "$name" >&2
+          return 1
+        fi
+      fi
       printf 'apw: %s is present\n' "$name"
       return 0
       ;;
@@ -279,7 +286,10 @@ self_test() {
   local status
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/apw-selftest.XXXXXX")
   trap 'rm -rf "$tmp"' EXIT
-  mkdir -p "$tmp/values"
+  mkdir -p "$tmp/values" "$tmp/home"
+  # Keep the self-test away from the caller's real age key, so the backup
+  # comparison does not compare a fixture value with a production key.
+  export HOME=$tmp/home
   cat > "$tmp/apw" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail

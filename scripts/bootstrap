@@ -381,16 +381,20 @@ apw_available() {
 }
 
 restore_personal_key_from_apw() {
-  local tmp
+  local tmp pub expected
   tmp=$(mktemp "${TMPDIR:-/tmp}/anix-age.XXXXXX") || return 1
   if ! "$repo_root/scripts/apw" secret get "$apw_secret_name" >"$tmp" 2>/dev/null; then
     rm -f "$tmp"
     return 1
   fi
-  if ! age_keygen -y "$tmp" >/dev/null 2>&1; then
+  if ! pub=$(age_keygen -y "$tmp" 2>/dev/null); then
     rm -f "$tmp"
     warn "the Apple Passwords item $apw_secret_name does not hold a valid age key"
     return 1
+  fi
+  expected=$(awk '/^  personal: &personal /{ print $3; exit }' .sops.yaml 2>/dev/null || true)
+  if [[ -n $expected && $pub != "$expected" ]]; then
+    warn "the restored age key does not match the personal recipient in .sops.yaml; the backup may be stale"
   fi
   mkdir -p "$(dirname "$personal_key")" || {
     rm -f "$tmp"
@@ -656,14 +660,21 @@ ensure_secrets() {
   if ! sops_cmd decrypt "$secrets_file" >/dev/null 2>&1; then
     die "cannot decrypt $secrets_file with $personal_key"
   fi
-  if [[ $host == anix ]]; then
-    local stored_builder
+  if [[ $host == anix ]] && secrets_has '["mac-builder-key"]'; then
+    local stored_builder current_builder
     stored_builder="$(secrets_get '["mac-builder-key"]')"
-    if [[ -n $stored_builder && "$stored_builder" != "$(cat "$builder_key")" ]]; then
-      warn "mac-builder-key in secrets differs from ~/.ssh/mac-builder; the Mac authorized key may not match"
+    current_builder="$(cat "$builder_key")"
+    if [[ "$stored_builder" != "$current_builder" ]]; then
+      if [[ $assume_yes -eq 1 ]] ||
+        ask "mac-builder-key in secrets is stale. Update it to the current ~/.ssh/mac-builder?" y; then
+        secrets_set_file '["mac-builder-key"]' "$builder_key"
+        say "updated mac-builder-key"
+      else
+        warn "mac-builder-key is stale; anix remote builds will fail until it is updated"
+      fi
     fi
   fi
-  if [[ -z "$(secrets_get '["mac-builder-key"]')" ]]; then
+  if ! secrets_has '["mac-builder-key"]'; then
     if mac_side; then
       die "mac-builder-key is missing; add it on anix and push"
     fi
@@ -747,7 +758,13 @@ add_recipient() {
     awk -v line="      - *${name}" '{ print; if ($0 == "      - *personal") print line }' .sops.yaml > .sops.yaml.tmp
     mv .sops.yaml.tmp .sops.yaml
   fi
+  if ! grep -qE "^[[:space:]]+- \*${name}[[:space:]]*$" .sops.yaml; then
+    die "could not add *${name} to the age creation rule in .sops.yaml; add it manually"
+  fi
   sops_cmd updatekeys -y "$secrets_file"
+  if [[ -e $secrets_file ]] && ! grep -qF "$recipient" "$secrets_file"; then
+    die "sops updatekeys did not add the $name recipient to $secrets_file"
+  fi
 }
 
 commit_secrets() {
@@ -876,7 +893,7 @@ switch_mac() {
     return 0
   fi
   local file
-  for file in /etc/nix/nix.conf /etc/nix/nix.custom.conf /etc/bashrc /etc/zshrc; do
+  for file in /etc/nix/nix.conf /etc/nix/nix.custom.conf /etc/bashrc /etc/zshrc /etc/zprofile /etc/shells; do
     if [[ -e $file && ! -e ${file}.before-nix-darwin ]]; then
       run sudo mv "$file" "${file}.before-nix-darwin"
     fi

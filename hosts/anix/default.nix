@@ -47,12 +47,35 @@ in
   programs.zsh.enable = true;
   users.users.${userName}.shell = pkgs.zsh;
 
+  # The OpenCode config reaches Headroom at 127.0.0.1:8787 as an MCP server,
+  # a provider, and a plugin. Provision the proxy so a fresh switch is usable.
+  systemd.user.services.headroom = {
+    description = "Headroom context proxy";
+    after = [ "network-online.target" ];
+    wantedBy = [ "default.target" ];
+    environment = {
+      HEADROOM_PORT = "8787";
+      HEADROOM_HOST = "127.0.0.1";
+      HEADROOM_MODE = "token";
+      HEADROOM_BACKEND = "anthropic";
+      HEADROOM_EMBEDDER_RUNTIME = "cpu";
+      HEADROOM_KOMPRESS_BACKEND = "onnx";
+      HEADROOM_ALLOW_UNAUTHENTICATED_BIND = "1";
+    };
+    serviceConfig = {
+      ExecStart = "${pkgs.uv}/bin/uvx --from 'headroom-ai[all]==0.42.0' headroom proxy --host 127.0.0.1 --port 8787";
+      Restart = "on-failure";
+      RestartSec = 5;
+    };
+  };
+
   environment.systemPackages = with pkgs; [
     age
     basedpyright
     curl
     fff-mcp
     git
+    go
     gopls
     herdr
     (hunspell.withDicts (dicts: [ dicts.en_US ]))

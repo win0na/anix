@@ -121,9 +121,6 @@
       }
     }
   },
-  "experimental": {
-    "background_compaction": true
-  },
   "provider": {
     "headroom": {
       "npm": "@ai-sdk/openai-compatible",

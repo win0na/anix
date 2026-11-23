@@ -19,10 +19,10 @@ macOS account short name, which `whoami` prints on the Mac.
 The project root defaults to `src` under the anix home. If your projects
 already live in `code`, `projects`, or an absolute path, keep them there and
 use that parent as `projectsDir`. The directories keep their names; `provision`
-copies the ones you select into the NixOS home. An absolute root must already
-exist on the NixOS-WSL disk and be under `/home/<anix-user>` or `/mnt/<name>`;
-a Windows drive under `/mnt/c` cannot be exported over NFS, so use a relative
-root there.
+copies the ones you select into the NixOS home. An absolute root is used as-is
+and is not copied by `provision`; it must already exist on the NixOS-WSL disk
+and be under `/home/<anix-user>` or `/mnt/<name>`. A Windows drive under
+`/mnt/c` cannot be exported over NFS, so use a relative root there.
 
 Two limits apply before the first switch. nixpkgs 26.05 is the last release
 that builds for `x86_64-darwin`, so an Intel Mac stops receiving Nix security
@@ -67,7 +67,8 @@ It then installs Nix, clones the fork to `~/.config/anix`, and runs
 
 Because of those prompts, the first run needs a terminal. `--yes` accepts the
 defaults, skips the recovery key, commits without asking, and leaves the push
-to you.
+to you. It still needs `ANIX_REPO_URL` or a fork URL argument; it never guesses
+a repository.
 
 `provision` then asks for the project root (default `src`; type `code` or an
 absolute path under the anix home or `/mnt` if your projects already live there),
@@ -236,12 +237,16 @@ The personal age key can live in Apple Passwords. On anix:
 ```sh
 ~/.config/anix/scripts/install-apw
 apw login
+grep '^AGE-SECRET-KEY-' ~/.config/sops/age/keys.txt |
+  ~/.config/anix/scripts/apw secret set anix-sops-age-key --stdin
 ~/.config/anix/scripts/apw backup check
 ```
 
-`--prepare` restores the key from there when `~/.config/sops/age/keys.txt` is
-missing. See [Secrets](secrets.md#apple-passwords-backup) for the anisette
-server and the passphrase.
+`backup check` reports whether the login exists and, when
+`~/.config/sops/age/keys.txt` is present, whether it matches the local key.
+`--prepare` restores the key from there when the local file is missing. See
+[Secrets](secrets.md#apple-passwords-backup) for the anisette server and the
+passphrase.
 
 On the Mac, confirm the NFS mount and the editor stack:
 
@@ -262,8 +267,9 @@ git -C ~/.config/anix push
 
 NixOS usually has no GitHub credential, so the push asks for one. An SSH key
 or a token works; `git -C ~/.config/anix remote set-url origin` takes the SSH
-form of your fork URL. Until the push succeeds, the ciphertext and the
-recipient list exist only on the NixOS disk, and another host cannot decrypt.
+form of your fork URL. Until the push succeeds, the ciphertext and recipient
+list exist only on the NixOS disk and the Mac copy made by the Mac phase; a
+fresh clone cannot decrypt.
 
 ## If a step stops
 

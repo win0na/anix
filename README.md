@@ -97,13 +97,15 @@ the builder key at `~/.ssh/mac-builder`, and the encrypted
 regenerate. `scripts/bootstrap --prepare` prints its path and offers to create
 an offline recovery key; copy the personal key to a password manager before the
 first switch. On anix, `scripts/install-apw` provides apw, `scripts/apw backup
-check` verifies the copy, and `--prepare` saves or restores it.
+check` checks the copy and compares it with the local key when that file is
+present, and `--prepare` saves or restores it.
 
 The bootstrap commits `.sops.yaml` (public recipients only), `secrets/secrets.yaml`,
 and the values it writes to `home/default/amac.nix` and `users.nix`. You push
 them from the checkout. Tracking `.sops.yaml` keeps the anix, Mac, and recovery
-recipients on a fresh clone; if it is missing, `sops updatekeys` rebuilds the
-list from the personal key alone and drops the others.
+recipients on a fresh clone. If it is missing, recreate it from
+`.sops.yaml.example`; running `sops updatekeys` with only the personal
+recipient drops the host and recovery recipients.
 
 [Secrets](docs/secrets.md) covers adding, rotating, and recovering keys.
 
@@ -116,9 +118,11 @@ scripts/rebuild amac  # local Mac, or over SSH from anix
 nix flake update      # move inputs
 ```
 
-Rebuild both hosts after an input update. `scripts/check.sh` evaluates both
-configurations, parses the Windows helper with pwsh, and runs `bash -n`,
-shellcheck, and typos.
+Rebuild both hosts after an input update. `scripts/check.sh` evaluates anix and
+both amac configurations, parses the Windows helper with pwsh, runs `bash -n`,
+shellcheck, the Intel activation fragment, the brew-shim Rust tests, the
+opencode-dcp-fix Node tests, the apw self-test, and typos. `scripts/install-hooks`
+sets the optional pre-push hook to the same command.
 
 ## Docs
 

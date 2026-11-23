@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/smoke [anix|amac]
+
+Read-only checks for a live host. Run on the host itself.
+
+  anix  code tunnel, NFS export, Headroom user service, Mac reachability,
+        and the Apple Passwords age-key backup.
+  amac  Homebrew, MacPorts on Intel, and the NFS project mount.
+
+With no target, the OS picks anix on Linux and amac on Darwin.
+EOF
+}
+
+if [[ ${1:-} == -h || ${1:-} == --help ]]; then
+  usage
+  exit 0
+fi
+if [[ $# -gt 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+host=${1:-}
+if [[ -z $host ]]; then
+  case "$(uname -s)" in
+    Linux) host=anix ;;
+    Darwin) host=amac ;;
+    *) echo "error: unsupported operating system: $(uname -s)" >&2; exit 2 ;;
+  esac
+fi
+
+failures=0
+pass() { printf 'ok   %s\n' "$*"; }
+fail() { printf 'FAIL %s\n' "$*" >&2; failures=$((failures + 1)); }
+
+case "$host" in
+  anix)
+    for unit in code-tunnel nfs-server; do
+      if systemctl is-active --quiet "$unit"; then
+        pass "systemd $unit"
+      else
+        fail "systemd $unit is not active"
+      fi
+    done
+    if systemctl --user is-active --quiet headroom 2>/dev/null; then
+      pass "systemd user headroom"
+    else
+      fail "systemd user headroom is not active"
+    fi
+    if [[ -r /run/secrets/mac-builder-key ]]; then
+      pass "sops secret mac-builder-key"
+    else
+      fail "sops secret mac-builder-key is missing"
+    fi
+    if ssh -o BatchMode=yes -o ConnectTimeout=5 amac true 2>/dev/null; then
+      pass "ssh amac"
+    else
+      fail "ssh amac failed"
+    fi
+    if scripts/apw available >/dev/null 2>&1; then
+      if scripts/apw backup check >/dev/null 2>&1; then
+        pass "Apple Passwords age-key backup"
+      else
+        fail "Apple Passwords age-key backup is missing or stale"
+      fi
+    else
+      fail "apw is not available"
+    fi
+    ;;
+  amac)
+    if brew --version >/dev/null 2>&1; then
+      pass "brew $(brew --version | head -n 1)"
+    else
+      fail "brew is not usable"
+    fi
+    if [[ "$(uname -m)" == x86_64 ]]; then
+      if port version >/dev/null 2>&1; then
+        pass "MacPorts $(port version | awk '{ print $2 }')"
+      else
+        fail "MacPorts port is not usable"
+      fi
+    fi
+    if mount | grep -q ' on /Users/'; then
+      pass "NFS project mount"
+    else
+      fail "no NFS mount under /Users"
+    fi
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+if ((failures > 0)); then
+  printf 'smoke: %d failure(s)\n' "$failures" >&2
+  exit 1
+fi
+echo "smoke: ok"

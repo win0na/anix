@@ -5,8 +5,8 @@
   "pruneNotification": "detailed",
   "pruneNotificationType": "toast",
 
-  // Verbose plugin log at ~/.config/opencode/logs/dcp/daily/.
-  "debug": true,
+  // Debug logs grew to tens of gigabytes; opt in only while diagnosing.
+  "debug": false,
 
   "compress": {
     "mode": "range",

@@ -227,7 +227,7 @@
           ]
         },
         "librarian": {
-          "model": "opencode/glm-5.3-flash-free",
+          "model": "opencode/deepseek-v4.1-flash-free",
           "variant": "high",
           "skills": [],
           "mcps": [
@@ -253,7 +253,7 @@
           ]
         },
         "observer": {
-          "model": "opencode/glm-5.3-flash-free",
+          "model": "opencode/deepseek-v4.1-flash-free",
           "variant": "high",
           "skills": [],
           "mcps": [
@@ -330,70 +330,68 @@
       }
     },
     "go-flash-claude": {
-      "agents": {
-        "orchestrator": {
-          "model": "opencode-go/deepseek-v4.1-flash",
-          "variant": "high",
-          "skills": [
-            "*"
-          ],
-          "mcps": [
-            "*",
-            "!context7"
-          ]
-        },
-        "oracle": {
-          "model": "opencode-go/deepseek-v4.1-flash",
-          "variant": "high",
-          "skills": [
-            "simplify"
-          ],
-          "mcps": [
-            "fff"
-          ]
-        },
-        "explorer": {
-          "model": "opencode-go/deepseek-v4.1-flash",
-          "variant": "low",
-          "skills": [],
-          "mcps": [
-            "fff"
-          ]
-        },
-        "librarian": {
-          "model": "opencode-go/glm-5.3-flash",
-          "variant": "high",
-          "skills": [],
-          "mcps": [
-            "context7",
-            "gh_grep",
-            "fff"
-          ]
-        },
-        "designer": {
-          "model": "anthropic/claude-sonnet-5-5",
-          "variant": "high",
-          "skills": [],
-          "mcps": [
-            "fff"
-          ]
-        },
-        "fixer": {
-          "model": "opencode-go/deepseek-v4.1-flash",
-          "variant": "high",
-          "skills": [],
-          "mcps": [
-            "fff"
-          ]
-        },
-        "observer": {
-          "model": "opencode-go/glm-5.3-flash",
-          "variant": "high",
-          "skills": [],
-          "mcps": [
-            "fff"
-          ]
-        }
+      "orchestrator": {
+        "model": "opencode-go/deepseek-v4.1-flash",
+        "variant": "high",
+        "skills": [
+          "*"
+        ],
+        "mcps": [
+          "*",
+          "!context7"
+        ]
+      },
+      "oracle": {
+        "model": "opencode-go/deepseek-v4.1-flash",
+        "variant": "high",
+        "skills": [
+          "simplify"
+        ],
+        "mcps": [
+          "fff"
+        ]
+      },
+      "explorer": {
+        "model": "opencode-go/deepseek-v4.1-flash",
+        "variant": "low",
+        "skills": [],
+        "mcps": [
+          "fff"
+        ]
+      },
+      "librarian": {
+        "model": "opencode-go/deepseek-v4.1-flash",
+        "variant": "high",
+        "skills": [],
+        "mcps": [
+          "context7",
+          "gh_grep",
+          "fff"
+        ]
+      },
+      "designer": {
+        "model": "anthropic/claude-sonnet-5-5",
+        "variant": "high",
+        "skills": [],
+        "mcps": [
+          "fff"
+        ]
+      },
+      "fixer": {
+        "model": "opencode-go/deepseek-v4.1-flash",
+        "variant": "high",
+        "skills": [],
+        "mcps": [
+          "fff"
+        ]
+      },
+      "observer": {
+        "model": "opencode-go/deepseek-v4.1-flash",
+        "variant": "high",
+        "skills": [],
+        "mcps": [
+          "fff"
+        ]
       }
     }
   }

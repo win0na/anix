@@ -63,6 +63,16 @@ run() {
   "$@"
 }
 
+check_host_recipient() {
+  local name=$1
+  [[ -s "$repo_root/secrets/secrets.yaml" && -e "$repo_root/.sops.yaml" ]] || return 0
+  if ! grep -q "^  ${name}: &${name} " "$repo_root/.sops.yaml"; then
+    echo "error: secrets exist but .sops.yaml has no $name recipient" >&2
+    echo "run scripts/bootstrap --host $name on that host once, then retry" >&2
+    exit 1
+  fi
+}
+
 case "$target" in
   anix)
     if [[ "$host_os" != "Linux" ]]; then
@@ -73,9 +83,11 @@ case "$target" in
       echo "error: nixos-rebuild not found on PATH (is this NixOS?)" >&2
       exit 1
     fi
+    check_host_recipient anix
     run sudo nixos-rebuild switch --flake "$repo_root#anix"
     ;;
   amac)
+    check_host_recipient amac
     if [[ "$host_os" == "Darwin" ]]; then
       if ! command -v darwin-rebuild >/dev/null 2>&1; then
         echo "error: darwin-rebuild not found on PATH (is nix-darwin installed?)" >&2
@@ -121,7 +133,7 @@ case "$target" in
       # amac` compiles the current flake, not the last copied one. Exclude .git:
       # the Mac copy must not receive refs from this checkout.
       echo "==> syncing the checkout to amac"
-      tar -C "$repo_root" --exclude=.git -cf - . |
+      tar -C "$repo_root" --exclude=.git --exclude='./pkgs/*/target' --exclude='./result*' -cf - . |
         ssh amac 'set -e; mkdir -p "$HOME/.config/anix"; tar -xf - -C "$HOME/.config/anix"'
       # -t gives sudo a terminal; Remote Login must allow full disk access for
       # remote users or nix-darwin refuses app updates.
