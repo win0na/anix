@@ -80,8 +80,9 @@ bootstrap, and prepares the Mac. Reboot first if it installs WSL.
 
 ### Mac
 
-Path B runs this phase for you. Otherwise, enable Remote Login on the Mac and
-run this from anix:
+The [fresh Windows install](#fresh-windows) runs this phase at the end. For the
+Ubuntu WSL install, or to retry, enable Remote Login on the Mac and run this
+from anix:
 
 ```sh
 ~/.config/anix/scripts/bootstrap-mac-remote

@@ -140,7 +140,8 @@ PowerShell, start the distribution again, then rerun
 
 ## The Mac
 
-Path B runs this phase at the end. For Path A, or to retry, do this from anix
+The [fresh Windows install](#path-b-fresh-windows) runs this phase at the end.
+For the [Ubuntu WSL install](#path-a-ubuntu-wsl), or to retry, do this from anix
 after the anix bootstrap succeeds.
 
 1. On the Mac, open **System Settings > General > Sharing** and enable
