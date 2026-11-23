@@ -425,14 +425,20 @@ ensure_personal_key() {
         say "would generate an age key at $personal_key"
       else
         # Generate aside and move: a failed run must not leave a truncated key
-        # that a later run accepts.
-        tmp_key=$(mktemp "${TMPDIR:-/tmp}/anix-age.XXXXXX")
+        # that a later run accepts. age-keygen refuses an existing output path,
+        # and mktemp creates one, so write into a new directory.
+        tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/anix-age.XXXXXX")
+        tmp_key=$tmp_dir/key.txt
         if ! ( umask 077; age_keygen -o "$tmp_key" ); then
-          rm -f "$tmp_key"
+          rm -rf "$tmp_dir"
           die "age-keygen failed; nothing was written to $personal_key"
         fi
         chmod 600 "$tmp_key"
-        mv -f "$tmp_key" "$personal_key"
+        if ! mv -f "$tmp_key" "$personal_key"; then
+          rm -rf "$tmp_dir"
+          die "could not move the age key to $personal_key"
+        fi
+        rm -rf "$tmp_dir"
         created=1
       fi
     fi
@@ -672,20 +678,26 @@ ensure_recovery_key() {
     warn "no recovery recipient; if the personal key is lost the secrets are unrecoverable"
     return 0
   fi
-  local path pub tmp_key
+  local path pub tmp_dir tmp_key
   read -r -p "Recovery key path [$HOME/anix-recovery-$(date +%Y%m%d).txt]: " path || true
   path=${path:-$HOME/anix-recovery-$(date +%Y%m%d).txt}
   [[ ! -e $path ]] || die "refusing to overwrite $path"
   # Generate aside and move: a failed run must not leave a short file that a
   # rerun refuses to replace and that could be archived as the recovery key.
-  tmp_key=$(mktemp "${path}.XXXXXX")
+  # age-keygen refuses an existing output path, so write into a new directory.
+  tmp_dir=$(mktemp -d "${path}.XXXXXX")
+  tmp_key=$tmp_dir/key.txt
   # The subshell keeps umask 077 from leaking into the later nixos-rebuild.
   if ! ( umask 077; age_keygen -o "$tmp_key" ); then
-    rm -f "$tmp_key"
+    rm -rf "$tmp_dir"
     die "age-keygen failed; nothing was written to $path"
   fi
   chmod 600 "$tmp_key"
-  mv -f "$tmp_key" "$path"
+  if ! mv -f "$tmp_key" "$path"; then
+    rm -rf "$tmp_dir"
+    die "could not move the recovery key to $path"
+  fi
+  rm -rf "$tmp_dir"
   pub=$(age_keygen -y "$path")
   add_recipient recovery "$pub"
   say "Recovery key written to $path"

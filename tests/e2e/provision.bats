@@ -81,3 +81,16 @@ teardown() {
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
   assert_contains "$output" "Dry run: Mac host amac, user"
 }
+
+@test "bootstrap prepare generates keys on a fresh home" {
+  rm -rf "$HOME/.config/sops/age" "$HOME/.ssh"
+  rm -f "$fx/repo/secrets/secrets.yaml"
+
+  run "$fx/repo/scripts/bootstrap" --prepare --yes --no-install
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+
+  assert_mode "$HOME/.config/sops/age/keys.txt" 600
+  assert_mode "$HOME/.ssh/mac-builder" 600
+  assert_nonempty "$fx/repo/secrets/secrets.yaml"
+  grep -q '^  personal: &personal ' "$fx/repo/.sops.yaml"
+}

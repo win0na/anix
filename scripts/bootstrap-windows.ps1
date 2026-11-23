@@ -248,11 +248,12 @@ if ($wslVersion) {
   }
 }
 
+$processorCount = [Math]::Min(8, [Environment]::ProcessorCount)
 $wslconfig = Join-Path $env:UserProfile ".wslconfig"
 $content = @"
 [wsl2]
 memory=16GB
-processors=8
+processors=$processorCount
 swap=8GB
 networkingMode=$NetworkingMode
 dnsTunneling=true
