@@ -122,10 +122,10 @@ fi
 
 echo "==> node --test pkgs/opencode-dcp-fix"
 if command -v node >/dev/null 2>&1; then
-  node --test "$repo_root/pkgs/opencode-dcp-fix/test/" || fail "opencode-dcp-fix tests failed"
+  node --test "$repo_root"/pkgs/opencode-dcp-fix/test/*.test.mjs || fail "opencode-dcp-fix tests failed"
 else
   nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#nodejs -c \
-    node --test "$repo_root/pkgs/opencode-dcp-fix/test/" || fail "opencode-dcp-fix tests failed"
+    node --test "$repo_root"/pkgs/opencode-dcp-fix/test/*.test.mjs || fail "opencode-dcp-fix tests failed"
 fi
 
 echo "==> apw adapter self-test"
