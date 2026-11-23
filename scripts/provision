@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
+  echo "error: run scripts/provision as your user, not root" >&2
+  echo "sudo puts the checkout, keys, and secrets under /root" >&2
+  exit 1
+fi
+
 usage() {
   cat <<'EOF'
 Usage: scripts/provision [options]
@@ -133,6 +139,7 @@ fi
 command -v wsl.exe >/dev/null || die "wsl.exe not found; run this inside WSL"
 command -v powershell.exe >/dev/null || die "powershell.exe not found; run this inside WSL"
 [[ -n ${WSL_DISTRO_NAME:-} ]] || die "WSL_DISTRO_NAME is not set; run this from the Ubuntu WSL shell"
+grep -qi 'microsoft-standard-WSL2' /proc/version || die "WSL2 is required; WSL1 cannot import the NixOS image"
 if ! command -v nix >/dev/null 2>&1; then
   for p in "$HOME/.nix-profile/bin" /nix/var/nix/profiles/default/bin; do
     [[ -x "$p/nix" ]] && PATH="$p:$PATH"
@@ -415,10 +422,11 @@ fi
 say "Transferring keys and ${#selected[@]} project paths"
 if [[ $dry_run -eq 1 ]]; then
   printf '  $ tar -C %s -cf - .config/sops/age/keys.txt .ssh/mac-builder | wsl.exe ...\n' "$HOME"
-  printf '  $ tar -C %s -cf - %s | wsl.exe ... (--skip-old-files)\n' "$HOME" "${selected[*]}"
+  printf '  $ tar -C %s -cf - %s | wsl.exe ... (--keep-newer-files)\n' "$HOME" "${selected[*]}"
 else
-  # Keys overwrite: a truncated transfer must not leave a 0-byte key that
-  # --skip-old-files then keeps on every rerun.
+  # Keys overwrite: a truncated transfer must not leave a 0-byte key that a
+  # rerun keeps. Projects use --keep-newer-files so a truncated file is
+  # replaced while a newer local edit survives.
   tar -C "$HOME" -cf - .config/sops/age/keys.txt .ssh/mac-builder |
     wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc '
       set -euo pipefail
@@ -436,7 +444,7 @@ else
       --exclude='*/.next' --exclude='*/.venv' --exclude='*/Pods' \
       --exclude='*/xcuserdata' --exclude='*.dSYM' \
       -cf - "${selected[@]}" |
-      wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - --skip-old-files -C "$HOME"' ||
+      wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc 'set -euo pipefail; tar -xf - --keep-newer-files -C "$HOME"' ||
       die "transferring the project directories to $distro failed; rerun: scripts/provision ${original_args[*]:-}"
   fi
 fi
@@ -502,6 +510,11 @@ if [[ $do_mac -eq 1 ]]; then
   fi
 fi
 
+if [[ $do_finalize -eq 1 && $do_transfer -eq 1 && -z $projects_rel ]]; then
+  warn "project root is absolute; no project directories were transferred; Ubuntu will be kept."
+  do_finalize=0
+fi
+
 # A missing recovery recipient means the archive below would be the only copy
 # of a key nobody can replace, so do not offer to unregister at all.
 if [[ $do_finalize -eq 1 && $dry_run -eq 0 ]] &&
@@ -527,16 +540,17 @@ if [[ $do_finalize -eq 1 && $do_mac -eq 1 ]]; then
   fi
   [[ -n $backup ]] || backup=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' | tr -d '\r\n') ||
     die "powershell.exe failed; rerun scripts/provision --backup <windows path>"
-  [[ $backup == *.age || $backup == *.tar ]] || backup="$backup\\anix-ubuntu-backup.tar"
+  [[ $backup == *.age || $backup == *.tar ]] || backup="$backup.tar"
   if [[ $dry_run -eq 1 ]]; then
     say "would export $WSL_DISTRO_NAME to an age-encrypted archive"
   else
-    backup_unix=$(wslpath -u "$backup")
+    backup_unix=$(wslpath -u "$backup") || die "invalid Windows backup path: $backup"
+    mkdir -p "$(dirname "$backup_unix")" || die "could not create the backup directory: $(dirname "$backup_unix")"
     if [[ -s $backup_unix ]]; then
       say "Existing backup: $backup"
     elif ask "Export $WSL_DISTRO_NAME before removing it? The archive is the only copy." y; then
       export_ubuntu "$backup"
-      backup_unix=$(wslpath -u "$backup")
+      backup_unix=$(wslpath -u "$backup") || die "invalid Windows backup path: $backup"
     fi
     # Unregistering without a backup loses the recovery key and every file
     # that was not selected for transfer.

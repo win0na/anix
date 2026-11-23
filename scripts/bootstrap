@@ -368,6 +368,9 @@ load_apw_env() {
   local file=$HOME/.config/apw/sync.env key value
   [[ -r $file ]] || return 0
   while IFS='=' read -r key value; do
+    case "$value" in
+      \"*\" | \'*\') value=${value:1:${#value}-2} ;;
+    esac
     case "$key" in
       APW_PASSPHRASE | APW_ANISETTE_URL) export "$key=$value" ;;
     esac

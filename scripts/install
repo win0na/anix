@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
+  echo "error: run scripts/install as your user, not root" >&2
+  echo "sudo puts the checkout, keys, and secrets under /root" >&2
+  exit 1
+fi
+
 usage() {
   cat <<'EOF'
 Usage: scripts/install [options] [REPO_URL]
@@ -119,15 +125,15 @@ install_nix() {
 }
 
 ensure_nix() {
-  if find_nix; then
-    say "Nix: $(command -v nix)"
-    return 0
-  fi
   case "$(uname -s)" in
     Darwin) ensure_macos_deps ;;
     Linux) ensure_linux_deps ;;
     *) die "unsupported operating system: $(uname -s)" ;;
   esac
+  if find_nix; then
+    say "Nix: $(command -v nix)"
+    return 0
+  fi
   install_nix
 }
 
@@ -173,8 +179,8 @@ case "$(uname -s)" in
     fi
     ;;
   Linux)
-    if [[ ! -e /etc/NIXOS ]] && ! grep -qi microsoft /proc/version; then
-      die "run this on Ubuntu WSL, NixOS, or macOS"
+    if [[ ! -e /etc/NIXOS ]] && ! grep -qi 'microsoft-standard-WSL2' /proc/version; then
+      die "run this on WSL2, NixOS, or macOS"
     fi
     ;;
   *) die "unsupported operating system: $(uname -s)" ;;
@@ -185,7 +191,7 @@ target_exists=0
 [[ -d $target/.git ]] && target_exists=1
 
 current_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
-if [[ $current_root == "$target" && -f $current_root/flake.nix && -x $current_root/scripts/install ]]; then
+if [[ -n $current_root && -f $current_root/flake.nix && -x $current_root/scripts/install ]]; then
   repo_root=$current_root
 else
   repo_root=""

@@ -89,7 +89,8 @@ if [[ -n $src_path ]]; then
   src_path="$(cd "$src_path" && pwd)"
   source_desc="checkout $src_path"
 else
-  source_desc="github:win0na/apw"
+  apw_rev=1f684ab2d853f6d4fb63b7e7d57fe770de7f786c
+  source_desc="github:win0na/apw@${apw_rev:0:7}"
 fi
 
 nix_flags=(--extra-experimental-features "nix-command flakes")
@@ -102,7 +103,7 @@ cargo_args=(install --locked --root "$HOME/.local")
 if [[ -n $src_path ]]; then
   cargo_args+=(--path "$src_path")
 else
-  cargo_args+=(--git https://github.com/win0na/apw)
+  cargo_args+=(--git https://github.com/win0na/apw --rev "$apw_rev")
 fi
 if [[ $force -eq 1 ]]; then
   cargo_args+=(--force)
