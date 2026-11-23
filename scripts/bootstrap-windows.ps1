@@ -36,6 +36,11 @@ Stop after the clone. Do not run scripts/bootstrap inside the new distribution.
 
 .PARAMETER NoMac
 Do not run scripts/bootstrap-mac-remote after the anix bootstrap.
+
+.PARAMETER NetworkingMode
+WSL networking mode written to .wslconfig. Default mirrored. Use nat on
+Windows Server or where mirrored networking is unavailable; port forwarding for
+the Mac then needs a separate netsh portproxy rule.
 #>
 param(
   [switch]$Yes,
@@ -55,7 +60,9 @@ param(
   [string]$ImageUrl = "https://github.com/nix-community/NixOS-WSL/releases/download/2605.7.2/nixos.wsl",
   [string]$ImageSha256 = "e7180ad555fdcb8e1e057e2ef056de467603a5e502ff8531053738371be3f6b9",
   [string]$ImagePath = "",
-  [string]$Location = ""
+  [string]$Location = "",
+  [ValidateSet("mirrored", "nat")]
+  [string]$NetworkingMode = "mirrored"
 )
 
 $ErrorActionPreference = "Stop"
@@ -247,7 +254,7 @@ $content = @"
 memory=16GB
 processors=8
 swap=8GB
-networkingMode=mirrored
+networkingMode=$NetworkingMode
 dnsTunneling=true
 autoProxy=true
 # NixOS-WSL does not load kernel modules itself, and the 6.6 WSL kernel builds

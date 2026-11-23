@@ -55,7 +55,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           ./scripts/bootstrap-windows.ps1 -Yes -SkipWslUpdate -NoShutdown -NoMac -SkipFirewall `
-            -DistroName NixOS -AnixUser winona -MacUser winona -ProjectsDir src `
+            -DistroName NixOS -AnixUser winona -MacUser winona -ProjectsDir src -NetworkingMode nat `
             -RepoUrl "${{ github.server_url }}/${{ github.repository }}.git"
       - name: Check the installed host
         shell: pwsh
