@@ -85,7 +85,7 @@ pub fn run(args: &[String]) -> Result<(), CliError> {
         "leaves" => read::leaves(&config),
         "info" => read::info(&config, rest),
         "search" => read::search(&config, rest),
-        "outdated" => read::outdated(),
+        "outdated" => read::outdated(&config),
         "deps" => read::deps(&config, rest),
         "uses" => read::uses(&config, rest),
         "config" => read::config(&config),

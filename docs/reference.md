@@ -61,7 +61,7 @@ On Intel, `brew` is a shim (`pkgs/brew-shim`) that speaks to `port`:
 | `brew` | Intel |
 | --- | --- |
 | `brew --prefix` | `/opt/local` |
-| `brew --prefix jq` | `/opt/local/opt/jq` after the first activation |
+| `brew --prefix jq` | `/opt/local/opt/jq` |
 | `brew install jq` | `sudo port -b install jq`, Homebrew when no archive exists |
 | `brew list` | ports and Homebrew formulae |
 | `brew install --cask stats` | the real Homebrew at `/usr/local/bin/brew` |
@@ -72,8 +72,8 @@ Activation gives every installed port a `/opt/local/Cellar/<name>/<version>`
 directory whose entries (`bin`, `lib`, `include`, `share`, `etc`) link into the
 prefix, plus `/opt/local/opt/<name>` pointing at that directory. The tree never
 links to the prefix itself, so scanning one formula cannot walk every port.
-Until the layout has run for a port, `brew --prefix <name>` prints `/opt/local`
-rather than a path that does not exist yet.
+Until the layout has run for a port, `brew --prefix <name>` still prints
+`/opt/local/opt/<name>`; the link appears on the next activation.
 
 ## Ports
 

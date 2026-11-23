@@ -16,14 +16,9 @@ pub fn prefix(config: &Config, formula: Option<&str>) -> Result<(), CliError> {
         Ok(port_name) => {
             let installed = port::installed()?;
             if installed.iter().any(|entry| entry.name == port_name) {
-                // The activation step refreshes the brew layout, so a port
-                // installed moments ago may not have its link yet.
-                let opt = config.opt(&port_name);
-                if opt.exists() {
-                    println!("{}", opt.display());
-                } else {
-                    println!("{}", config.prefix_str());
-                }
+                // Homebrew prints the opt path for an installed formula even
+                // before the activation step creates the link.
+                println!("{}", config.opt(&port_name).display());
                 return Ok(());
             }
             if brew::has_formula(config, formula) {
@@ -235,11 +230,24 @@ pub fn search(config: &Config, args: &[String]) -> Result<(), CliError> {
     Ok(())
 }
 
-pub fn outdated() -> Result<(), CliError> {
+pub fn outdated(config: &Config) -> Result<(), CliError> {
     let mut rows = port::outdated()?;
     rows.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut seen: BTreeSet<String> = rows.iter().map(|(name, _, _)| name.clone()).collect();
     for (name, old, new) in rows {
         println!("{} ({}) < {}", name, old, new);
+    }
+    let brew_outdated = brew::capture(config, &["outdated".into()]).unwrap_or_default();
+    for line in brew_outdated.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let name = line.split_whitespace().next().unwrap_or("");
+        if !is_brew_name(name) || !seen.insert(name.to_string()) {
+            continue;
+        }
+        println!("{}", line);
     }
     Ok(())
 }

@@ -121,6 +121,9 @@ case "$*" in
   "leaves")
     [ -f "$STUB_DIR/brew_leaves.txt" ] && cat "$STUB_DIR/brew_leaves.txt"
     ;;
+  "outdated")
+    [ -f "$STUB_DIR/brew_outdated.txt" ] && cat "$STUB_DIR/brew_outdated.txt"
+    ;;
   "search "*)
     [ -f "$STUB_DIR/brew_search.txt" ] && cat "$STUB_DIR/brew_search.txt"
     ;;
@@ -249,9 +252,8 @@ fn prefix_reports_installed_port_and_rejects_unknown_formula() {
 
     let installed = fixture.run(&["--prefix", "python312"]);
     assert_eq!(code(&installed), 0, "stderr: {}", stderr(&installed));
-    // Without the activation layout there is no opt link, so the prefix itself
-    // is the honest answer; it always exists.
-    assert_eq!(stdout(&installed), format!("{PREFIX}\n"));
+    // The opt path is Homebrew's answer even before activation links it.
+    assert_eq!(stdout(&installed), format!("{PREFIX}/opt/python312\n"));
 
     let prefix = fixture.dir.join("prefix");
     fs::create_dir_all(prefix.join("opt")).expect("create test prefix");
@@ -687,6 +689,22 @@ fn revision_only_outdated_keeps_raw_versions() {
     let output = fixture.run(&["outdated"]);
     assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
     assert_eq!(stdout(&output), "python312 (3.12.7_0) < 3.12.7_1\n");
+}
+
+#[test]
+fn outdated_unions_homebrew_formulae() {
+    let fixture = Fixture::new();
+    fixture.write("outdated.txt", "python312  3.12.7_0 < 3.12.7_1\n");
+    fixture.write("brew_outdated.txt", "wget (1.21.3) < 1.21.4\n");
+
+    let output = fixture.run(&["outdated"]);
+    assert_eq!(code(&output), 0, "stderr: {}", stderr(&output));
+    let text = stdout(&output);
+    assert!(
+        text.contains("python312 (3.12.7_0) < 3.12.7_1"),
+        "stdout: {text}"
+    );
+    assert!(text.contains("wget (1.21.3) < 1.21.4"), "stdout: {text}");
 }
 
 #[test]

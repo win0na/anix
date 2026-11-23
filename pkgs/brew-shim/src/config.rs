@@ -16,7 +16,14 @@ impl Config {
                 .unwrap_or_else(|| PathBuf::from("/opt/local")),
             brew_real: env::var_os("ANIX_BREW_REAL")
                 .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("/usr/local/bin/brew")),
+                .unwrap_or_else(|| {
+                    // Homebrew's prefix follows the CPU on macOS.
+                    if cfg!(target_arch = "aarch64") {
+                        PathBuf::from("/opt/homebrew/bin/brew")
+                    } else {
+                        PathBuf::from("/usr/local/bin/brew")
+                    }
+                }),
             version: env::var("ANIX_BREW_VERSION").unwrap_or_else(|_| "7.0.13".to_string()),
         }
     }
