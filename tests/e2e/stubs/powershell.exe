@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Minimal powershell.exe: the environment queries provision reads, plus a stub
+# for scripts/bootstrap-windows.ps1 that registers the distribution.
+set -u
+cmd=""
+file=""
+while (($#)); do
+  case "$1" in
+    -NoProfile|-NonInteractive) shift ;;
+    -ExecutionPolicy) shift 2 ;;
+    -Command) cmd=$2; shift 2 ;;
+    -File) file=$2; shift 2; break ;;
+    *) shift ;;
+  esac
+done
+if [[ -n $cmd ]]; then
+  case "$cmd" in
+    *USERPROFILE*) printf '%s\r\n' "${ANIX_E2E_WIN_HOME:?}"; exit 0 ;;
+    *TEMP*) printf '%s\r\n' "${ANIX_E2E_WIN_TEMP:?}"; exit 0 ;;
+    *Administrator*) printf '%s\r\n' "${ANIX_E2E_ADMIN:-True}"; exit 0 ;;
+    *) exit 1 ;;
+  esac
+fi
+case "$file" in
+  *bootstrap-windows.ps1)
+    distro=NixOS
+    user=nixos
+    while (($#)); do
+      case "$1" in
+        -DistroName) distro=$2; shift 2 ;;
+        -AnixUser) user=$2; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    dir=$ANIX_E2E_WSL_ROOT/distros/$distro
+    mkdir -p "$dir/home/$user" "$dir/users" "$dir/root"
+    touch "$dir/users/$user"
+    logdir=$ANIX_E2E_WIN_ROOT/Users/e2e/AppData/Local/Temp/anix
+    mkdir -p "$logdir"
+    printf 'stub helper: imported %s for %s\n' "$distro" "$user" >"$logdir/anix-bootstrap-windows.log"
+    exit 0
+    ;;
+esac
+exit 1

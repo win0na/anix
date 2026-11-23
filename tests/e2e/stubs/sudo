@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# sudo without root: two paths the first Mac switch writes into /root go to the
+# fake system root; everything else runs as the current user.
+set -u
+case "$*" in
+  "install -d -m 700 /root/.ssh")
+    mkdir -p "${ANIX_E2E_SYSTEM:?}/root/.ssh"
+    exit 0
+    ;;
+  "tee -a /root/.ssh/known_hosts")
+    mkdir -p "$ANIX_E2E_SYSTEM/root/.ssh"
+    cat >"$ANIX_E2E_SYSTEM/root/.ssh/known_hosts"
+    exit 0
+    ;;
+esac
+exec "$@"

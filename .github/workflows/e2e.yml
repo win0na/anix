@@ -1,0 +1,68 @@
+name: e2e
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Install pipeline against a stubbed Windows/WSL/Mac boundary
+        run: ./tests/e2e/run.sh
+
+  macos:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Prepare the keys and secrets
+        run: ./scripts/bootstrap --prepare --yes --no-install
+      - name: Bootstrap amac without the first switch
+        run: ./scripts/bootstrap --host amac --no-switch --no-install </dev/null
+      - name: Adapter self-test
+        run: ./scripts/apw --self-test
+
+  windows-wsl:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-2025
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install NixOS-WSL and run the anix bootstrap
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/bootstrap-windows.ps1 -Yes -SkipWslUpdate -NoShutdown -NoMac -SkipFirewall `
+            -DistroName NixOS -AnixUser winona -MacUser winona -ProjectsDir src `
+            -RepoUrl "${{ github.server_url }}/${{ github.repository }}.git"
+      - name: Check the installed host
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          wsl -d NixOS -u winona --exec bash -lc 'cd ~/.config/anix && git log -1 --oneline && ./scripts/check.sh'
+      - name: Show the Windows helper log
+        if: failure()
+        shell: pwsh
+        run: Get-Content "$env:TEMP\anix\anix-bootstrap-windows.log"

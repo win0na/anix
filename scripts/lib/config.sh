@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Tracked project settings from users.nix.
 
 # Read the tracked project settings from users.nix. Source this after setting
 # repo_root, or pass the users.nix path as the last argument.

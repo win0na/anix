@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Record the switch and install the builder key where sops would.
+set -u
+sys=${ANIX_E2E_SYSTEM:?}
+mkdir -p "$sys/etc/nix"
+if [[ -s $HOME/.ssh/mac-builder ]]; then
+  cp "$HOME/.ssh/mac-builder" "$sys/etc/nix/mac-builder"
+fi
+printf '%s\n' "$*" >"$sys/switch.args"
+touch "$sys/switch.ok"
+exit 0

@@ -66,9 +66,9 @@ repo_root=$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || tru
   echo "error: not a git checkout" >&2
   exit 1
 }
-# shellcheck source=anix-config.sh
+# shellcheck source=lib/config.sh
 # shellcheck disable=SC1091
-. "$script_dir/anix-config.sh"
+. "$script_dir/lib/config.sh"
 projects_dir=$(anix_projects_dir "$repo_root/users.nix")
 anix_check_projects_dir "$projects_dir" "$HOME" || {
   echo "error: invalid projectsDir in users.nix: $projects_dir" >&2

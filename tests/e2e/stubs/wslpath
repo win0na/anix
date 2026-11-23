@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Map a Windows path under C: to the fake Windows root and back.
+set -u
+mode=$1
+path=$2
+root=${ANIX_E2E_WIN_ROOT:?}
+case "$mode" in
+  -u)
+    path=${path//\\//}
+    if [[ $path == [Cc]:* ]]; then
+      printf '%s/%s\n' "$root" "${path:2}"
+    else
+      printf '%s\n' "$path"
+    fi
+    ;;
+  -w)
+    if [[ $path == "$root"* ]]; then
+      printf 'C:%s\n' "${path#"$root"}" | sed 's|/|\\|g'
+    else
+      printf '%s\n' "$path"
+    fi
+    ;;
+  *) printf '%s\n' "$path" ;;
+esac

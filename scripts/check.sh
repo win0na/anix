@@ -8,6 +8,7 @@ Usage: scripts/check.sh
 Validate the repository without installing anything:
   - evaluate the anix and both amac system derivations
   - run bash -n on every file in scripts/
+  - run bash -n on the E2E helper and stubs
   - run shellcheck on every scripts/ file from PATH or nixpkgs
   - parse scripts/bootstrap-windows.ps1 with pwsh
   - run the brew-shim Rust tests
@@ -84,7 +85,12 @@ fi
 echo "==> bash -n scripts/*"
 while IFS= read -r -d '' file; do
   bash -n "$file" || fail "syntax error in ${file#"$repo_root"/}"
-done < <(find "$repo_root/scripts" -maxdepth 1 -type f ! -name '*.ps1' -print0)
+done < <(find "$repo_root/scripts" -maxdepth 2 -type f ! -name '*.ps1' -print0)
+
+echo "==> bash -n tests/e2e"
+while IFS= read -r -d '' file; do
+  bash -n "$file" || fail "syntax error in ${file#"$repo_root"/}"
+done < <(find "$repo_root/tests/e2e" -type f \( -name '*.sh' -o -name '*.bash' -o -path '*/stubs/*' \) -print0)
 
 echo "==> shellcheck scripts/*"
 while IFS= read -r -d '' file; do
@@ -94,7 +100,7 @@ while IFS= read -r -d '' file; do
     nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#shellcheck -c shellcheck "$file" ||
       fail "shellcheck failed for ${file#"$repo_root"/}"
   fi
-done < <(find "$repo_root/scripts" -maxdepth 1 -type f ! -name '*.ps1' -print0)
+done < <(find "$repo_root/scripts" -maxdepth 2 -type f ! -name '*.ps1' -print0)
 
 echo "==> pwsh parse scripts/bootstrap-windows.ps1"
 if command -v pwsh >/dev/null 2>&1; then

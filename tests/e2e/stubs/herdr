@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Keep host Herdr off the case; the install treats a failed plugin install as a
+# warning.
+exit 1

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -u
+case "$*" in
+  *is-active*) exit "${ANIX_E2E_NFS_SERVICE:-0}" ;;
+  *) exit 0 ;;
+esac

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib/common.sh
+# shellcheck disable=SC1091
+. "$script_dir/lib/common.sh"
+
 usage() {
   cat <<'EOF'
 Usage: scripts/bootstrap-mac-remote [options]
@@ -21,9 +26,6 @@ Options:
 EOF
 }
 
-die() { printf 'error: %s\n' "$*" >&2; exit 1; }
-warn() { printf 'warning: %s\n' "$*" >&2; }
-say() { printf '\n==> %s\n' "$*"; }
 assume_yes=0
 dry_run=0
 do_switch=1
@@ -46,17 +48,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-ask() {
-  local prompt=$1 default=${2:-n} reply
-  if [[ $assume_yes -eq 1 ]]; then [[ $default == y ]]; return; fi
-  if [[ $default == y ]]; then prompt="$prompt [Y/n]"; else prompt="$prompt [y/N]"; fi
-  # On EOF, treat the answer as "no" rather than silently taking the default,
-  # so a non-interactive run cannot loop forever.
-  read -r -p "$prompt " reply || return 1
-  reply=${reply:-$default}
-  [[ $reply == [Yy]* ]]
-}
-
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || true)
 [[ -n $repo_root ]] || die "not a git checkout"
@@ -65,9 +56,9 @@ cd "$repo_root"
   die "missing personal age key; run scripts/bootstrap --prepare to restore it from Apple Passwords"
 [[ -s secrets/secrets.yaml ]] || die "missing secrets/secrets.yaml"
 
-# shellcheck source=anix-config.sh
+# shellcheck source=lib/config.sh
 # shellcheck disable=SC1091
-. "$script_dir/anix-config.sh"
+. "$script_dir/lib/config.sh"
 
 value_from_users() {
   anix_value_from_users "$1" "$repo_root/users.nix"

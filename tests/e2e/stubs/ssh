@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Minimal ssh to a fake Mac home. Options are skipped; the command runs on this
+# host with HOME set to the fake Mac home.
+set -u
+while (($#)); do
+  case "$1" in
+    -o|-i|-p|-l|-F) shift 2 ;;
+    -tt|-t|-T|-v) shift ;;
+    -*) shift ;;
+    *) break ;;
+  esac
+done
+shift
+[[ ${1:-} == -tt ]] && shift
+cmd=$*
+mac=${ANIX_E2E_MAC_HOME:?}
+msys=${ANIX_E2E_MAC_SYSTEM:?}
+case "$cmd" in
+  true) exit 0 ;;
+  "uname -m") echo arm64; exit 0 ;;
+  "xcode-select -p >/dev/null 2>&1") exit 0 ;;
+  "test -x /nix/var/nix/profiles/default/bin/nix") exit 0 ;;
+  'test -e "$HOME/.config/anix/.git"') [[ -e $mac/.config/anix/.git ]]; exit ;;
+  "cat /etc/ssh/ssh_host_ed25519_key.pub") cat "$msys/etc/ssh/ssh_host_ed25519_key.pub"; exit 0 ;;
+  "sudo ssh-keygen -A")
+    mkdir -p "$msys/etc/ssh"
+    [[ -s $msys/etc/ssh/ssh_host_ed25519_key ]] ||
+      ssh-keygen -q -t ed25519 -N '' -f "$msys/etc/ssh/ssh_host_ed25519_key"
+    exit 0
+    ;;
+  *"open -a Terminal"*)
+    mkdir -p "$mac/anix-first-switch"
+    touch "$mac/anix-first-switch/post.ok"
+    exit 0
+    ;;
+  'uname -m; mount | grep " on /Users/" || true; herdr plugin list 2>/dev/null || true')
+    echo arm64
+    exit 0
+    ;;
+esac
+HOME=$mac exec env PATH="$ANIX_E2E_STUBS:${ANIX_E2E_BIN:-}:$PATH" bash -c "$cmd"

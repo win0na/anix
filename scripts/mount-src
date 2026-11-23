@@ -38,9 +38,9 @@ done
 # checkout this script lives in.
 if [[ -z ${ANIX_PROJECTS_DIR:-} ]]; then
   script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-  # shellcheck source=anix-config.sh
+  # shellcheck source=lib/config.sh
   # shellcheck disable=SC1091
-  . "$script_dir/anix-config.sh"
+  . "$script_dir/lib/config.sh"
   ANIX_PROJECTS_DIR=$(anix_projects_dir "$script_dir/../users.nix")
   anix_user=$(anix_value_from_users anix "$script_dir/../users.nix")
   # A hand-edited users.nix must not mount the export over a system folder.

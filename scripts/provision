@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib/common.sh
+# shellcheck disable=SC1091
+. "$script_dir/lib/common.sh"
+# shellcheck source=lib/platform.sh
+# shellcheck disable=SC1091
+. "$script_dir/lib/platform.sh"
+
 if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
   echo "error: run scripts/provision as your user, not root" >&2
   echo "sudo puts the checkout, keys, and secrets under /root" >&2
@@ -38,9 +46,6 @@ Options:
 EOF
 }
 
-die() { printf 'error: %s\n' "$*" >&2; exit 1; }
-warn() { printf 'warning: %s\n' "$*" >&2; }
-say() { printf '\n==> %s\n' "$*"; }
 usage_error() { printf 'error: %s\n' "$*" >&2; usage >&2; exit 2; }
 
 original_args=("$@")
@@ -126,9 +131,9 @@ repo_root=$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || tru
 [[ -n $repo_root ]] || die "not a git checkout: $script_dir/.."
 cd "$repo_root"
 
-# shellcheck source=anix-config.sh
+# shellcheck source=lib/config.sh
 # shellcheck disable=SC1091
-. "$script_dir/anix-config.sh"
+. "$script_dir/lib/config.sh"
 
 if ! command -v wsl.exe >/dev/null 2>&1 || ! command -v powershell.exe >/dev/null 2>&1; then
   for p in /mnt/c/Windows/System32 /mnt/c/Windows/System32/WindowsPowerShell/v1.0; do
@@ -139,12 +144,9 @@ fi
 command -v wsl.exe >/dev/null || die "wsl.exe not found; run this inside WSL"
 command -v powershell.exe >/dev/null || die "powershell.exe not found; run this inside WSL"
 [[ -n ${WSL_DISTRO_NAME:-} ]] || die "WSL_DISTRO_NAME is not set; run this from the Ubuntu WSL shell"
-grep -qi 'microsoft-standard-WSL2' /proc/version || die "WSL2 is required; WSL1 cannot import the NixOS image"
+anix_is_wsl2 || die "WSL2 is required; WSL1 cannot import the NixOS image"
 if ! command -v nix >/dev/null 2>&1; then
-  for p in "$HOME/.nix-profile/bin" /nix/var/nix/profiles/default/bin; do
-    [[ -x "$p/nix" ]] && PATH="$p:$PATH"
-  done
-  export PATH
+  anix_find_nix || true
 fi
 if ! command -v nix >/dev/null 2>&1; then
   if [[ $dry_run -eq 1 ]]; then
@@ -340,11 +342,16 @@ else
   }
 fi
 
-if [[ $dry_run -eq 0 ]] && ! wsl.exe --list --quiet 2>/dev/null | tr -d '\0\r' | grep -qx "$distro"; then
-  if [[ ! -s $win_log_unix ]]; then
-    die "the Windows helper did not start; approve the UAC prompt, then rerun scripts/provision"
+if [[ $dry_run -eq 0 ]]; then
+  # Capture before grep: grep -q closes the pipe early, and pipefail would
+  # report the writer's SIGPIPE as a failed distribution check.
+  installed_distros=$(wsl.exe --list --quiet 2>/dev/null | tr -d '\0\r') || installed_distros=""
+  if ! grep -qx "$distro" <<<"$installed_distros"; then
+    if [[ ! -s $win_log_unix ]]; then
+      die "the Windows helper did not start; approve the UAC prompt, then rerun scripts/provision"
+    fi
+    die "the $distro distribution was not created; read $win_log, then rerun scripts/provision"
   fi
-  die "the $distro distribution was not created; read $win_log, then rerun scripts/provision"
 fi
 
 first_switch=1

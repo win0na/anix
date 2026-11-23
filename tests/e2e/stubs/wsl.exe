@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Minimal wsl.exe for the install E2E. Each distribution is a directory under
+# $ANIX_E2E_WSL_ROOT/distros; --exec runs the command on this host with HOME
+# pointed at that distribution's home.
+set -u
+root=${ANIX_E2E_WSL_ROOT:?}
+distros=$root/distros
+name=""
+user=""
+action=""
+dest=""
+while (($#)); do
+  case "$1" in
+    --list) action=list; shift ;;
+    --export) action="export"; name=$2; shift 2; dest=${1:-}; (($#)) && shift ;;
+    --terminate) action=terminate; name=$2; shift 2 ;;
+    --unregister) action=unregister; name=$2; shift 2 ;;
+    --set-default) shift 2 ;;
+    -d|--distribution) name=$2; shift 2 ;;
+    -u|--user) user=$2; shift 2 ;;
+    --exec) shift; break ;;
+    *) shift ;;
+  esac
+done
+case "$action" in
+  list)
+    for d in "$distros"/*; do [[ -d $d ]] && basename "$d"; done
+    exit 0
+    ;;
+  export)
+    [[ -d $distros/$name ]] || exit 1
+    if [[ ${ANIX_E2E_EXPORT:-ok} == fail ]]; then
+      echo "export failed" >&2
+      exit 1
+    fi
+    if [[ $dest == - || -z $dest ]]; then
+      tar -C "$distros/$name" -cf - .
+    else
+      tar -C "$distros/$name" -cf "$dest" .
+    fi
+    exit 0
+    ;;
+  terminate)
+    touch "$distros/$name/terminated" 2>/dev/null || true
+    exit 0
+    ;;
+  unregister)
+    rm -rf "${distros:?}/$name"
+    exit 0
+    ;;
+esac
+[[ -n $name ]] || { echo "wsl stub: no distribution" >&2; exit 1; }
+home=$distros/$name/home/${user:-root}
+[[ ${user:-} == root ]] && home=$distros/$name/root
+mkdir -p "$home"
+export HOME=$home ANIX_E2E_DISTRO=$name ANIX_E2E_DISTRO_USER=${user:-root}
+export PATH="$ANIX_E2E_STUBS:$PATH"
+if [[ ${1:-} == id ]]; then
+  [[ -e $distros/$name/users/$2 ]] && { echo 1000; exit 0; }
+  exit 1
+fi
+if [[ $* == *nfsd* ]]; then
+  [[ ${ANIX_E2E_NFSD:-1} == 1 ]] && exit 0 || exit 1
+fi
+# A login shell would replace PATH with the host's, leaking host tools into the
+# case. Run the same command non-login with the stub path first.
+if [[ ${1:-} == bash && ${2:-} =~ ^-(lc|c)$ ]]; then
+  exec env PATH="$ANIX_E2E_STUBS:${ANIX_E2E_BIN:-}:$PATH" bash -c "$3"
+fi
+exec "$@"
