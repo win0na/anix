@@ -126,11 +126,13 @@ else
 fi
 
 echo "==> cargo test pkgs/brew-shim"
-if command -v cargo >/dev/null 2>&1; then
+# A host cargo without a C compiler (a NixOS profile install, for example)
+# cannot link the test binary; use the nixpkgs toolchain in that case.
+if command -v cargo >/dev/null 2>&1 && command -v cc >/dev/null 2>&1; then
   cargo test --quiet --manifest-path "$repo_root/pkgs/brew-shim/Cargo.toml" ||
     fail "brew-shim tests failed"
 else
-  nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#cargo nixpkgs#rustc -c \
+  nix "${nix_flags[@]}" shell --inputs-from "$repo_root" nixpkgs#cargo nixpkgs#rustc nixpkgs#gcc -c \
     cargo test --quiet --manifest-path "$repo_root/pkgs/brew-shim/Cargo.toml" ||
     fail "brew-shim tests failed"
 fi
