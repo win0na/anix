@@ -80,8 +80,9 @@ bootstrap, and prepares the Mac. Reboot first if it installs WSL.
 
 ### Mac
 
-The [fresh Windows install](#fresh-windows) runs this phase at the end. For the
-Ubuntu WSL install, or to retry, enable Remote Login on the Mac and run this
+The installer runs this phase at the end of both the
+[Ubuntu WSL](#ubuntu-wsl) and [fresh Windows](#fresh-windows) installs. If it
+stops at the NFS gate, or to retry, enable Remote Login on the Mac and run this
 from anix:
 
 ```sh

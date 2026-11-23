@@ -140,9 +140,10 @@ PowerShell, start the distribution again, then rerun
 
 ## The Mac
 
-The [fresh Windows install](#path-b-fresh-windows) runs this phase at the end.
-For the [Ubuntu WSL install](#path-a-ubuntu-wsl), or to retry, do this from anix
-after the anix bootstrap succeeds.
+The installer runs this phase at the end of both the
+[fresh Windows](#path-b-fresh-windows) and
+[Ubuntu WSL](#path-a-ubuntu-wsl) installs. If the Ubuntu WSL path stops at the
+NFS gate, or to retry, do this from anix after the anix bootstrap succeeds.
 
 1. On the Mac, open **System Settings > General > Sharing** and enable
    **Remote Login**.
