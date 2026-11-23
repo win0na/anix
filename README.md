@@ -96,7 +96,8 @@ the builder key at `~/.ssh/mac-builder`, and the encrypted
 `secrets/secrets.yaml`. The personal key is the only file you cannot
 regenerate. `scripts/bootstrap --prepare` prints its path and offers to create
 an offline recovery key; copy the personal key to a password manager before the
-first switch.
+first switch. On anix, `scripts/install-apw` provides apw, `scripts/apw backup
+check` verifies the copy, and `--prepare` saves or restores it.
 
 The bootstrap commits `.sops.yaml` (public recipients only), `secrets/secrets.yaml`,
 and the values it writes to `home/default/amac.nix` and `users.nix`. You push

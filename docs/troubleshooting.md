@@ -206,6 +206,16 @@ The patched sidebar is not active. `herdr plugin list` should show the
 `herdr-sidebar` path in the Nix store, not a GitHub checkout. Rebuild and rerun
 `scripts/install-herdr-plugins.sh`.
 
+## apw cannot read the snapshot
+
+`scripts/apw backup check` exits `5` when `apw` cannot open the snapshot. Run
+`apw status` for the error. If it asks for a password, set `APW_PASSPHRASE` in
+`~/.config/apw/sync.env` or unlock Secret Service. If it reports a network or
+anisette error, start the anisette server and run `apw login`.
+
+An exit `3` means the snapshot is readable but the `anix-sops-age-key` login is
+missing. Save the key with the command the check prints.
+
 ## sops cannot decrypt
 
 From the checkout:

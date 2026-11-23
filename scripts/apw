@@ -5,66 +5,447 @@ usage() {
   cat <<'EOF'
 Usage: apw <command> [args]
 
-Stub for the Passwords.app adapter. The real apw port is a separate project.
-This host has no supported Passwords.app CLI, so every storage command exits 5
-and prints the manual instruction.
+Apple Passwords adapter. `apw` reads an encrypted snapshot of the iCloud
+Passwords vault; this wrapper gives the repository one stable interface for the
+personal age key backup.
 
 Commands:
-  secret exists NAME        exit 0 if present (or 5 when unavailable)
-  secret get NAME           print the value (or 5 when unavailable)
-  secret set NAME --stdin   store a value (or 5 when unavailable)
-  secret delete NAME        remove a value (or 5 when unavailable)
-  secret verify NAME        verify a value (or 5 when unavailable)
-  backup check [NAME]       check the backup state (or 5 when unavailable)
-  version                   print the adapter version
+  available                 exit 0 when apw can read the snapshot
+  secret exists NAME        exit 0 if present, 3 if absent, 5 if unavailable
+  secret get NAME           print the value
+  secret set NAME --stdin   store a one-line value, then sync
+  secret delete NAME        remove the value, then sync
+  secret verify NAME        compare stdin with the stored value
+  backup check [NAME]       report the snapshot and whether NAME is present
+  version                   print the apw version
+  --self-test               run the adapter tests with a fake apw
+
+Environment:
+  APW_MODE=auto|off|required  auto uses apw when available; off always exits 5;
+                              required is the same here, and makes the
+                              bootstrap stop when apw is unavailable
+  APW_BIN=PATH                use this apw binary
+  ANIX_APW_SECRET=NAME        backup check default (anix-sops-age-key)
+
+Exit codes: 0 success, 1 mismatch, 2 usage, 3 absent, 5 unavailable.
 EOF
+}
+
+die_usage() {
+  printf 'apw: %s\n' "$*" >&2
+  exit 2
+}
+
+unavailable() {
+  printf 'apw: %s\n' "$*" >&2
+  exit 5
 }
 
 mode=${APW_MODE:-auto}
 case "$mode" in
   auto|off|required) ;;
-  *) printf 'apw: invalid APW_MODE: %s\n' "$mode" >&2; exit 2 ;;
+  *) die_usage "invalid APW_MODE: $mode" ;;
 esac
 
+apw_bin=""
+find_apw() {
+  local candidate
+  if [[ -n ${APW_BIN:-} ]]; then
+    if [[ -x $APW_BIN ]]; then
+      apw_bin=$APW_BIN
+      return 0
+    fi
+    return 1
+  fi
+  for candidate in \
+    "$(command -v apw 2>/dev/null || true)" \
+    "$HOME/.cargo/bin/apw" \
+    "$HOME/.local/bin/apw" \
+    /usr/local/bin/apw; do
+    if [[ -n $candidate && -x $candidate ]]; then
+      apw_bin=$candidate
+      return 0
+    fi
+  done
+  return 1
+}
+
+require_apw() {
+  if [[ $mode == off ]]; then
+    unavailable "disabled by APW_MODE=off"
+  fi
+  if ! find_apw; then
+    unavailable "apw is not installed; run scripts/install-apw"
+  fi
+}
+
+validate_name() {
+  local name=$1
+  [[ $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die_usage "invalid secret name: $name"
+}
+
+read_value() {
+  local value
+  value=$(cat)
+  value=${value%$'\n'}
+  if [[ $value == *$'\n'* ]]; then
+    die_usage "the value must be a single line"
+  fi
+  if [[ -z $value ]]; then
+    die_usage "the value must not be empty"
+  fi
+  printf '%s' "$value"
+}
+
+# Print the stored value, 3 when absent, 5 when the snapshot is unreadable.
+# A query that matches more than one entry returns 2, never a guess.
+get_value() {
+  local name=$1 out status
+  if out=$("$apw_bin" get "$name" --password-only </dev/null 2>/dev/null); then
+    status=0
+  else
+    status=$?
+  fi
+  case "$status" in
+    0)
+      if [[ $(printf '%s\n' "$out" | wc -l) -ne 1 ]]; then
+        printf 'apw: %s matches more than one entry; delete the duplicates\n' "$name" >&2
+        return 2
+      fi
+      printf '%s\n' "$out"
+      return 0
+      ;;
+    3) return 3 ;;
+    *) return 5 ;;
+  esac
+}
+
+cmd_available() {
+  if [[ $mode == off ]]; then
+    return 5
+  fi
+  find_apw || return 5
+  "$apw_bin" status --json </dev/null >/dev/null 2>&1 || return 5
+  return 0
+}
+
+cmd_version() {
+  require_apw
+  exec "$apw_bin" --version
+}
+
+cmd_secret_exists() {
+  local name=$1 status
+  validate_name "$name"
+  if get_value "$name" >/dev/null; then
+    return 0
+  else
+    status=$?
+    return "$status"
+  fi
+}
+
+cmd_secret_get() {
+  local name=$1 value status
+  validate_name "$name"
+  if value=$(get_value "$name"); then
+    printf '%s\n' "$value"
+    return 0
+  else
+    status=$?
+  fi
+  case "$status" in
+    2) printf 'apw: %s matches more than one entry\n' "$name" >&2 ;;
+    3) printf 'apw: %s is not present\n' "$name" >&2 ;;
+    *) printf 'apw: cannot read the Apple Passwords snapshot\n' >&2 ;;
+  esac
+  return "$status"
+}
+
+cmd_secret_set() {
+  local name=$1 value status
+  shift
+  [[ ${1:-} == --stdin ]] || die_usage "secret set needs --stdin"
+  validate_name "$name"
+  value=$(read_value)
+  set +e
+  get_value "$name" >/dev/null
+  status=$?
+  set -e
+  case "$status" in
+    0)
+      if ! printf '%s\n' "$value" | "$apw_bin" edit "$name" --password-stdin >/dev/null; then
+        unavailable "could not update $name"
+      fi
+      ;;
+    3)
+      if ! printf '%s\n' "$value" | "$apw_bin" add login "https://anix.invalid/$name" \
+        --username anix --title "$name" --password-stdin >/dev/null; then
+        unavailable "could not add $name"
+      fi
+      ;;
+    2) die_usage "$name matches more than one entry" ;;
+    *) unavailable "cannot read the Apple Passwords snapshot" ;;
+  esac
+  if ! "$apw_bin" sync </dev/null >/dev/null 2>&1; then
+    printf 'apw: saved %s locally; run `apw sync` to push it\n' "$name" >&2
+    return 0
+  fi
+  printf 'apw: saved %s\n' "$name" >&2
+}
+
+cmd_secret_delete() {
+  local name=$1 status
+  validate_name "$name"
+  set +e
+  "$apw_bin" rm "$name" --yes </dev/null >/dev/null 2>&1
+  status=$?
+  set -e
+  case "$status" in
+    0)
+      if ! "$apw_bin" sync </dev/null >/dev/null 2>&1; then
+        printf 'apw: deleted %s locally; run `apw sync` to push it\n' "$name" >&2
+      else
+        printf 'apw: deleted %s\n' "$name" >&2
+      fi
+      return 0
+      ;;
+    3)
+      printf 'apw: %s is not present\n' "$name" >&2
+      return 0
+      ;;
+    *) unavailable "could not delete $name" ;;
+  esac
+}
+
+cmd_secret_verify() {
+  local name=$1 expected actual status
+  validate_name "$name"
+  expected=$(read_value)
+  set +e
+  actual=$(get_value "$name")
+  status=$?
+  set -e
+  case "$status" in
+    0) ;;
+    3)
+      printf 'apw: %s is not present\n' "$name" >&2
+      return 3
+      ;;
+    *)
+      printf 'apw: cannot read the stored value\n' >&2
+      return 5
+      ;;
+  esac
+  if [[ $actual == "$expected" ]]; then
+    return 0
+  fi
+  printf 'apw: %s does not match\n' "$name" >&2
+  return 1
+}
+
+cmd_backup_check() {
+  local name=${1:-${ANIX_APW_SECRET:-anix-sops-age-key}} status
+  validate_name "$name"
+  require_apw
+  if ! "$apw_bin" --wide status </dev/null; then
+    unavailable "cannot read the Apple Passwords snapshot"
+  fi
+  set +e
+  get_value "$name" >/dev/null
+  status=$?
+  set -e
+  case "$status" in
+    0)
+      printf 'apw: %s is present\n' "$name"
+      return 0
+      ;;
+    3)
+      printf 'apw: %s is missing; run scripts/apw secret set %s --stdin\n' "$name" "$name" >&2
+      return 3
+      ;;
+    2)
+      printf 'apw: %s matches more than one entry\n' "$name" >&2
+      return 2
+      ;;
+    *)
+      printf 'apw: cannot read %s\n' "$name" >&2
+      return 5
+      ;;
+  esac
+}
+
+self_test() {
+  local status
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/apw-selftest.XXXXXX")
+  trap 'rm -rf "$tmp"' EXIT
+  mkdir -p "$tmp/values"
+  cat > "$tmp/apw" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+dir=${FAKE_APW_DIR:?}
+printf '%s\n' "$*" >> "$dir/calls.log"
+case "$1" in
+  --version) printf 'apw 9.9.9-test\n'; exit 0 ;;
+  status) printf '{"status":0,"data":{"account":"test","source":"fixture","entries":1}}\n'; exit 0 ;;
+  get)
+    name=${2:-}
+    if [[ -f "$dir/values/$name" ]]; then cat "$dir/values/$name"; exit 0; fi
+    exit 3
+    ;;
+  add)
+    name=""
+    shift 2
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --title) name=${2:-}; shift 2 ;;
+        --username) shift 2 ;;
+        --password-stdin) shift ;;
+        *) shift ;;
+      esac
+    done
+    IFS= read -r value || true
+    printf '%s\n' "$value" > "$dir/values/$name"
+    exit 0
+    ;;
+  edit)
+    name=${2:-}
+    IFS= read -r value || true
+    printf '%s\n' "$value" > "$dir/values/$name"
+    exit 0
+    ;;
+  rm)
+    name=${2:-}
+    if [[ -f "$dir/values/$name" ]]; then rm -f "$dir/values/$name"; exit 0; fi
+    exit 3
+    ;;
+  sync) exit 0 ;;
+  *) exit 0 ;;
+esac
+FAKE
+  chmod +x "$tmp/apw"
+  export FAKE_APW_DIR=$tmp
+  export APW_BIN=$tmp/apw
+  export APW_MODE=auto
+
+  fail() {
+    printf 'apw self-test: %s\n' "$*" >&2
+    exit 1
+  }
+
+  [[ $("$0" version) == 'apw 9.9.9-test' ]] || fail 'version'
+  "$0" available || fail 'available'
+  set +e
+  "$0" secret exists missing >/dev/null 2>&1
+  status=$?
+  set -e
+  [[ $status -eq 3 ]] || fail "exists missing returned $status"
+  printf 'value one\n' | "$0" secret set backup-key --stdin 2>/dev/null || fail 'set add'
+  grep -q '^add login' "$tmp/calls.log" || fail 'set did not add'
+  "$0" secret exists backup-key || fail 'exists present'
+  [[ $("$0" secret get backup-key) == 'value one' ]] || fail 'get'
+  printf 'value one\n' | "$0" secret verify backup-key || fail 'verify match'
+  set +e
+  printf 'wrong\n' | "$0" secret verify backup-key >/dev/null 2>&1
+  status=$?
+  set -e
+  [[ $status -eq 1 ]] || fail "verify mismatch returned $status"
+  printf 'value two\n' | "$0" secret set backup-key --stdin 2>/dev/null || fail 'set edit'
+  grep -q '^edit backup-key' "$tmp/calls.log" || fail 'set did not edit'
+  [[ $("$0" secret get backup-key) == 'value two' ]] || fail 'get after edit'
+  "$0" backup check backup-key >/dev/null 2>&1 || fail 'backup check present'
+  "$0" secret delete backup-key 2>/dev/null || fail 'delete'
+  set +e
+  "$0" secret exists backup-key >/dev/null 2>&1
+  status=$?
+  set -e
+  [[ $status -eq 3 ]] || fail "exists after delete returned $status"
+  "$0" secret delete backup-key 2>/dev/null || fail 'delete is idempotent'
+  set +e
+  APW_MODE=off "$0" available >/dev/null 2>&1
+  status=$?
+  [[ $status -eq 5 ]] || fail "APW_MODE=off available returned $status"
+  APW_MODE=off "$0" secret get backup-key >/dev/null 2>&1
+  status=$?
+  [[ $status -eq 5 ]] || fail "APW_MODE=off get returned $status"
+  APW_BIN=$tmp/missing "$0" available >/dev/null 2>&1
+  status=$?
+  [[ $status -eq 5 ]] || fail "missing binary returned $status"
+  "$0" secret set 'bad name' --stdin </dev/null >/dev/null 2>&1
+  status=$?
+  [[ $status -eq 2 ]] || fail "invalid name returned $status"
+  printf 'one\ntwo\n' | "$0" secret set backup-key --stdin >/dev/null 2>&1
+  status=$?
+  set -e
+  [[ $status -eq 2 ]] || fail "multi-line value returned $status"
+  printf 'apw self-test: ok\n'
+}
+
 cmd=${1:-}
-[[ $# -gt 0 ]] && shift || true
+if [[ $# -gt 0 ]]; then
+  shift
+fi
 case "$cmd" in
   -h|--help|help)
     usage
     exit 0
     ;;
+  --self-test)
+    self_test
+    ;;
+  available)
+    cmd_available
+    ;;
   version)
-    printf 'apw 0.0.0-stub\n'
-    exit 0
+    cmd_version
     ;;
   secret)
     sub=${1:-}
-    [[ $# -gt 0 ]] && shift || true
+    if [[ $# -gt 0 ]]; then
+      shift
+    fi
     name=${1:-}
+    if [[ -n $name ]]; then
+      shift
+    fi
+    [[ -n $name ]] || die_usage "secret ${sub:-} needs NAME"
     case "$sub" in
-      exists|get|set|delete|verify)
-        [[ -n $name ]] || { printf 'apw: secret %s needs NAME\n' "$sub" >&2; exit 2; }
-        printf 'apw: Passwords.app CLI unavailable; store %s manually and use APW_MODE=off\n' "$name" >&2
-        exit 5
+      exists)
+        require_apw
+        cmd_secret_exists "$name"
+        ;;
+      get)
+        require_apw
+        cmd_secret_get "$name"
+        ;;
+      set)
+        require_apw
+        cmd_secret_set "$name" "$@"
+        ;;
+      delete)
+        require_apw
+        cmd_secret_delete "$name"
+        ;;
+      verify)
+        require_apw
+        cmd_secret_verify "$name"
         ;;
       *)
-        printf 'apw: unknown secret command: %s\n' "${sub:-}" >&2
-        exit 2
+        die_usage "unknown secret command: ${sub:-}"
         ;;
     esac
     ;;
   backup)
     sub=${1:-}
-    [[ $# -gt 0 ]] && shift || true
-    name=${1:-keys}
+    if [[ $# -gt 0 ]]; then
+      shift
+    fi
     case "$sub" in
       check)
-        printf 'apw: backup check for %s is unavailable without Passwords.app\n' "$name" >&2
-        exit 5
+        cmd_backup_check "${1:-}"
         ;;
       *)
-        printf 'apw: unknown backup command: %s\n' "${sub:-}" >&2
-        exit 2
+        die_usage "unknown backup command: ${sub:-}"
         ;;
     esac
     ;;
@@ -73,7 +454,6 @@ case "$cmd" in
     exit 2
     ;;
   *)
-    printf 'apw: unknown command: %s\n' "$cmd" >&2
-    exit 2
+    die_usage "unknown command: $cmd"
     ;;
 esac

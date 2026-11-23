@@ -178,6 +178,7 @@ prepare=0
 no_install=0
 force_ssh=0
 repo_url="${ANIX_REPO_URL:-https://github.com/win0na/anix.git}"
+apw_secret_name=${ANIX_APW_SECRET:-anix-sops-age-key}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -360,42 +361,128 @@ checkout_notes() {
   fi
 }
 
+# apw keeps the headless passphrase and anisette URL in sync.env for its timer.
+# Import only those two keys so the backup works in the same non-interactive
+# session, without turning the file into a general environment source.
+load_apw_env() {
+  local file=$HOME/.config/apw/sync.env key value
+  [[ -r $file ]] || return 0
+  while IFS='=' read -r key value; do
+    case "$key" in
+      APW_PASSPHRASE | APW_ANISETTE_URL) export "$key=$value" ;;
+    esac
+  done < "$file"
+}
+
+apw_available() {
+  [[ $dry_run -eq 1 ]] && return 1
+  [[ "$(uname -s)" == Linux ]] || return 1
+  "$repo_root/scripts/apw" available >/dev/null 2>&1
+}
+
+restore_personal_key_from_apw() {
+  local tmp
+  tmp=$(mktemp "${TMPDIR:-/tmp}/anix-age.XXXXXX") || return 1
+  if ! "$repo_root/scripts/apw" secret get "$apw_secret_name" >"$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if ! age_keygen -y "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    warn "the Apple Passwords item $apw_secret_name does not hold a valid age key"
+    return 1
+  fi
+  mkdir -p "$(dirname "$personal_key")" || {
+    rm -f "$tmp"
+    return 1
+  }
+  chmod 700 "$(dirname "$personal_key")" || {
+    rm -f "$tmp"
+    return 1
+  }
+  chmod 600 "$tmp" || {
+    rm -f "$tmp"
+    return 1
+  }
+  mv -f "$tmp" "$personal_key" || {
+    rm -f "$tmp"
+    return 1
+  }
+  return 0
+}
+
+save_personal_key_to_apw() {
+  local value
+  value=$(grep -m 1 '^AGE-SECRET-KEY-' "$personal_key" || true)
+  if [[ -z $value ]]; then
+    warn "cannot read the age secret from $personal_key"
+    return 1
+  fi
+  printf '%s\n' "$value" | "$repo_root/scripts/apw" secret set "$apw_secret_name" --stdin
+}
+
 ensure_personal_key() {
   personal_key="$HOME/.config/sops/age/keys.txt"
   export SOPS_AGE_KEY_FILE="$personal_key"
+  local created=0
   if [[ ! -s $personal_key ]]; then
     if mac_side; then
       die "restore the personal age key from Passwords.app to $personal_key"
     fi
-    if [[ -s "$repo_root/secrets/secrets.yaml" ]]; then
-      die "secrets exist but $personal_key is missing; restore the key from Passwords.app"
-    fi
+    load_apw_env
     if [[ $dry_run -eq 1 ]]; then
       say "would create $personal_key"
       age_pub="AGE_RECIPIENT"
       return 0
     fi
-    if ! ask "No age key at $personal_key. Generate one now?" y; then
-      die "restore the key from Passwords.app and rerun"
-    fi
-    run mkdir -p "$(dirname "$personal_key")"
-    run chmod 700 "$(dirname "$personal_key")"
-    if [[ $dry_run -eq 1 ]]; then
-      say "would generate an age key at $personal_key"
-    else
-      # Generate aside and move: a failed run must not leave a truncated key
-      # that a later run accepts.
-      tmp_key=$(mktemp "${TMPDIR:-/tmp}/anix-age.XXXXXX")
-      if ! ( umask 077; age_keygen -o "$tmp_key" ); then
-        rm -f "$tmp_key"
-        die "age-keygen failed; nothing was written to $personal_key"
+    if apw_available; then
+      if "$repo_root/scripts/apw" secret exists "$apw_secret_name" >/dev/null 2>&1 &&
+        ask "No age key at $personal_key. Restore it from Apple Passwords?" y; then
+        if restore_personal_key_from_apw; then
+          say "restored the personal age key from Apple Passwords"
+        else
+          warn "could not restore the personal age key from Apple Passwords"
+        fi
       fi
-      chmod 600 "$tmp_key"
-      mv -f "$tmp_key" "$personal_key"
+    elif [[ ${APW_MODE:-auto} == required ]]; then
+      die "APW_MODE=required but apw cannot read the snapshot; run scripts/install-apw and apw login"
+    fi
+    if [[ ! -s $personal_key ]]; then
+      if [[ -s "$repo_root/secrets/secrets.yaml" ]]; then
+        die "secrets exist but $personal_key is missing; restore it from Passwords.app or with scripts/apw secret get $apw_secret_name"
+      fi
+      if ! ask "No age key at $personal_key. Generate one now?" y; then
+        die "restore the key from Passwords.app, or run scripts/install-apw and rerun"
+      fi
+      run mkdir -p "$(dirname "$personal_key")"
+      run chmod 700 "$(dirname "$personal_key")"
+      if [[ $dry_run -eq 1 ]]; then
+        say "would generate an age key at $personal_key"
+      else
+        # Generate aside and move: a failed run must not leave a truncated key
+        # that a later run accepts.
+        tmp_key=$(mktemp "${TMPDIR:-/tmp}/anix-age.XXXXXX")
+        if ! ( umask 077; age_keygen -o "$tmp_key" ); then
+          rm -f "$tmp_key"
+          die "age-keygen failed; nothing was written to $personal_key"
+        fi
+        chmod 600 "$tmp_key"
+        mv -f "$tmp_key" "$personal_key"
+        created=1
+      fi
     fi
   fi
   age_pub="$(age_keygen -y "$personal_key")"
   say "personal age recipient: $age_pub"
+  if [[ $created -eq 1 ]] && apw_available; then
+    if ask "Save the personal age key to Apple Passwords?" y; then
+      if save_personal_key_to_apw; then
+        say "saved the personal age key to Apple Passwords as $apw_secret_name"
+      else
+        warn "could not save the personal age key; copy $personal_key to your password manager"
+      fi
+    fi
+  fi
 }
 
 ensure_sops_personal() {
@@ -991,6 +1078,13 @@ prepare_next_steps() {
       printf '  clone the repository on anix, then run scripts/bootstrap-mac-remote from that checkout.\n'
       ;;
     *)
+      if [[ "$(uname -s)" == Linux ]]; then
+        if "$repo_root/scripts/apw" version >/dev/null 2>&1; then
+          printf '  optional: run `apw login` and scripts/apw backup check to keep the personal age key in Apple Passwords.\n'
+        elif [[ ${APW_MODE:-auto} != off ]]; then
+          printf '  optional: run scripts/install-apw, then `apw login`, to keep the personal age key in Apple Passwords.\n'
+        fi
+      fi
       printf '  run scripts/provision, or on NixOS run scripts/bootstrap --host anix.\n'
       ;;
   esac

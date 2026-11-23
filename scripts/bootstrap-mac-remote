@@ -61,7 +61,8 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || true)
 [[ -n $repo_root ]] || die "not a git checkout"
 cd "$repo_root"
-[[ -s $HOME/.config/sops/age/keys.txt ]] || die "missing personal age key"
+[[ -s $HOME/.config/sops/age/keys.txt ]] ||
+  die "missing personal age key; run scripts/bootstrap --prepare to restore it from Apple Passwords"
 [[ -s secrets/secrets.yaml ]] || die "missing secrets/secrets.yaml"
 
 # shellcheck source=anix-config.sh

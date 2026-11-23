@@ -41,6 +41,39 @@ host bootstraps add each host key as a recipient:
 The recovery key is optional. Prepare offers to generate it and add it as a
 recipient; keep the private half offline.
 
+## Apple Passwords backup
+
+`apw` reads an encrypted snapshot of iCloud Passwords on Linux. `scripts/apw`
+wraps it for the personal age key, so the key can live in Apple Passwords, not
+only in a manual copy.
+
+On anix, install the binary with cargo and sign in:
+
+```sh
+scripts/install-apw
+apw login
+apw sync
+scripts/apw backup check
+```
+
+`scripts/bootstrap --prepare` offers to restore a missing personal key from
+Apple Passwords and to save a newly generated one. The login is named
+`anix-sops-age-key`; only the `AGE-SECRET-KEY-...` line is stored.
+
+To save an existing key by hand:
+
+```sh
+grep '^AGE-SECRET-KEY-' ~/.config/sops/age/keys.txt |
+  scripts/apw secret set anix-sops-age-key --stdin
+```
+
+The wrapper reads `~/.config/apw/sync.env` for `APW_PASSPHRASE` and
+`APW_ANISETTE_URL`, the same file the hourly timer uses. `APW_MODE=off` skips
+Apple Passwords; `APW_MODE=required` makes `--prepare` stop when `apw` cannot
+read the snapshot. `apw` needs an anisette server; the [apw install
+docs](https://github.com/win0na/apw/blob/main/docs/install.md) show the podman
+command.
+
 ## Add a secret
 
 1. Open the encrypted file:
@@ -102,6 +135,9 @@ SOPS_AGE_KEY_FILE=~/anix-recovery-YYYYMMDD.txt sops -d secrets/secrets.yaml
 `--prepare` names the file `~/anix-recovery-$(date +%Y%m%d).txt` unless you
 give another path.
 
+If the key is in Apple Passwords, `scripts/bootstrap --prepare` restores it to
+`~/.config/sops/age/keys.txt` when the file is missing.
+
 If the personal key is lost, generate a new one and make it a recipient:
 
 ```sh
@@ -133,5 +169,6 @@ recipient, and rebuild that host.
   can read its keys. Treat the Mac as an appliance on a trusted tailnet.
 - The personal key is a bearer credential. The password manager copy is a
   backup, not a runtime dependency.
-- `scripts/apw` is a stub for the Passwords.app adapter. Storage commands exit
-  `5`; anix never calls it.
+- `scripts/apw` is a thin adapter over [apw](https://github.com/win0na/apw).
+  It stores the personal age key as the `anix-sops-age-key` login in Apple
+  Passwords; only `secret get` prints it. `APW_MODE=off` disables it.

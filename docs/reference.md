@@ -43,6 +43,8 @@ sops-nix is pinned twice for the same reason.
 | `~/.config/sops/age/keys.txt` | both | Personal age key. |
 | `~/.ssh/mac-builder` | anix | Builder key before sops installs it. |
 | `~/.vscode/cli/token.json` | anix | Code tunnel OAuth state. |
+| `~/.local/bin/apw` | anix | apw binary from `scripts/install-apw`. |
+| `~/.config/apw/` | anix | apw config, snapshot, and sync timer. |
 | `/run/secrets/<name>` | both | Decrypted sops secrets at runtime. |
 | `~/.config/herdr` | both | Herdr config and palette. |
 | `/opt/local` | amac Intel | MacPorts prefix, with the shim's `Cellar` and `opt` links. |
@@ -102,7 +104,16 @@ code tunnel needs no inbound rule.
 | `scripts/herdr-ide` | Build the sidebar, agent, and ttt layout. Bound to `prefix+i`. |
 | `scripts/ttt-handoff vscode <path> [line] [col]` | Open a file in VS Code through the tunnel. |
 | `scripts/migrate-projects.sh` | Move projects into the configured root and leave symlinks. |
-| `scripts/apw <command>` | Stub for the Passwords.app adapter. Storage commands exit `5`. |
+| `scripts/install-apw` | Build apw with cargo into `~/.local/bin`; Linux only. |
+| `scripts/apw <command>` | Apple Passwords adapter: `available`, `version`, `secret`, `backup check`. |
+
+`scripts/apw` accepts `APW_MODE=auto|off|required`, `APW_BIN`, and
+`ANIX_APW_SECRET` (default `anix-sops-age-key`). It exits `0` on success, `1`
+on a verify mismatch, `3` when the login is absent, and `5` when apw or its
+snapshot is unavailable. `apw` itself reads `APW_PASSPHRASE` and
+`APW_ANISETTE_URL`; on anix, `--prepare` imports both from
+`~/.config/apw/sync.env`. `scripts/install-apw` takes `--path DIR` to build a
+local checkout and `--force` to replace an existing binary.
 
 `scripts/install` takes `--anix-user`, `--mac-user`, `--yes`, `--dry-run`,
 `--no-pull`, and `--ensure-nix`. `scripts/provision`, `scripts/bootstrap`, and

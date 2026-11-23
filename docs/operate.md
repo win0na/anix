@@ -64,7 +64,9 @@ switch still completes.
 ## Backups
 
 Keep two things outside the repository: the personal age key in a password
-manager, and the optional recovery key offline. The encrypted
+manager, and the optional recovery key offline. On anix, `scripts/install-apw`
+provides apw, `scripts/apw backup check` verifies the saved key, and `--prepare`
+restores a missing key from Apple Passwords or saves a new one. The encrypted
 `secrets/secrets.yaml` is committed to your fork and is the ciphertext backup.
 
 The repository holds the configuration. Projects live in the configured root

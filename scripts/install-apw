@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/install-apw [options]
+
+Build apw with cargo and install it to ~/.local/bin, which is on the anix
+session PATH. Linux only.
+
+Options:
+  --path DIR  Install from a local checkout instead of GitHub.
+  --force     Rebuild and replace an existing ~/.local/bin/apw.
+  -h, --help  Show this help and exit.
+
+The build uses the flake's nixpkgs for cargo, rustc, Zig, cmake, perl,
+pkg-config, dbus, and git, so it needs no Rust toolchain on PATH. The first
+build takes several minutes; later builds reuse the cargo cache.
+EOF
+}
+
+usage_error() {
+  printf 'error: %s\n' "$*" >&2
+  usage >&2
+  exit 2
+}
+
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+src_path=""
+force=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --path)
+      [[ $# -ge 2 && -n $2 ]] || usage_error "--path requires a directory"
+      src_path=$2
+      shift 2
+      ;;
+    --path=*)
+      src_path=${1#*=}
+      [[ -n $src_path ]] || usage_error "--path requires a directory"
+      shift
+      ;;
+    --force)
+      force=1
+      shift
+      ;;
+    *)
+      usage_error "unknown argument: $1"
+      ;;
+  esac
+done
+
+[[ "$(uname -s)" == Linux ]] || die "apw runs on Linux only"
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z $repo_root ]]; then
+  repo_root="$(cd "$script_dir/.." && pwd)"
+fi
+
+if ! command -v nix >/dev/null 2>&1; then
+  if [[ -x "$HOME/.nix-profile/bin/nix" ]]; then
+    PATH="$HOME/.nix-profile/bin:$PATH"
+    export PATH
+  elif [[ -x /nix/var/nix/profiles/default/bin/nix ]]; then
+    PATH="/nix/var/nix/profiles/default/bin:$PATH"
+    export PATH
+  fi
+fi
+command -v nix >/dev/null 2>&1 || die "nix not found; run scripts/install --ensure-nix first"
+
+target=$HOME/.local/bin/apw
+if [[ -x $target && $force -eq 0 ]]; then
+  "$target" --version
+  printf 'apw: already installed at %s; use --force to rebuild\n' "$target"
+  exit 0
+fi
+
+if [[ -n $src_path ]]; then
+  [[ -d $src_path ]] || die "not a directory: $src_path"
+  src_path="$(cd "$src_path" && pwd)"
+  source_desc="checkout $src_path"
+else
+  source_desc="github:win0na/apw"
+fi
+
+nix_flags=(--extra-experimental-features "nix-command flakes")
+printf '==> building apw from %s\n' "$source_desc"
+dbus_dev=$(nix "${nix_flags[@]}" build --no-link --print-out-paths \
+  --inputs-from "$repo_root" nixpkgs#dbus.dev)
+export PKG_CONFIG_PATH="$dbus_dev/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+
+cargo_args=(install --locked --root "$HOME/.local")
+if [[ -n $src_path ]]; then
+  cargo_args+=(--path "$src_path")
+else
+  cargo_args+=(--git https://github.com/win0na/apw)
+fi
+if [[ $force -eq 1 ]]; then
+  cargo_args+=(--force)
+fi
+
+nix "${nix_flags[@]}" shell --inputs-from "$repo_root" \
+  nixpkgs#cargo nixpkgs#rustc nixpkgs#zig nixpkgs#cmake nixpkgs#perl \
+  nixpkgs#pkg-config nixpkgs#dbus nixpkgs#git nixpkgs#gcc \
+  -c cargo "${cargo_args[@]}"
+
+[[ -x $target ]] || die "cargo finished but $target is missing"
+"$target" --version
+printf 'apw: installed at %s\n' "$target"

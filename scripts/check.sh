@@ -11,6 +11,7 @@ Validate the repository without installing anything:
   - run shellcheck on every scripts/ file from PATH or nixpkgs
   - parse scripts/bootstrap-windows.ps1 with pwsh
   - run the brew-shim Rust tests
+  - run the apw adapter self-test
   - run typos over the repository when typos is on PATH
 
 Options:
@@ -99,6 +100,9 @@ else
     cargo test --quiet --manifest-path "$repo_root/pkgs/brew-shim/Cargo.toml" ||
     fail "brew-shim tests failed"
 fi
+
+echo "==> apw adapter self-test"
+"$repo_root/scripts/apw" --self-test || fail "apw adapter self-test failed"
 
 echo "==> typos"
 if command -v typos >/dev/null 2>&1; then

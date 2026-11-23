@@ -185,6 +185,7 @@ the commands above.
 | Enable Remote Login | macOS | `bootstrap-mac-remote` reaches the Mac over SSH. |
 | Approve Terminal and App Management | macOS | The first `darwin-rebuild` touches protected paths. |
 | Install Xcode | macOS | Xcode needs an Apple ID and 2FA. |
+| Sign in to apw | anix | Optional: backs up the personal age key in Apple Passwords. |
 
 ## Flags
 
@@ -227,6 +228,20 @@ ssh amac uname -m
 `check.sh` evaluates both host configurations, parses the Windows helper with
 pwsh, and runs `bash -n`, shellcheck, and typos. The SSH command prints `arm64`
 on Apple silicon or `x86_64` on Intel.
+
+### Apple Passwords
+
+The personal age key can live in Apple Passwords. On anix:
+
+```sh
+~/.config/anix/scripts/install-apw
+apw login
+~/.config/anix/scripts/apw backup check
+```
+
+`--prepare` restores the key from there when `~/.config/sops/age/keys.txt` is
+missing. See [Secrets](secrets.md#apple-passwords-backup) for the anisette
+server and the passphrase.
 
 On the Mac, confirm the NFS mount and the editor stack:
 
