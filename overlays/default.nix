@@ -9,5 +9,6 @@ final: prev:
   nuvio = final.callPackage ../pkgs/nuvio { };
 }
 // prev.lib.optionalAttrs prev.stdenv.hostPlatform.isLinux {
+  anisette-server = final.callPackage ../pkgs/anisette-server { };
   vscode-cli = final.callPackage ../pkgs/vscode-cli { };
 }

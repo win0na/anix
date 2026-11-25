@@ -69,6 +69,23 @@ in
     };
   };
 
+  # apw signs in to Apple with device identity ("anisette") headers. The ADI
+  # service serves them locally, so no container has to be started by hand.
+  systemd.user.services.anisette = {
+    description = "Anisette ADI service for apw";
+    after = [ "network-online.target" ];
+    wantedBy = [ "default.target" ];
+    serviceConfig = {
+      ExecStartPre = "${pkgs.anisette-server}/bin/anisette-server --check --backend macos";
+      ExecStart = "${pkgs.anisette-server}/bin/anisette-server --backend windows --listen 127.0.0.1:6969 --state-dir %S/anisette";
+      # Provision on start so the first apw request is not the slow one.
+      ExecStartPost = "-${pkgs.curl}/bin/curl -fsS -o /dev/null --max-time 120 --retry 2 http://127.0.0.1:6969/";
+      StateDirectory = "anisette";
+      Restart = "on-failure";
+      RestartSec = 5;
+    };
+  };
+
   environment.systemPackages = with pkgs; [
     age
     basedpyright

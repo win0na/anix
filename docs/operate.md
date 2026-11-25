@@ -134,6 +134,23 @@ firewall rule is needed. The token is local OAuth state in
 VS Code on amac connects to the tunnel and opens the project root. The NFS
 mount is for Finder and other local tools, not for the editor.
 
+## Anisette service
+
+`apw` sends Apple device-identity headers on every sign-in and escrow request.
+`anisette-server` produces them from the ADI binaries Apple ships with macOS
+and iTunes. `pkgs/anisette-server` builds the server and pins the hashes of both
+binaries, so a switch installs both with the service.
+
+The user service listens on `127.0.0.1:6969` and stores one machine identity per
+backend under `~/.local/state/anisette`. Keep that directory: Apple ties the
+identity to the machine that provisioned it, and a new directory means a new
+provisioning. Check the service with:
+
+```sh
+systemctl --user status anisette
+curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:6969/
+```
+
 ## Power
 
 The Mac runs with the lid closed: `pmset` disables sleep and hibernation,

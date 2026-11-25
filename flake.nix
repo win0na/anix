@@ -139,6 +139,7 @@
           pkgsFor = channel: system: import channel { inherit system overlays; };
         in
         {
+          x86_64-linux.anisette-server = (pkgsFor nixpkgs "x86_64-linux").anisette-server;
           x86_64-linux.fff-mcp = (pkgsFor nixpkgs "x86_64-linux").fff-mcp;
           x86_64-linux.herdr = (pkgsFor nixpkgs "x86_64-linux").herdr;
           x86_64-linux.herdr-sidebar = (pkgsFor nixpkgs "x86_64-linux").herdr-sidebar;
