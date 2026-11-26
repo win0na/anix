@@ -48,8 +48,8 @@ wraps it for the personal age key, so the key can live in Apple Passwords, not
 only in a manual copy.
 
 On anix, install the binary with cargo and sign in. The host configuration runs
-an anisette service on `127.0.0.1:6969`, so no container is needed for
-`apw login` or `apw sync`.
+an anisette service on `127.0.0.1:6969`, so no container is needed for `apw
+login` or `apw sync`.
 
 ```sh
 scripts/install-apw
