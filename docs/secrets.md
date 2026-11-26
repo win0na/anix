@@ -47,9 +47,9 @@ recipient; keep the private half offline.
 wraps it for the personal age key, so the key can live in Apple Passwords, not
 only in a manual copy.
 
-On anix, install the binary with cargo and sign in. The host configuration runs
-an anisette service on `127.0.0.1:6969`, so no container is needed for `apw
-login` or `apw sync`.
+On anix, install the binary with cargo and sign in. Start an anisette server
+before `apw login`; the [apw install docs](https://github.com/win0na/apw/blob/main/docs/install.md)
+show the podman command.
 
 ```sh
 scripts/install-apw

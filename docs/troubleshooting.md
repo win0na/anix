@@ -217,14 +217,7 @@ The patched sidebar is not active. `herdr plugin list` should show the
 `scripts/apw backup check` exits `5` when `apw` cannot open the snapshot. Run
 `apw status` for the error. If it asks for a password, set `APW_PASSPHRASE` in
 `~/.config/apw/sync.env` or unlock Secret Service. If it reports a network or
-anisette error, check the service and run `apw login`:
-
-```sh
-systemctl --user status anisette
-curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:6969/
-```
-
-A `200` means the service answers.
+anisette error, start the anisette server and run `apw login`.
 
 An exit `3` means the snapshot is readable but the `anix-sops-age-key` login is
 missing. Save the key with the command the check prints.
