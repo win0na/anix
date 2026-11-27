@@ -24,6 +24,8 @@ teardown() {
 
   assert_mode "$nixos/.config/sops/age/keys.txt" 600
   assert_mode "$nixos/.ssh/mac-builder" 600
+  assert_mode "$nixos/.ssh/authorized_keys" 600
+  grep -q anix-device "$nixos/.ssh/authorized_keys"
 
   assert_file "$fx/system/switch.ok"
   assert_nonempty "$fx/mac/.config/anix/flake.nix"

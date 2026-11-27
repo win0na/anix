@@ -76,9 +76,9 @@ confirms the `users.nix` write, offers a backup of Ubuntu, and shows the
 directory checklist.
 
 `provision` exports Ubuntu, installs NixOS-WSL alongside it, transfers the
-repository and the projects you select, runs the anix bootstrap, and prepares
-the Mac. Ubuntu stays until both hosts pass, and it is removed only after you
-type the distribution name.
+repository, the keys (including `~/.ssh/authorized_keys`), and the projects
+you select, runs the anix bootstrap, and prepares the Mac. Ubuntu stays until
+both hosts pass, and it is removed only after you type the distribution name.
 
 The Mac phase needs the NFS export, and the export needs the WSL kernel
 modules, which load only when the WSL VM starts. If the kernel has not loaded

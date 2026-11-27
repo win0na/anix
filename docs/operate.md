@@ -150,9 +150,10 @@ The printed JSON carries `"ProtoVer":3`. Ports 61000-61999 must be reachable
 over UDP; on WSL, forward that range from Windows because the NAT does not pass
 inbound UDP on its own.
 
-`tsshd` needs an SSH login. The NixOS host sets `services.openssh.enable =
-false`, so tssh cannot reach it until OpenSSH is enabled or the connection goes
-through a host that runs sshd.
+`tsshd` needs an SSH login. `anix` runs OpenSSH with key authentication only,
+reachable from the Tailscale range on TCP 22, and opens UDP 61000-61999 to the
+same range. `scripts/provision` carries `~/.ssh/authorized_keys` into the new
+host, so the device key keeps working after the switch.
 
 ## VS Code tunnel
 

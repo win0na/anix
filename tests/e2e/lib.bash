@@ -25,6 +25,10 @@ e2e_setup() {
   chmod 600 "$fx/home/.config/sops/age/keys.txt"
   ssh-keygen -q -t ed25519 -N '' -C anix-builder -f "$fx/home/.ssh/mac-builder"
   chmod 600 "$fx/home/.ssh/mac-builder"
+  ssh-keygen -q -t ed25519 -N '' -C anix-device -f "$fx/home/.ssh/device"
+  chmod 600 "$fx/home/.ssh/device"
+  cp "$fx/home/.ssh/device.pub" "$fx/home/.ssh/authorized_keys"
+  chmod 600 "$fx/home/.ssh/authorized_keys"
   age-keygen -o "$fx/recovery.txt" 2>/dev/null
 
   local pub recovery builder

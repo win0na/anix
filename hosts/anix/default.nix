@@ -117,10 +117,18 @@ in
     }
   ];
 
-  # Generate the host key for sops without running an SSH daemon.
+  # Rootshel's tssh transport bootstraps from a normal SSH login, so the host
+  # runs sshd. Key authentication only, reachable from the Tailscale range.
+  # The host key still feeds sops-nix.
   services.openssh = {
-    enable = false;
+    enable = true;
     generateHostKeys = true;
+    openFirewall = false;
+    settings = {
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
+      PermitRootLogin = "no";
+    };
   };
 
   services.nfs.server = {
@@ -147,6 +155,8 @@ in
     enable = true;
     extraInputRules = ''
       ip saddr 100.64.0.0/10 tcp dport 2049 accept
+      ip saddr 100.64.0.0/10 tcp dport 22 accept
+      ip saddr 100.64.0.0/10 udp dport 61000-61999 accept
     '';
   };
 

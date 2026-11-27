@@ -80,6 +80,7 @@ Until the layout has run for a port, `brew --prefix <name>` still prints
 | Port | From | To | Use |
 | --- | --- | --- | --- |
 | 22 | anix | amac | Remote builds and the Mac bootstrap. |
+| 22 | Rootshel device | anix | tssh bootstrap; key authentication, Tailscale range only. |
 | 2049 | amac | Windows Tailscale node | NFSv4.1, forwarded to the WSL host. |
 | 443 | anix | Microsoft | Outbound code tunnel. |
 | 61000-61999/udp | Rootshel device | anix | tssh session transport; control mode needs it. |

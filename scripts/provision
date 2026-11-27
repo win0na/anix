@@ -426,21 +426,27 @@ else
     die "writing users.nix in $distro failed; rerun: scripts/provision ${original_args[*]:-}"
 fi
 
+key_files=(.config/sops/age/keys.txt .ssh/mac-builder)
+# The device authenticates to sshd with this key, and the new host disables
+# password logins, so provision must carry the file or SSH locks out.
+[[ -s $HOME/.ssh/authorized_keys ]] && key_files+=(.ssh/authorized_keys)
+
 say "Transferring keys and ${#selected[@]} project paths"
 if [[ $dry_run -eq 1 ]]; then
-  printf '  $ tar -C %s -cf - .config/sops/age/keys.txt .ssh/mac-builder | wsl.exe ...\n' "$HOME"
+  printf '  $ tar -C %s -cf - %s | wsl.exe ...\n' "$HOME" "${key_files[*]}"
   printf '  $ tar -C %s -cf - %s | wsl.exe ... (--keep-newer-files)\n' "$HOME" "${selected[*]}"
 else
   # Keys overwrite: a truncated transfer must not leave a 0-byte key that a
   # rerun keeps. Projects use --keep-newer-files so a truncated file is
   # replaced while a newer local edit survives.
-  tar -C "$HOME" -cf - .config/sops/age/keys.txt .ssh/mac-builder |
+  tar -C "$HOME" -cf - "${key_files[@]}" |
     wsl.exe -d "$distro" -u "$anix_user" --exec bash -lc '
       set -euo pipefail
       mkdir -p "$HOME/.config/sops/age" "$HOME/.ssh"
       tar -xf - -C "$HOME"
       chmod 700 "$HOME/.ssh" "$HOME/.config/sops/age"
       chmod 600 "$HOME/.ssh/mac-builder" "$HOME/.config/sops/age/keys.txt"
+      if [ -e "$HOME/.ssh/authorized_keys" ]; then chmod 600 "$HOME/.ssh/authorized_keys"; fi
       chmod 600 "$HOME/.config/anix/secrets/secrets.yaml" 2>/dev/null || true
       [ -s "$HOME/.config/sops/age/keys.txt" ] && [ -s "$HOME/.ssh/mac-builder" ]
     ' || die "transferring the keys to $distro failed; rerun: scripts/provision ${original_args[*]:-}"
