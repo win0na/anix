@@ -10,8 +10,8 @@ Usage: scripts/smoke [anix|amac]
 
 Read-only checks for a live host. Run on the host itself.
 
-  anix  code tunnel, NFS export, Headroom user service, Mac reachability,
-        and the Apple Passwords age-key backup.
+  anix  code tunnel, NFS export, Headroom user service, sshd and tsshd for
+        tssh, Mac reachability, and the Apple Passwords age-key backup.
   amac  Homebrew, MacPorts on Intel, and the NFS project mount.
 
 With no target, the OS picks anix on Linux and amac on Darwin.
@@ -53,6 +53,16 @@ case "$host" in
       pass "systemd user headroom"
     else
       fail "systemd user headroom is not active"
+    fi
+    if command -v tsshd >/dev/null 2>&1; then
+      pass "tsshd $(tsshd --version | awk '{ print $3 }')"
+    else
+      fail "tsshd is not on PATH"
+    fi
+    if systemctl is-active --quiet sshd; then
+      pass "systemd sshd"
+    else
+      fail "systemd sshd is not active"
     fi
     if [[ -r /run/secrets/mac-builder-key ]]; then
       pass "sops secret mac-builder-key"
