@@ -246,9 +246,10 @@ grep '^AGE-SECRET-KEY-' ~/.config/sops/age/keys.txt |
 
 `backup check` reports whether the login exists and, when
 `~/.config/sops/age/keys.txt` is present, whether it matches the local key.
-`--prepare` restores the key from there when the local file is missing. See
-[Secrets](secrets.md#apple-passwords-backup) for the anisette server and the
-passphrase.
+`--prepare` restores the key from there when the local file is missing. The
+first `apw login` provisions the device identity and may ask for a two-factor
+code and the escrow passcode. See [Secrets](secrets.md#apple-passwords-backup)
+for the identity and the passphrase.
 
 On the Mac, confirm the NFS mount and the editor stack:
 

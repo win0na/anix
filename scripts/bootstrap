@@ -319,9 +319,10 @@ checkout_notes() {
   fi
 }
 
-# apw keeps the headless passphrase and anisette URL in sync.env for its timer.
-# Import only those two keys so the backup works in the same non-interactive
-# session, without turning the file into a general environment source.
+# apw keeps the headless passphrase and an optional external anisette URL in
+# sync.env for its timer. Import only those two keys so the backup works in the
+# same non-interactive session, without turning the file into a general
+# environment source.
 load_apw_env() {
   local file=$HOME/.config/apw/sync.env key value
   [[ -r $file ]] || return 0

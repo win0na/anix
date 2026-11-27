@@ -47,9 +47,13 @@ recipient; keep the private half offline.
 wraps it for the personal age key, so the key can live in Apple Passwords, not
 only in a manual copy.
 
-On anix, install the binary with cargo and sign in. Start an anisette server
-before `apw login`; the [apw install docs](https://github.com/win0na/apw/blob/main/docs/install.md)
-show the podman command.
+On anix, `scripts/install-apw` builds apw and installs both the executable and
+its OpenTUI library. `apw` provisions the device identity in process, so it
+needs no anisette server. The first sign-in needs network access to Apple and
+may ask for a two-factor code and the escrow passcode; later sign-ins reuse
+`$XDG_STATE_HOME/apw/adi/macos.json` (or `windows.json` when Apple refuses the
+macOS profile). The [apw install docs](https://github.com/win0na/apw/blob/main/docs/install.md)
+cover the identity and the build.
 
 ```sh
 scripts/install-apw
@@ -73,10 +77,16 @@ grep '^AGE-SECRET-KEY-' ~/.config/sops/age/keys.txt |
   scripts/apw secret set anix-sops-age-key --stdin
 ```
 
+If you used a separate anisette service, delete `anisette_url` from
+`~/.config/apw/config.toml` and `APW_ANISETTE_URL` from `sync.env`; with either
+set, `apw` keeps using that server. Sign in again so the session uses the macOS
+identity that the escrow flow needs.
+
 `scripts/bootstrap --prepare` reads `~/.config/apw/sync.env` for
-`APW_PASSPHRASE` and `APW_ANISETTE_URL`, the same file the hourly timer uses.
-`APW_MODE=off` skips Apple Passwords; `APW_MODE=required` makes `--prepare`
-stop when `apw` cannot read the snapshot.
+`APW_PASSPHRASE`, the same file the hourly timer uses. It also imports
+`APW_ANISETTE_URL` when you deliberately use an external server. `APW_MODE=off`
+skips Apple Passwords; `APW_MODE=required` makes `--prepare` stop when `apw`
+cannot read the snapshot.
 
 ## Add a secret
 

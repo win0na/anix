@@ -58,9 +58,9 @@ find_apw() {
     return 1
   fi
   for candidate in \
+    "$HOME/.local/bin/apw" \
     "$(command -v apw 2>/dev/null || true)" \
     "$HOME/.cargo/bin/apw" \
-    "$HOME/.local/bin/apw" \
     /usr/local/bin/apw; do
     if [[ -n $candidate && -x $candidate ]]; then
       apw_bin=$candidate
@@ -125,7 +125,9 @@ cmd_available() {
     return 5
   fi
   find_apw || return 5
-  "$apw_bin" status --json </dev/null >/dev/null 2>&1 || return 5
+  # `status` reads state.json, not the snapshot, so it succeeds after the
+  # snapshot is gone. Listing entries opens the snapshot and proves the key.
+  "$apw_bin" list --json </dev/null >/dev/null 2>&1 || return 5
   return 0
 }
 
@@ -248,13 +250,19 @@ cmd_backup_check() {
   local name=${1:-${ANIX_APW_SECRET:-anix-sops-age-key}} status stored local_key
   validate_name "$name"
   require_apw
-  if ! "$apw_bin" --wide status </dev/null; then
-    unavailable "cannot read the Apple Passwords snapshot"
-  fi
+  # `get_value` opens the snapshot and returns 5 when it cannot, so this is
+  # both the read and the availability check. `status` only reads state.json,
+  # so print it only after the snapshot is known readable.
   set +e
   stored=$(get_value "$name")
   status=$?
   set -e
+  if [[ $status -eq 5 ]]; then
+    unavailable "cannot read the Apple Passwords snapshot"
+  fi
+  if ! "$apw_bin" --wide status </dev/null; then
+    unavailable "cannot read the Apple Passwords snapshot"
+  fi
   case "$status" in
     0)
       if [[ -r "$HOME/.config/sops/age/keys.txt" ]]; then
@@ -298,7 +306,18 @@ printf '%s\n' "$*" >> "$dir/calls.log"
 case "$1" in
   --version) printf 'apw 9.9.9-test\n'; exit 0 ;;
   status) printf '{"status":0,"data":{"account":"test","source":"fixture","entries":1}}\n'; exit 0 ;;
+  list)
+    if [[ -f "$dir/unavailable" ]]; then
+      printf '{"error":{"code":"auth","message":"no snapshot"},"status":4}\n' >&2
+      exit 4
+    fi
+    exit 0
+    ;;
   get)
+    if [[ -f "$dir/unavailable" ]]; then
+      printf '{"error":{"code":"auth","message":"no snapshot"},"status":4}\n' >&2
+      exit 4
+    fi
     name=${2:-}
     if [[ -f "$dir/values/$name" ]]; then cat "$dir/values/$name"; exit 0; fi
     exit 3
@@ -345,6 +364,14 @@ FAKE
 
   [[ $("$0" version) == 'apw 9.9.9-test' ]] || fail 'version'
   "$0" available || fail 'available'
+  touch "$tmp/unavailable"
+  set +e
+  "$0" available >/dev/null 2>&1
+  status=$?
+  set -e
+  [[ $status -eq 5 ]] || fail "available without a snapshot returned $status"
+  rm -f "$tmp/unavailable"
+  "$0" available || fail 'available after the snapshot returns'
   set +e
   "$0" secret exists missing >/dev/null 2>&1
   status=$?
@@ -364,6 +391,14 @@ FAKE
   grep -q '^edit backup-key' "$tmp/calls.log" || fail 'set did not edit'
   [[ $("$0" secret get backup-key) == 'value two' ]] || fail 'get after edit'
   "$0" backup check backup-key >/dev/null 2>&1 || fail 'backup check present'
+  touch "$tmp/unavailable"
+  set +e
+  output=$("$0" backup check backup-key 2>&1)
+  status=$?
+  set -e
+  [[ $status -eq 5 ]] || fail "backup check without a snapshot returned $status"
+  [[ $output != *Account* ]] || fail 'backup check printed stale state without a snapshot'
+  rm -f "$tmp/unavailable"
   "$0" secret delete backup-key 2>/dev/null || fail 'delete'
   set +e
   "$0" secret exists backup-key >/dev/null 2>&1

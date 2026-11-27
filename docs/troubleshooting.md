@@ -251,12 +251,23 @@ The action targets the focused pane, so tap the pane on the device first.
 ## apw cannot read the snapshot
 
 `scripts/apw backup check` exits `5` when `apw` cannot open the snapshot. Run
-`apw status` for the error. If it asks for a password, set `APW_PASSPHRASE` in
-`~/.config/apw/sync.env` or unlock Secret Service. If it reports a network or
-anisette error, start the anisette server and run `apw login`.
+`apw list --json` for the error; `apw status` only reads `state.json` and still
+succeeds when the snapshot is missing. If it asks for a password, set
+`APW_PASSPHRASE` in `~/.config/apw/sync.env` or unlock Secret Service. If it
+reports a network or identity error, confirm the first sign-in could reach
+Apple. Remove `anisette_url` or `APW_ANISETTE_URL` to use the native identity.
+Deleting `$XDG_STATE_HOME/apw/adi/` makes the next sign-in provision a new
+identity, but that costs an escrow attempt, and about ten failures destroy the
+recovery record. A `windows.json` there means Apple refused the macOS profile.
 
 An exit `3` means the snapshot is readable but the `anix-sops-age-key` login is
 missing. Save the key with the command the check prints.
+
+## apw cannot load libopentui.so
+
+The executable loads `../lib/apw/libopentui.so` relative to itself. Reinstall
+both files with `scripts/install-apw --force`; a binary from an older install
+has no library beside it.
 
 ## sops cannot decrypt
 

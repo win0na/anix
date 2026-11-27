@@ -44,7 +44,10 @@ branches. sops-nix is pinned twice for the same reason.
 | `~/.ssh/mac-builder` | anix | Builder key before sops installs it. |
 | `~/.vscode/cli/token.json` | anix | Code tunnel OAuth state. |
 | `~/.local/bin/apw` | anix | apw binary from `scripts/install-apw`. |
-| `~/.config/apw/` | anix | apw config, `sync.env`, and snapshot; the timer is a systemd user unit. |
+| `~/.local/lib/apw/libopentui.so` | anix | OpenTUI library that the apw binary loads. |
+| `~/.config/apw/` | anix | apw config and `sync.env`; the timer is a systemd user unit. |
+| `$XDG_DATA_HOME/apw/` | anix | Snapshot (`snapshot.bin`) and its lock. |
+| `$XDG_STATE_HOME/apw/` | anix | `state.json` and native device identities under `adi/`. |
 | `/run/secrets/<name>` | both | Decrypted sops secrets at runtime. |
 | `~/.config/herdr` | both | Herdr config and palette. |
 | `/opt/local` | amac Intel | MacPorts prefix, with the shim's `Cellar` and `opt` links. |
@@ -108,16 +111,18 @@ code tunnel needs no inbound rule.
 | `scripts/herdr-action <action>` | Run `ide`, `bar`, `sidebar`, or `ttt` from a Rootshel profile shortcut. |
 | `scripts/ttt-handoff vscode <path> [line] [col]` | Open a file in VS Code through the tunnel. |
 | `scripts/migrate-projects.sh` | Move projects into the configured root and leave symlinks. |
-| `scripts/install-apw` | Build apw with cargo into `~/.local/bin`; Linux only. |
+| `scripts/install-apw` | Build apw and install the executable and its OpenTUI library; Linux only. |
 | `scripts/apw <command>` | Apple Passwords adapter: `available`, `version`, `secret`, `backup check`. |
 
 `scripts/apw` accepts `APW_MODE=auto|off|required`, `APW_BIN`, and
 `ANIX_APW_SECRET` (default `anix-sops-age-key`). It exits `0` on success, `1`
-on a verify mismatch, `3` when the login is absent, and `5` when apw or its
-snapshot is unavailable. `apw` itself reads `APW_PASSPHRASE` and
-`APW_ANISETTE_URL`; on anix, `--prepare` imports both from
+on a verify mismatch, `2` on a usage or invalid request, `3` when the login is
+absent, and `5` when apw or its snapshot is unavailable. `apw` itself reads
+`APW_PASSPHRASE`; with no `APW_ANISETTE_URL` or `anisette_url`, it provisions
+the device identity in `$XDG_STATE_HOME/apw/adi/`. On anix, `--prepare` imports
+the passphrase and an optional external server URL from
 `~/.config/apw/sync.env`. `scripts/install-apw` takes `--path DIR` to build a
-local checkout and `--force` to replace an existing binary.
+local checkout and `--force` to replace an existing install.
 
 `scripts/install` takes `--anix-user`, `--mac-user`, `--yes`, `--dry-run`,
 `--no-pull`, and `--ensure-nix`. `scripts/provision`, `scripts/bootstrap`, and
