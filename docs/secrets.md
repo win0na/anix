@@ -47,12 +47,12 @@ recipient; keep the private half offline.
 wraps it for the personal age key, so the key can live in Apple Passwords, not
 only in a manual copy.
 
-On anix, `scripts/install-apw` builds apw and installs both the executable and
-its OpenTUI library. `apw` provisions the device identity in process, so it
-needs no anisette server. The first sign-in needs network access to Apple and
-may ask for a two-factor code and the escrow passcode; later sign-ins reuse
-`$XDG_STATE_HOME/apw/adi/macos.json` (or `windows.json` when Apple refuses the
-macOS profile). The [apw install docs](https://github.com/win0na/apw/blob/main/docs/install.md)
+On anix, `scripts/install-apw` builds apw and installs the executable; OpenTUI
+is linked in, so there is no separate library. `apw` provisions the device
+identity in process, so it needs no anisette server. The first sign-in needs
+network access to Apple and may ask for a two-factor code and the escrow
+passcode; later sign-ins reuse `$XDG_STATE_HOME/apw/adi/macos.json` (or
+`windows.json` when Apple refuses the macOS profile). The [apw install docs](https://github.com/win0na/apw/blob/main/docs/install.md)
 cover the identity and the build.
 
 ```sh

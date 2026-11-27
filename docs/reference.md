@@ -44,7 +44,7 @@ branches. sops-nix is pinned twice for the same reason.
 | `~/.ssh/mac-builder` | anix | Builder key before sops installs it. |
 | `~/.vscode/cli/token.json` | anix | Code tunnel OAuth state. |
 | `~/.local/bin/apw` | anix | apw binary from `scripts/install-apw`. |
-| `~/.local/lib/apw/libopentui.so` | anix | OpenTUI library that the apw binary loads. |
+| `~/.local/lib/apw/` | anix | apw revision/hash stamp and GC roots for its Nix store libraries; keep it. |
 | `~/.config/apw/` | anix | apw config and `sync.env`; the timer is a systemd user unit. |
 | `$XDG_DATA_HOME/apw/` | anix | Snapshot (`snapshot.bin`) and its lock. |
 | `$XDG_STATE_HOME/apw/` | anix | `state.json` and native device identities under `adi/`. |
@@ -111,7 +111,7 @@ code tunnel needs no inbound rule.
 | `scripts/herdr-action <action>` | Run `ide`, `bar`, `sidebar`, or `ttt` from a Rootshel profile shortcut. |
 | `scripts/ttt-handoff vscode <path> [line] [col]` | Open a file in VS Code through the tunnel. |
 | `scripts/migrate-projects.sh` | Move projects into the configured root and leave symlinks. |
-| `scripts/install-apw` | Build apw and install the executable and its OpenTUI library; Linux only. |
+| `scripts/install-apw` | Build apw and install the executable; OpenTUI is linked in. Linux only. |
 | `scripts/apw <command>` | Apple Passwords adapter: `available`, `version`, `secret`, `backup check`. |
 
 `scripts/apw` accepts `APW_MODE=auto|off|required`, `APW_BIN`, and

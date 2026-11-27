@@ -48,10 +48,14 @@ case "$mode" in
 esac
 
 apw_bin=""
+apw_starts() {
+  [[ -x $1 ]] && "$1" --version </dev/null >/dev/null 2>&1
+}
+
 find_apw() {
   local candidate
   if [[ -n ${APW_BIN:-} ]]; then
-    if [[ -x $APW_BIN ]]; then
+    if apw_starts "$APW_BIN"; then
       apw_bin=$APW_BIN
       return 0
     fi
@@ -62,7 +66,7 @@ find_apw() {
     "$(command -v apw 2>/dev/null || true)" \
     "$HOME/.cargo/bin/apw" \
     /usr/local/bin/apw; do
-    if [[ -n $candidate && -x $candidate ]]; then
+    if apw_starts "$candidate"; then
       apw_bin=$candidate
       return 0
     fi
@@ -75,7 +79,7 @@ require_apw() {
     unavailable "disabled by APW_MODE=off"
   fi
   if ! find_apw; then
-    unavailable "apw is not installed; run scripts/install-apw"
+    unavailable "apw is not installed or cannot start; run scripts/install-apw"
   fi
 }
 
@@ -215,6 +219,10 @@ cmd_secret_delete() {
     3)
       printf 'apw: %s is not present\n' "$name" >&2
       return 0
+      ;;
+    2)
+      printf 'apw: %s matches more than one entry\n' "$name" >&2
+      return 2
       ;;
     *) unavailable "could not delete $name" ;;
   esac

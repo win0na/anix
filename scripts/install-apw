@@ -5,18 +5,20 @@ usage() {
   cat <<'EOF'
 Usage: scripts/install-apw [options]
 
-Build apw with cargo and install the executable to ~/.local/bin and its OpenTUI
-library to ~/.local/lib/apw. Linux only.
+Build apw with cargo and install the executable to ~/.local/bin. Linux only.
+OpenTUI is linked statically, so the installed binary needs no separate library.
 
 Options:
-  --path DIR  Install from a local checkout instead of GitHub.
+  --path DIR  Install from a local checkout instead of GitHub; the OpenTUI
+              build writes its native artifacts into that checkout.
   --force     Rebuild and replace an existing install.
   -h, --help  Show this help and exit.
 
 The remote fetch uses git on PATH. The build uses the flake's nixpkgs for cargo,
 rustc, Zig 0.17, pkg-config, dbus, and gcc, so it needs no Rust toolchain on
 PATH. The source and build caches live under ~/.cache/anix/apw; later builds
-reuse them.
+reuse them. The installed binary needs glibc, libdbus-1, libgcc_s, and
+libsystemd at runtime.
 EOF
 }
 
@@ -62,14 +64,8 @@ done
 [[ "$(uname -s)" == Linux ]] || die "apw runs on Linux only"
 
 case "$(uname -m)" in
-  x86_64 | amd64)
-    platform=x86_64-linux
-    target_triple=x86_64-unknown-linux-gnu
-    ;;
-  aarch64 | arm64)
-    platform=aarch64-linux
-    target_triple=aarch64-unknown-linux-gnu
-    ;;
+  x86_64 | amd64) target_triple=x86_64-unknown-linux-gnu ;;
+  aarch64 | arm64) target_triple=aarch64-unknown-linux-gnu ;;
   *) die "unsupported architecture: $(uname -m)" ;;
 esac
 
@@ -92,7 +88,6 @@ command -v nix >/dev/null 2>&1 || die "nix not found; run scripts/install --ensu
 
 cache_root=${XDG_CACHE_HOME:-$HOME/.cache}/anix/apw
 target=$HOME/.local/bin/apw
-lib_target=$HOME/.local/lib/apw/libopentui.so
 stamp=$HOME/.local/lib/apw/rev
 
 if [[ -n $src_path ]]; then
@@ -100,20 +95,30 @@ if [[ -n $src_path ]]; then
   checkout="$(cd "$src_path" && pwd)"
   source_desc="checkout $checkout"
   want="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || printf 'path:%s' "$checkout")"
+  if git -C "$checkout" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    want="$want:$(git -C "$checkout" diff --no-ext-diff --ignore-submodules=all HEAD -- . |
+      sha256sum | cut -d' ' -f1)"
+  fi
 else
   command -v git >/dev/null 2>&1 || die "git not found"
-  apw_rev=584748f5a1275ce81e9d017b1d4be5e2ad9927a0
+  apw_rev=8b6a206f8e128af616b64bc1c14a955a03307eb0
   source_desc="github:win0na/apw@${apw_rev:0:7}"
   checkout=$cache_root/src
-  want=$apw_rev
+  want="$apw_rev:$(printf '' | sha256sum | cut -d' ' -f1)"
 fi
 
-if [[ -x $target && -f $lib_target && -f $stamp && $force -eq 0 && $(<"$stamp") == "$want" ]]; then
-  if "$target" --version; then
-    printf 'apw: already installed at %s; use --force to rebuild\n' "$target"
-    exit 0
+if [[ -x $target && -f $stamp && $force -eq 0 ]]; then
+  installed_want=""
+  installed_hash=""
+  { IFS= read -r installed_want; IFS= read -r installed_hash; } <"$stamp"
+  current_hash=$(sha256sum "$target" | cut -d' ' -f1)
+  if [[ $installed_want == "$want" && $installed_hash == "$current_hash" ]]; then
+    if "$target" --version; then
+      printf 'apw: already installed at %s; use --force to rebuild\n' "$target"
+      exit 0
+    fi
+    printf 'apw: existing install cannot run; rebuilding\n' >&2
   fi
-  printf 'apw: existing install cannot run; rebuilding\n' >&2
 fi
 
 if [[ -z $src_path ]]; then
@@ -153,23 +158,33 @@ export PKG_CONFIG_PATH="$dbus_dev/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_P
 )
 
 binary=$CARGO_TARGET_DIR/$target_triple/release/apw
-library=$checkout/opentui/packages/native/lib/$platform/libopentui.so
 [[ -x $binary ]] || die "cargo finished but $binary is missing"
-[[ -f $library ]] || die "cargo finished but $library is missing"
 
-install -Dm644 "$library" "$lib_target"
 install -Dm755 "$binary" "$target"
 "$target" --version
-mkdir -p "$(dirname "$stamp")"
-printf '%s\n' "$want" >"$stamp"
-chmod 644 "$stamp"
+# OpenTUI is static now; remove the library from an older install.
+rm -f "$HOME/.local/lib/apw/libopentui.so"
 
 # The cargo build links glibc, dbus, and libgcc from the nix shell, not from a
 # profile. Root those store paths or `nix-collect-garbage` removes them and the
 # installed binary cannot start.
 root_runtime_deps() {
-  local root_dir=$HOME/.local/lib/apw/deps
-  local nix_bin nix_dir nix_store i=0 dep
+  local root_base=$HOME/.local/lib/apw/deps
+  local nix_bin nix_dir nix_store gen dep i=0 failures=0
+  local -a deps=()
+
+  while IFS= read -r dep; do
+    deps+=("$dep")
+  done < <(ldd "$target" 2>/dev/null |
+    awk '/=> \/nix\/store/ {print $3} /^[[:space:]]*\/nix\/store/ {print $1}' |
+    sed -E 's|^(/nix/store/[^/]+).*|\1|' |
+    sort -u)
+
+  if ((${#deps[@]} == 0)); then
+    printf 'apw: no Nix store runtime paths to root\n' >&2
+    return 0
+  fi
+
   nix_store=$(command -v nix-store 2>/dev/null || true)
   if [[ -z $nix_store ]]; then
     nix_bin=$(command -v nix 2>/dev/null || true)
@@ -180,20 +195,36 @@ root_runtime_deps() {
   fi
   if [[ -z $nix_store ]]; then
     printf 'apw: nix-store not found; runtime libraries are not GC-rooted\n' >&2
-    return 0
+    return 1
   fi
 
-  rm -rf "$root_dir"
-  mkdir -p "$root_dir"
-  while IFS= read -r dep; do
-    [[ $dep == /nix/store/* ]] || continue
+  gen=$root_base/$(date +%s).$$
+  mkdir -p "$gen" || return 1
+  for dep in "${deps[@]}"; do
     i=$((i + 1))
-    "$nix_store" --add-root "$root_dir/$i" --indirect -r "$dep" >/dev/null 2>&1 ||
+    "$nix_store" --add-root "$gen/$i" --indirect -r "$dep" >/dev/null 2>&1 || {
       printf 'apw: could not root %s\n' "$dep" >&2
-  done < <(ldd "$target" "$lib_target" 2>/dev/null |
-    awk '/=> \/nix\/store/ {print $3} /^[[:space:]]*\/nix\/store/ {print $1}')
-  printf 'apw: rooted %d runtime store path(s)\n' "$i"
+      failures=1
+    }
+  done
+  if ((failures)); then
+    printf 'apw: runtime roots are incomplete under %s\n' "$gen" >&2
+    rm -rf "$gen"
+    return 1
+  fi
+
+  # Keep the new generation and drop older roots.
+  find "$root_base" -mindepth 1 -maxdepth 1 ! -path "$gen" -exec rm -rf {} + || true
+  printf 'apw: rooted %d runtime store path(s) under %s\n' "$i" "$gen"
 }
 
-root_runtime_deps
-printf 'apw: installed at %s with %s\n' "$target" "$lib_target"
+if ! root_runtime_deps; then
+  die "apw is installed but its runtime libraries are not GC-rooted; rerun scripts/install-apw"
+fi
+mkdir -p "$(dirname "$stamp")"
+{
+  printf '%s\n' "$want"
+  sha256sum "$target" | cut -d' ' -f1
+} >"$stamp"
+chmod 644 "$stamp"
+printf 'apw: installed at %s\n' "$target"

@@ -263,11 +263,13 @@ recovery record. A `windows.json` there means Apple refused the macOS profile.
 An exit `3` means the snapshot is readable but the `anix-sops-age-key` login is
 missing. Save the key with the command the check prints.
 
-## apw cannot load libopentui.so
+## apw cannot start
 
-The executable loads `../lib/apw/libopentui.so` relative to itself. Reinstall
-both files with `scripts/install-apw --force`; a binary from an older install
-has no library beside it.
+The installed binary needs glibc, `libdbus-1`, `libgcc_s`, and `libsystemd` from
+the Nix store. `scripts/install-apw` roots those paths under
+`~/.local/lib/apw/deps/` and rerunning it rebuilds when the existing binary
+cannot run. The binary is host-bound to those paths, so copying it to another
+machine does not work.
 
 ## sops cannot decrypt
 
