@@ -143,6 +143,7 @@
           x86_64-linux.herdr = (pkgsFor nixpkgs "x86_64-linux").herdr;
           x86_64-linux.herdr-sidebar = (pkgsFor nixpkgs "x86_64-linux").herdr-sidebar;
           x86_64-linux.ttt = (pkgsFor nixpkgs "x86_64-linux").ttt;
+          x86_64-linux.tsshd = (pkgsFor nixpkgs "x86_64-linux").tsshd;
           aarch64-darwin.brew-shim = (pkgsFor nixpkgs-2605 "aarch64-darwin").brew-shim;
           aarch64-darwin.fff-mcp = (pkgsFor nixpkgs-2605 "aarch64-darwin").fff-mcp;
           aarch64-darwin.herdr = (pkgsFor nixpkgs-2605 "aarch64-darwin").herdr;

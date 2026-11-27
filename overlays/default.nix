@@ -9,5 +9,6 @@ final: prev:
   nuvio = final.callPackage ../pkgs/nuvio { };
 }
 // prev.lib.optionalAttrs prev.stdenv.hostPlatform.isLinux {
+  tsshd = final.callPackage ../pkgs/tsshd { };
   vscode-cli = final.callPackage ../pkgs/vscode-cli { };
 }

@@ -82,6 +82,7 @@ Until the layout has run for a port, `brew --prefix <name>` still prints
 | 22 | anix | amac | Remote builds and the Mac bootstrap. |
 | 2049 | amac | Windows Tailscale node | NFSv4.1, forwarded to the WSL host. |
 | 443 | anix | Microsoft | Outbound code tunnel. |
+| 61000-61999/udp | Rootshel device | anix | tssh session transport; control mode needs it. |
 
 The anix firewall accepts NFS from `100.64.0.0/10`, the Tailscale range. The
 code tunnel needs no inbound rule.
@@ -103,6 +104,7 @@ code tunnel needs no inbound rule.
 | `scripts/ios <project> <scheme> <udid>` | Build an iOS app on the Mac and install it; `--build-only` skips the device. |
 | `scripts/install-herdr-plugins.sh` | Link the first-party sidebar plugin and list the set. |
 | `scripts/herdr-ide` | Build the sidebar, agent, and ttt layout. Bound to `prefix+i`. |
+| `scripts/herdr-action <action>` | Run `ide`, `bar`, `sidebar`, or `ttt` from a Rootshel profile shortcut. |
 | `scripts/ttt-handoff vscode <path> [line] [col]` | Open a file in VS Code through the tunnel. |
 | `scripts/migrate-projects.sh` | Move projects into the configured root and leave symlinks. |
 | `scripts/install-apw` | Build apw with cargo into `~/.local/bin`; Linux only. |
@@ -141,6 +143,7 @@ The NixOS NFS export and `scripts/rebuild` use the fixed names `anix` and
 | --- | --- |
 | NixOS-WSL image | 2605.7.2, SHA-256 `e7180ad555fdcb8e1e057e2ef056de467603a5e502ff8531053738371be3f6b9` |
 | Herdr | 0.9.5, rootshell channel 0.1.10 |
+| tsshd | 0.1.10, rootshell fork at `269df07a` |
 | ttt | 1.11.0 |
 | fff-mcp | 0.11.0 |
 | VS Code CLI | 1.145.2 |
@@ -149,6 +152,8 @@ The NixOS NFS export and `scripts/rebuild` use the fixed names `anix` and
 
 The Herdr fork is `kitknox/herdr` at tag `rootshell-v0.1.10`, commit
 `174c202`. The sidebar plugin is `alexarthurs/herdr-sidebar` at `081ed13`.
+`tsshd` is `kitknox/tsshd-rootshell` at commit `269df07a`; the Ubuntu PPA
+build is protocol 1 and does not support Herdr's control stream.
 
 ## macOS host
 

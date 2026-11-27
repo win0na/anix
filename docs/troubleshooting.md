@@ -212,6 +212,42 @@ The patched sidebar is not active. `herdr plugin list` should show the
 `herdr-sidebar` path in the Nix store, not a GitHub checkout. Rebuild and rerun
 `scripts/install-herdr-plugins.sh`.
 
+## Rootshel does not use control mode
+
+Rootshell falls back to a plain terminal when the server or the transport does
+not support a control stream. Check both ends:
+
+```sh
+herdr --version    # 0.9.5-rootshell.0.1.10 or newer
+printf '' | timeout 10 herdr control
+```
+
+The first JSON line carries `"terminal_control_stream":3` and a
+`control_features` list with `pane_geometry`. No line, or an error, means the
+Herdr build is not the rootshell fork.
+
+Control mode also needs tssh:
+
+```sh
+tsshd --version    # trzsz sshd 0.1.10
+tsshd --attachable --port 61000-61999 --kcp
+```
+
+The JSON must say `"ProtoVer":3`; the Ubuntu PPA build says 1. Mosh cannot
+carry the control stream. On WSL, forward UDP 61000-61999 from Windows.
+
+## A profile shortcut does nothing
+
+`herdr-action` needs Herdr, `jq`, and `ttt` on the login `PATH`, or
+`HERDR_BIN_PATH` set. Run it from an SSH shell to see the error:
+
+```sh
+herdr-action ide
+```
+
+For a named session, prefix the profile command with `HERDR_SESSION=<name>`.
+The action targets the focused pane, so tap the pane on the device first.
+
 ## apw cannot read the snapshot
 
 `scripts/apw backup check` exits `5` when `apw` cannot open the snapshot. Run

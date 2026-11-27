@@ -124,6 +124,36 @@ nix build --no-link .#packages.aarch64-darwin.herdr
 nix build --no-link .#packages.x86_64-darwin.herdr
 ```
 
+## tssh transport
+
+Rootshell reaches the host through tssh. A normal SSH login runs one `tsshd`
+per session, the session moves to UDP, and the SSH connection carries only the
+bootstrap. Herdr's control mode needs the auxiliary channel tssh provides;
+Mosh has none.
+
+The repo packages rootshell's fork, which speaks protocol 3. The Ubuntu PPA
+build speaks protocol 1 and cannot carry the control stream.
+
+```sh
+nix build .#tsshd
+sudo install -m755 result/bin/tsshd /usr/local/bin/tsshd
+tsshd --version    # trzsz sshd 0.1.10
+```
+
+Start it by hand to confirm the protocol:
+
+```sh
+tsshd --attachable --port 61000-61999 --kcp
+```
+
+The printed JSON carries `"ProtoVer":3`. Ports 61000-61999 must be reachable
+over UDP; on WSL, forward that range from Windows because the NAT does not pass
+inbound UDP on its own.
+
+`tsshd` needs an SSH login. The NixOS host sets `services.openssh.enable =
+false`, so tssh cannot reach it until OpenSSH is enabled or the connection goes
+through a host that runs sshd.
+
 ## VS Code tunnel
 
 anix runs Microsoft's `code tunnel` as a systemd service. It connects outbound

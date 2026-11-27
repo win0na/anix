@@ -89,6 +89,7 @@ in
     sops
     ssh-to-age
     ttt
+    tsshd
     typos
     typescript-language-server
     vscode-cli

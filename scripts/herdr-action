@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Run one Rootshel profile shortcut.
+#
+# A control-mode client sends Herdr raw terminal bytes and never triggers the
+# TUI keybindings, so every keybind that must survive gets an explicit
+# command. Point a Rootshel profile at this script, one action per profile.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: herdr-action <action>
+
+Run a Herdr workflow from outside a pane, for a Rootshel profile shortcut.
+
+Actions:
+  ide      IDE layout: sidebar, agent, ttt (same as prefix+i)
+  bar      herdr-bar as a full-tab overlay (same as prefix+k)
+  sidebar  Open or focus the explorer sidebar
+  ttt      Open ttt in a new pane (same as prefix+e)
+
+Environment:
+  HERDR_BIN_PATH   Herdr binary. Defaults to PATH, then the hand install.
+  HERDR_SESSION    Named session. Defaults to Herdr's default session.
+
+Options:
+  -h, --help  Show this help and exit.
+EOF
+}
+
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+  "") usage >&2; exit 2 ;;
+esac
+
+if [ -n "${HERDR_BIN_PATH:-}" ] && [ -x "$HERDR_BIN_PATH" ]; then
+  herdr=$HERDR_BIN_PATH
+elif command -v herdr >/dev/null 2>&1; then
+  herdr=$(command -v herdr)
+elif [ -x "$HOME/.local/opt/herdr-rootshell/bin/herdr" ]; then
+  herdr=$HOME/.local/opt/herdr-rootshell/bin/herdr
+else
+  echo "herdr-action: herdr is not on PATH" >&2
+  exit 1
+fi
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+
+case "$1" in
+  ide)
+    exec "$script_dir/herdr-ide"
+    ;;
+  bar)
+    # herdr-bar ships its own popup manifest. The overlay placement is legal
+    # on the same entrypoint and closes itself when the bar exits.
+    exec "$herdr" plugin pane open \
+      --plugin herdr-bar \
+      --entrypoint bar \
+      --placement overlay
+    ;;
+  sidebar)
+    exec "$herdr" plugin action invoke herdr-sidebar.show-explorer
+    ;;
+  ttt)
+    exec "$herdr" plugin pane open --plugin ttt.editor --entrypoint editor
+    ;;
+  *)
+    echo "herdr-action: unknown action: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

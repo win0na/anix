@@ -7,6 +7,7 @@
   };
 
   home.file.".local/bin/herdr-ide".source = ../../../scripts/herdr-ide;
+  home.file.".local/bin/herdr-action".source = ../../../scripts/herdr-action;
 
   # Replace the GitHub herdr-sidebar with the single-ttt-pane build.
   home.activation.herdrSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

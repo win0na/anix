@@ -26,7 +26,18 @@ case "${1:-}" in
   *) echo "herdr-ide: unknown argument: $1" >&2; usage >&2; exit 2 ;;
 esac
 
-herdr=${HERDR_BIN_PATH:-herdr}
+# A Rootshel profile shortcut runs this over SSH exec, outside a pane, so
+# HERDR_BIN_PATH is unset and a hand-installed Herdr is not on PATH.
+if [ -n "${HERDR_BIN_PATH:-}" ] && [ -x "$HERDR_BIN_PATH" ]; then
+  herdr=$HERDR_BIN_PATH
+elif command -v herdr >/dev/null 2>&1; then
+  herdr=$(command -v herdr)
+elif [ -x "$HOME/.local/opt/herdr-rootshell/bin/herdr" ]; then
+  herdr=$HOME/.local/opt/herdr-rootshell/bin/herdr
+else
+  echo "herdr-ide: herdr is not on PATH" >&2
+  exit 1
+fi
 command -v jq >/dev/null || { echo "herdr-ide: jq is required" >&2; exit 1; }
 
 state=$("$herdr" pane list)

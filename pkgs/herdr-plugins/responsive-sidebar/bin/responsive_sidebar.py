@@ -7,6 +7,12 @@ only owns the server-side herdr-sidebar pane:
   wide tab   -> docked split, managed by herdr-sidebar itself
   narrow tab -> full-screen overlay, opened by this plugin
 
+A Rootshel control client renders the layout itself, so the watcher stands
+down while any control stream is attached: it closes the overlays it opened,
+opens nothing, and resumes when the stream goes away. Polling
+`control.list` is the only way a plugin can see that, since control streams
+are not panes.
+
 A detached watcher polls `session.snapshot` because herdr does not deliver
 resize or layout events to plugin hooks. Tab `area.width` is the width of the
 tab surface, so opening or closing a split does not move the breakpoint.
@@ -127,6 +133,26 @@ def snapshot() -> dict[str, Any]:
     if not isinstance(snap, dict):
         raise ApiError("session.snapshot: no snapshot")
     return snap
+
+
+def control_client_present() -> bool:
+    """True while a control stream (Rootshell) is driving the layout.
+
+    The stream renders tabs, splits, and overlays itself, so this plugin's
+    dock/overlay choreography would fight it. An older server has no
+    control.list; that counts as no control client.
+    """
+    try:
+        result = api("control.list")
+    except (ApiError, OSError, ValueError):
+        return False
+    connections = result.get("connections", [])
+    if not isinstance(connections, list):
+        return False
+    return any(
+        isinstance(conn, dict) and int(conn.get("control_protocol") or 0) > 0
+        for conn in connections
+    )
 
 
 def layouts_by_tab(snap: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -285,6 +311,9 @@ def resolve_tab(snap: dict[str, Any]) -> str:
 
 def cmd_toggle() -> int:
     cfg = load_config()
+    if control_client_present():
+        log("toggle ignored: a control client owns the layout")
+        return 0
     snap = snapshot()
     layouts = layouts_by_tab(snap)
     tab_id = resolve_tab(snap)
@@ -340,6 +369,7 @@ def watch() -> int:
     sidebar_hits: dict[str, int] = {}
     sentinel = object()
     failures = 0
+    control_mode = False
     log(
         f"watcher start min_columns={min_columns} poll={poll:.2f}s "
         f"open_on_start={cfg['open_on_start']} open_on_focus={cfg['open_on_focus']}"
@@ -363,6 +393,22 @@ def watch() -> int:
         focused = focused_tab_id(snap)
         now = time.monotonic()
         first_pass = not last_width
+
+        if control_client_present():
+            if not control_mode:
+                log("control client attached; watcher idle")
+                control_mode = True
+                for pane_id in load_overlays().values():
+                    try_close(pane_id, plugin_pane=True)
+                save_overlays({})
+                last_width.clear()
+                last_focused = ""
+                sidebar_hits.clear()
+            time.sleep(poll)
+            continue
+        if control_mode:
+            log("control client detached; watcher resumed")
+            control_mode = False
 
         for tab_id, layout in layouts.items():
             width = int(layout.get("area", {}).get("width", 0))
